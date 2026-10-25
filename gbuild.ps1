@@ -584,9 +584,12 @@ if ([string]::IsNullOrWhiteSpace($nativeProject)) {
         $__found = @($__candidates)
         Remove-Variable -Name __runLocation,__tempFiles,__priorState,__projectRoot,__volumeRoot,__resolved,__pu,__refusal,__candidates -ErrorAction SilentlyContinue
         if ($__refusalKind -eq 'volume-root') {
-            Write-Host (Get-LocaleMessage -Key 'log.launcher.volumeRootRefusal' -MessageArgs @($__refusedFrom)) -ForegroundColor Red
-            Write-Host ('        ' + (Get-LocaleMessage -Key 'log.launcher.volumeRootHint1')) -ForegroundColor Red
-            Write-Host ('        ' + (Get-LocaleMessage -Key 'log.launcher.volumeRootHint2')) -ForegroundColor Red
+            if (-not (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue)) {
+                $null = Import-Module (Join-Path $PSScriptRoot 'Modules/Locale.psm1') -Global -DisableNameChecking -ErrorAction SilentlyContinue
+            }
+            Write-Host (Get-LocaleMessage -Key 'log.launcher.volumeRootRefusal' -MessageArgs @($__refusedFrom) -Fallback 'Refusing to build from a volume root: {0}') -ForegroundColor Red
+            Write-Host ('        ' + (Get-LocaleMessage -Key 'log.launcher.volumeRootHint1' -Fallback 'A volume root cannot be a project.')) -ForegroundColor Red
+            Write-Host ('        ' + (Get-LocaleMessage -Key 'log.launcher.volumeRootHint2' -Fallback 'Run gbuild from inside a project directory.')) -ForegroundColor Red
         } else {
             # Routed through the locale layer: a refusal is the first thing a
             # user in a non-English locale sees, and ProcessMetrics.psm1's
