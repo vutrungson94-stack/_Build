@@ -449,7 +449,11 @@ function Test-BuildVolumeRoot {
         $root = [System.IO.Path]::GetPathRoot($full)
         if ([string]::IsNullOrEmpty($root)) { return $false }
         $rootTrim = $root.TrimEnd('\', '/')
-        if ([string]::IsNullOrEmpty($rootTrim)) { return $true }   # POSIX '/'
+        # POSIX root is '/' itself; only a path that IS the root counts as a
+        # volume root. Trimming '/' from '/' yields '' for EVERY POSIX path's
+        # root, so test the full path against the root, not against the trimmed
+        # root (which is '' for all '/'-rooted paths).
+        if ([string]::IsNullOrEmpty($rootTrim)) { return ($full -eq '/' -or $full -eq $root) }
         return ($full -eq $rootTrim)
     } catch { return $false }
 }
