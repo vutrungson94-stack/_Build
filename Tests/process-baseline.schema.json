@@ -1,0 +1,212 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/gbuild/_Build/Tests/process-baseline.schema.json",
+    "title": "gbuild verification-process baseline",
+    "description": "Structural contract for Tests/process-baseline.json, the versioned artefact that records how well the verification process itself is doing. This schema exists so the `$schema` reference in the baseline resolves to a real file that is actually enforced: until now the pointer named a path on a repository that does not exist, so nothing validated the file and a structural regression in the baseline would have shipped silently. Tests/Hygiene.Tests.ps1 ('the process baseline is versioned and structurally valid') now validates the baseline against THIS file, which makes the pointer load-bearing instead of decorative.",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+        "description",
+        "generatedAtUtc",
+        "generatedBy",
+        "host",
+        "core",
+        "e2e",
+        "coverage",
+        "hygiene",
+        "compatibility",
+        "adoptionFloor",
+        "adoptionFloorNote",
+        "platformPathLiteralExemptions"
+    ],
+    "properties": {
+        "$schema": {
+            "type": "string",
+            "description": "Path to this schema file, relative to the baseline."
+        },
+        "description": {
+            "type": "string",
+            "minLength": 1
+        },
+        "generatedAtUtc": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$",
+            "description": "When this baseline was measured. ISO-8601 UTC."
+        },
+        "generatedBy": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The command that produced these numbers. A baseline with no reproducible producer is an aspiration, not a measurement."
+        },
+        "host": {
+            "type": "string",
+            "minLength": 1
+        },
+        "core": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scopes", "testsTotal", "passed", "failedAllowed", "skipped", "skippedMaxAllowed", "killedByInfraAllowed"],
+            "properties": {
+                "scopes": { "type": "integer", "minimum": 1 },
+                "testsTotal": { "type": "integer", "minimum": 1 },
+                "passed": { "type": "integer", "minimum": 0 },
+                "failedAllowed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 0,
+                    "description": "Hard-zero. A baseline that tolerates failures is not a gate."
+                },
+                "skipped": { "type": "integer", "minimum": 0 },
+                "skippedMaxAllowed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The deliberate, reviewed skip allowance. Tests/Run-CoreTests.ps1 -StrictSkips - which every CI job passes - is enforced against THIS number rather than against zero. It was previously 'any skip fails', which cannot hold alongside a baseline that records skips: every run failed for a reason unrelated to the code under test and a genuine new skip was lost in the noise. Lowering this value is the ratchet; never raise it to make a red run green."
+                },
+                "skipEnforcement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Records which artefact -StrictSkips is measured against, so the authority for the gate is stated in the baseline rather than only in runner code."
+                },
+                "killedByInfraAllowed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 0,
+                    "description": "Hard-zero. A scope killed by infra (EDR, OOM) must never be counted as passing."
+                }
+            }
+        },
+        "e2e": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["scopes", "testsTotal", "passed", "failedAllowed", "skipped", "skippedMaxAllowed"],
+            "properties": {
+                "scopes": { "type": "integer", "minimum": 1 },
+                "testsTotal": { "type": "integer", "minimum": 1 },
+                "passed": { "type": "integer", "minimum": 0 },
+                "failedAllowed": { "type": "integer", "minimum": 0, "maximum": 0 },
+                "skipped": { "type": "integer", "minimum": 0 },
+                "skippedMaxAllowed": { "type": "integer", "minimum": 0 }
+            }
+        },
+        "coverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "floorPercent", "measuredSingleScopeOrchestrator", "note"],
+            "properties": {
+                "metric": { "type": "string", "minLength": 1 },
+                "floorPercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Ratchet floor. Raise only, never lower."
+                },
+                "measuredSingleScopeOrchestrator": { "type": "number", "minimum": 0 },
+                "note": { "type": "string", "minLength": 1 }
+            }
+        },
+        "hygiene": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["gates", "deadExportedFunctionsAllowed", "deliberatePublicApi", "unreferencedConstantsAllowed"],
+            "properties": {
+                "gates": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Describe blocks across Tests/Hygiene.Tests.ps1 + Tests/ModuleHygiene.Tests.ps1. Enforced against the real count by Tests/Hygiene.Tests.ps1, so this number cannot drift away from reality again."
+                },
+                "gatesAudit": {
+                    "type": "string",
+                    "description": "Why the gate count is what it is, and which gate was previously blind."
+                },
+                "dependencyGraphAudit": {
+                    "type": "string",
+                    "description": "How the module dependency graph is derived and what it now validates."
+                },
+                "deadExportedFunctionsAllowed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 0,
+                    "description": "Hard-zero. Dead public surface is only acceptable via deliberatePublicApi."
+                },
+                "deliberatePublicApi": {
+                    "type": "array",
+                    "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+::[A-Za-z][A-Za-z0-9_-]*$" },
+                    "description": "Module::Function entries that have zero production call sites BY DESIGN. Kept in sync with the dead-export gate by an explicit test."
+                },
+                "unreferencedConstantsAllowed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 0,
+                    "description": "Hard-zero. A declared-but-unread constant is dead configuration."
+                }
+            }
+        },
+        "compatibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["pwsh7", "windowsPowershell51", "entrypoints"],
+            "properties": {
+                "pwsh7": { "type": "string", "minLength": 1 },
+                "windowsPowershell51": { "type": "string", "minLength": 1 },
+                "entrypoints": {
+                    "type": "array",
+                    "minItems": 3,
+                    "items": { "type": "string", "minLength": 1 }
+                }
+            }
+        },
+        "adoptionFloor": {
+            "type": "object",
+            "description": "One entry per adoption-ratio class measured by Modules/ProcessMetrics.psm1. A class may not exist here unless the metric measures it, and the metric may not measure one that is absent here.",
+            "minProperties": 1,
+            "propertyNames": { "pattern": "^[A-Za-z][A-Za-z0-9]*$" },
+            "additionalProperties": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["minAdoption", "measured", "metric", "why"],
+                "properties": {
+                    "minAdoption": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "Adoption RATIO, not a defect count, so it stays comparable across refactors. Raise as the backlog shrinks; never lower to make a red run green."
+                    },
+                    "measured": { "type": "string", "minLength": 1 },
+                    "metric": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "What is actually counted. Must describe the fingerprint precisely: a metric whose description does not match its implementation is how stringHashDelegation reported 100% while two real duplicates shipped."
+                    },
+                    "why": { "type": "string", "minLength": 1 }
+                }
+            }
+        },
+        "adoptionFloorNote": {
+            "type": "string",
+            "minLength": 1,
+            "description": "States the raise-only rule explicitly, so the intent survives whoever edits the file next."
+        },
+        "platformPathLiteralExemptions": {
+            "type": "array",
+            "description": "PATTERN-scoped, never file-scoped. A file-scoped list silently exempts every future violation added to that file.",
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["file", "pattern", "reason"],
+                "properties": {
+                    "file": { "type": "string", "minLength": 1 },
+                    "pattern": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "The exact offending fragment. Names it precisely so a DIFFERENT backslash added to the same file is still caught."
+                    },
+                    "reason": { "type": "string", "minLength": 1 }
+                }
+            }
+        },
+        "platformPathLiteralExemptionNote": {
+            "type": "string",
+            "minLength": 1
+        }
+    }
+}

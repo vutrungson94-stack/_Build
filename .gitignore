@@ -1,0 +1,72 @@
+# _Build local runtime artifacts - never commit these.
+#
+# Every pattern below is listed exactly ONCE. The file previously carried four
+# of them twice (logs/, build-reports/, .gbuildcache/, test-results*.xml), split
+# across two independently-edited blocks. A duplicate is not harmless: it reads
+# as two independent rules, so deleting one looks like it narrows coverage when
+# it does not, and a future edit that removes "the" copy leaves the other
+# behind with nothing indicating it was ever there.
+
+# --- Tool state -----------------------------------------------------------------
+.tools/                 # vendored PSScriptAnalyzer etc.; not in a fresh checkout
+.gbuild/                # per-device locale cache (deviceId hash + UI language)
+.gbuildcache/           # incremental build cache
+.gbuildstate
+*.gbuildstate
+.gbuild-state.gbuildstate
+.gbuild-circuitbreaker.gbuildstate
+# Lock files sit beside the state they guard and were previously UNTRACKED:
+# .gbuild-state.gbuildstate.lock, .gbuildcache/index.json.lock,
+# build-reports/autotune-history.jsonl.lock, logs/*/audit.log.lock. A committed
+# lock is not just clutter - it advertises a stale exclusive handle to anyone
+# who clones, and `git status` noise hides real changes.
+*.lock
+
+# --- Reports and telemetry ------------------------------------------------------
+build-reports/
+distributed-report/
+reports/
+*.sdkcache.json
+last-run-*.log
+suite-progress-*.log
+Tests/suite-progress-*.log
+
+# --- Test artifacts -------------------------------------------------------------
+test-results*.xml
+testResults.xml
+TestResults/
+Tests/TestResults/
+__pycache__/
+*.pyc
+.aider*
+
+# --- Secrets --------------------------------------------------------------------
+# Vault key/salt filenames are NOT always suffixed (e.g. logs/test/vault.key),
+# so *.vault.key alone leaves them exposed outside logs/.
+vault.key
+*.vault.key
+*.vault.salt
+*.salt
+
+# --- Misc -----------------------------------------------------------------------
+gbuild-standalone-*/
+# Stray files produced by un-escaped cmd.exe redirects in batch fixtures
+# (a `>nul`r`n...` redirect creates a file literally named `nul`r`nexit`).
+nul*
+# logs/ is covered above.
+# Build output note: output is written into ProjectRoot, so it is harmless when
+# the project is a real checkout - but when gbuild is launched from a directory
+# that only CONTAINS projects (a folder of repos) it lands beside that folder
+# and is shared by every project underneath it. testResults.xml and
+# build-reports/ were both found next to the tool for exactly this reason.
+#
+# Ad-hoc debug scripts at the tool root (debug-*.ps1) are deliberately NOT
+# ignored: they ship with the tree and would escape the -SyntaxCheck scope
+# (Modules/Steps/Hooks only), which is how one once carried a real parse error
+# plus a backslash path literal that tripped the platformPathLiterals gate.
+# Debug against a scratch copy outside the repo instead.
+
+.gbuild/
+.gbuildcache/
+logs/
+publish-output/

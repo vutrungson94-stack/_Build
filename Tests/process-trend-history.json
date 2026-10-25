@@ -1,0 +1,40 @@
+{
+  "description": "Floor history. Append-only: one entry per deliberate ratchet change. Tests/process-baseline.json may only RAISE a minAdoption relative to the newest recorded value for that class.",
+  "classes": {
+    "fileLockDelegation": {
+      "minAdoption": 1.0,
+      "recordedAtUtc": "2026-10-08T00:00:00Z",
+      "reason": "seed: mirrors Tests/process-baseline.json floor at introduction of the history-ledger gate"
+    },
+    "eventNameRegistry": {
+      "minAdoption": 1.0,
+      "recordedAtUtc": "2026-10-08T00:00:00Z",
+      "reason": "seed: mirrors Tests/process-baseline.json floor at introduction of the history-ledger gate"
+    },
+    "sharedUtilsImportOwner": {
+      "minAdoption": 1.0,
+      "recordedAtUtc": "2026-10-08T00:00:00Z",
+      "reason": "seed: mirrors Tests/process-baseline.json floor at introduction of the history-ledger gate"
+    },
+    "stringHashDelegation": {
+      "minAdoption": 1.0,
+      "recordedAtUtc": "2026-10-08T00:00:00Z",
+      "reason": "seed: mirrors Tests/process-baseline.json floor at introduction of the history-ledger gate"
+    },
+    "platformPathLiterals": {
+      "minAdoption": 1.0,
+      "recordedAtUtc": "2026-10-08T00:00:00Z",
+      "reason": "seed: mirrors Tests/process-baseline.json floor at introduction of the history-ledger gate"
+    },
+    "localeKeyWiring": {
+      "minAdoption": 1.0,
+      "recordedAtUtc": "2026-10-08T00:00:00Z",
+      "reason": "seed: mirrors Tests/process-baseline.json floor at introduction of the history-ledger gate"
+    },
+    "i18nProseCoverage": {
+      "minAdoption": 0.8277,
+      "recordedAtUtc": "2026-10-12T00:00:00Z",
+      "reason": "ratchet raise 0.7105 -> 0.8277: measured 850/1027 after migrating Standalone.psm1 (39 emit sites), CredentialVault.psm1 (31) and Orchestrator.psm1 (31 of 32) to Get-LocaleMessage, with 30+28+20 new locale keys added to all 7 locale files. A floor that tracks measured reality is what makes a regression visible on the next run; leaving it at 0.7105 would have certified the remaining 177 sites as acceptable."
+    }
+  }
+}

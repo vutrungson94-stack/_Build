@@ -1,0 +1,23 @@
+{
+    "$schema":  "../../gbuild.plugin.schema.json",
+    "name":  "Swift",
+    "version":  "1.0.0",
+    "apiVersion":  "1.0.0",
+    "minGbuildVersion":  "2.0.0",
+    "maxGbuildVersion":  "",
+    "author":  "gbuild",
+    "description":  "Swift build, test and lint plugin (swift build/test, swiftlint).",
+    "supportedLanguages":  [
+                               "Swift"
+                           ],
+    "priority":  5,
+    "dependencies":  [
+                     ],
+    "capabilities":  [
+                         "build",
+                         "test",
+                         "lint",
+                         "preflight"
+                     ],
+    "entryPoint":  "Swift.psm1"
+}

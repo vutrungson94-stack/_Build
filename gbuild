@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# =============================================================
+# gbuild — Cross-platform portable launcher for gbuild.ps1
+# SYNCHRONIZED with gbuild.ps1 + gbuild.bat — keep all three in sync.
+# Project-root resolution lives in ONE place (Resolve-BuildProjectRoot /
+# Find-ProjectRoot in gbuild.ps1); this launcher must not duplicate it.
+# Usage:
+#   ./_Build/gbuild -Project "G:/path/with spaces"   # portable USB
+#   ./_Build/gbuild                                   # auto-detect from cwd
+#   ./_Build/gbuild "G:/path"                         # positional project path
+# Requires bash (uses BASH_SOURCE / "$@"). Works on Linux,
+# macOS, WSL, Git Bash. On Windows PowerShell/cmd, use .\gbuild.ps1 / .bat.
+# =============================================================
+set -euo pipefail
+
+# 1. Resolve _Build directory (no hardcoded paths, handles spaces)
+GBUILD_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GBUILD_PS1="$GBUILD_DIR/gbuild.ps1"
+
+if [ ! -f "$GBUILD_PS1" ]; then
+    echo "[FATAL] gbuild.ps1 not found at: $GBUILD_PS1" >&2
+    exit 1
+fi
+
+# 2. Detect PowerShell executable (pwsh preferred, powershell fallback)
+PWSH=""
+if command -v pwsh >/dev/null 2>&1; then
+    PWSH="pwsh"
+elif command -v powershell >/dev/null 2>&1; then
+    PWSH="powershell"
+elif command -v powershell.exe >/dev/null 2>&1; then
+    # WSL interop exposes Windows binaries with the .exe suffix: a WSL box
+    # with only Windows PowerShell has `powershell.exe`, never `powershell`,
+    # so without this branch the launcher reported "not found" on exactly
+    # the platform this file claims to support. Same preference order as
+    # gbuild.bat (pwsh -> powershell -> powershell.exe).
+    PWSH="powershell.exe"
+fi
+
+if [ -z "$PWSH" ]; then
+    echo "[FATAL] PowerShell (pwsh) not found. Install from https://github.com/PowerShell/PowerShell" >&2
+    exit 1
+fi
+
+# 3. Delegate everything to gbuild.ps1.
+# "$@" preserves each argument as a separate word, including paths with spaces.
+# MSYS2/Git Bash auto-converts Windows paths (G:\...) to Unix when calling
+# Windows exes; gbuild.ps1's Resolve-NativePath handles both forms, so no
+# manual conversion is needed here.
+exec "$PWSH" -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$GBUILD_PS1" "$@"
+

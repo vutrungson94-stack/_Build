@@ -1,0 +1,4349 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/${env:GBUILD_GITHUB_REPO}/_Build/gbuild.config.schema.json",
+  "title": "gbuild configuration",
+  "description": "Declarative configuration schema for the gbuild system.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "build",
+    "logging",
+    "health",
+    "report",
+    "profiles",
+    "projects"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Path or URL to this schema file."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[A-Za-z0-9.-]+)?(\\+[A-Za-z0-9.-]+)?$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "_securityNote": {
+      "type": "string",
+      "description": "Security guidance: all credential fields use ${env:VAR} placeholders resolved from the environment at runtime. Never commit real secrets."
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "defaultConfiguration": {
+          "type": "string"
+        },
+        "enableParallelBuild": {
+          "type": "boolean",
+          "default": true
+        },
+        "enableParallel": {
+          "type": "boolean",
+          "description": "Legacy alias for enableParallelBuild"
+        },
+        "maxParallelJobs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 8
+        },
+        "maxJobsMax": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 16,
+          "description": "Hard ceiling for parallel workers (Parallel.psm1 clamp). Defaults to max(maxParallelJobs*4, 16) when omitted."
+        },
+        "parallelMaxJobsScaleFactor": {
+          "type": "number",
+          "minimum": 0.1,
+          "default": 4,
+          "description": "Scale factor for maxJobsMax = maxParallelJobs * factor (BuildConstants.ParallelMaxJobsScaleFactor)."
+        },
+        "msBuildParallelArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "-p:BuildInParallel=true",
+            "-m"
+          ],
+          "description": "MSBuild parallel build arguments appended to dotnet publish (BuildConstants.MsBuildParallelArgs)."
+        },
+        "projectRootMaxDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "Max directory depth for Find-ProjectRoot upward scan (BuildConstants.ProjectRootMaxDepth)."
+        },
+        "compatMaxDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Max recursion depth for Invoke-CompatibleChildItem (BuildConstants.CompatibleChildItemMaxDepth)."
+        },
+        "relativeDepthErrorSentinel": {
+          "type": "integer",
+          "default": 999999,
+          "description": "Sentinel value for relative-depth errors in SDK discovery (BuildConstants.RelativeDepthErrorSentinel)."
+        },
+        "searchMaxDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3,
+          "description": "Directory recursion depth for Find-IndependentProjects csproj scan (default 3)."
+        },
+        "progressPollIntervalMs": {
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 5000,
+          "description": "Milliseconds between progress updates during parallel builds"
+        },
+        "progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Live build output streaming + silence heartbeat (BuildProgress.psm1 Invoke-WithLiveOutput). Applies to dotnet publish, plugin builds, SAST and container scans.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Master switch; when false commands run buffered and silent (CI log-friendly)."
+            },
+            "streamOutput": {
+              "type": "boolean",
+              "default": true,
+              "description": "Stream child-process lines to the console as they arrive instead of buffering until exit."
+            },
+            "throttleMs": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Minimum gap between consecutive non-error/warning output lines (noise throttle)."
+            },
+            "elapsedIntervalSec": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Heartbeat interval: log + EVT_STEP_PROGRESS when the child is silent this many seconds."
+            },
+            "pollMs": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 2000,
+              "description": "Main-thread drain/heartbeat polling interval for Process mode."
+            },
+            "killWaitMs": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 30000,
+              "default": 5000,
+              "description": "Bounded wait after Kill() in BuildProgress (BuildConstants.ProgressKillWaitMs)."
+            }
+          }
+        },
+        "enableIncremental": {
+          "type": "boolean"
+        },
+        "scopedLogging": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scoped pipeline logging: collapse disabled-step noise into one summary line so each build only shows logs relevant to its own project type (BuildConstants.LogScopedLogging)."
+        },
+        "openOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reveal the publish-output folder after a successful build (BuildConstants.OpenOutput). Shipped true for the interactive dev loop; never opens in CI/non-interactive runs even when true; set false to stay quiet everywhere."
+        },
+        "incrementalThresholdSeconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enableBuildCache": {
+          "type": "boolean"
+        },
+        "affected": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Nx-style affected-project detection (report + optional skip of unchanged projects)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Run the AffectedScan pipeline step (content fingerprint + git diff)"
+            },
+            "skipUnchanged": {
+              "type": "boolean",
+              "default": false,
+              "description": "Drop unchanged projects from the parallel build list (report-only when false)"
+            }
+          }
+        },
+        "cacheDirectory": {
+          "type": "string"
+        },
+        "maxCacheSizeMB": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projectMarkers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Project marker file patterns for auto-detection (BuildConstants.ProjectMarkers)."
+        },
+        "primaryLanguagePriority": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Primary-language tie-break order (BuildConstants.PrimaryLanguagePriority)."
+        },
+        "cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "shortHashLength": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 32,
+              "default": 8,
+              "description": "Short hash display length for cache keys (BuildConstants.ShortHashLength)."
+            },
+            "hashDepth": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 5,
+              "description": "Cache hash search depth (BuildConstants.CacheHashSearchDepth)."
+            },
+            "pluginHashLength": {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 32,
+              "default": 12,
+              "description": "Plugin incremental cache hash length (BuildConstants.PluginCacheHashLength, distinct from shortHashLength)."
+            }
+          }
+        },
+        "clean": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Smart-clean targets single-source (BuildConstants CleanTargetDirNames/CleanArtifactExtensions/CleanOutputFolderNames).",
+          "properties": {
+            "targetDirNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "artifactExtensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "outputFolderNames": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "correlationIdLength": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 32,
+          "default": 12,
+          "description": "CorrelationId short-guid length (BuildConstants.CorrelationIdLength)."
+        },
+        "deployChoiceArgs": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Deploy-choice MSBuild args single-source (BuildConstants DeployChoiceArgs*; Orchestrator Get-DeployChoiceArgs).",
+          "properties": {
+            "apk": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "ios": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "winMsix": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "aot": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "consoleSelfContained": {
+              "type": "string",
+              "default": "true"
+            },
+            "defaultRid": {
+              "type": "string",
+              "default": "win-x64"
+            }
+          }
+        },
+        "timeoutMinutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "defaultPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "portWaitAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Polling attempts (PortWaitDelayMs apart) waiting for the OS to release an occupied port before build."
+        },
+        "portWaitDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Milliseconds to wait between port-release polling attempts."
+        },
+        "locale": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "string",
+              "enum": [
+                "en",
+                "vi",
+                "de",
+                "fr",
+                "ja",
+                "zh",
+                "es"
+              ],
+              "default": "en",
+              "description": "Default UI language. External translation files live in _Build/Locales/<locale>.json and override the built-in messages."
+            }
+          }
+        },
+        "standalone": {
+          "type": "object",
+          "description": "Single-file self-extracting bundle (Standalone.psm1): packages gbuild.ps1 + Modules + Locales into one .ps1 that runs anywhere without the _Build tree.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "outputFile": {
+              "type": "string",
+              "default": "gbuild-standalone.ps1",
+              "description": "Output bundle name. Absolute path, or relative to _Build (ScriptRoot)."
+            },
+            "includeConfig": {
+              "type": "boolean",
+              "default": false,
+              "description": "Embed gbuild.config.json into the bundle. Disabled by default so credentials in the config never travel."
+            },
+            "embedLocales": {
+              "type": "boolean",
+              "default": true,
+              "description": "Embed Locales/*.json so the bundle is language-complete."
+            },
+            "bundleVersion": {
+              "type": "string",
+              "default": "1.0.0",
+              "description": "Single-file bundle format version (BuildConstants.StandaloneBundleVersion), not the gbuild tool version."
+            }
+          }
+        },
+        "publishArtifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "PublishArtifact pipeline step (Orchestrator $buildSteps): runs Steps/publish-artifact.ps1 to archive publish output after a successful build.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "envFile": {
+          "type": "string",
+          "default": "",
+          "description": "Optional .env file (relative to project root) loaded at startup before config secret resolution. Leave empty to rely on the automatic <ProjectRoot>/.env load."
+        },
+        "runTestLint": {
+          "type": "boolean",
+          "description": "LEGACY: superseded by build.test.enabled / build.test.lintEnabled (standalone Test/Lint pipeline steps). Used only when both canonical values are absent."
+        },
+        "test": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Standalone Test/Lint pipeline steps (Orchestrator $buildSteps). Applies to ALL languages via plugin dispatch. Non-blocking: missing tests/tools log a warning and never fail the build.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Run the 'Test' step (plugin test flow) after Build."
+            },
+            "lintEnabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Run the 'Lint' step (plugin lint flow) after Test. Default off: lint is an opt-in step (menu 'I'), matching BuildConstants.TestLintEnabled and the shipped gbuild.config.json."
+            }
+          }
+        },
+        "processKillList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Extra process names to kill when clearing a locked output dir (Build.psm1). The project exe name is always included."
+        },
+        "pluginDirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional plugin directories (relative to ProjectRoot or absolute)"
+        },
+        "languageMap": {
+          "type": "array",
+          "description": "Custom language detection entries (merged into built-in map)",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "Language": {
+                "type": "string"
+              },
+              "Ext": {
+                "type": "string"
+              },
+              "BuildTool": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "TestTool": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "LintTool": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "BuildFile": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "cacheRemote": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable remote cache synchronization"
+            },
+            "name": {
+              "type": "string",
+              "description": "Remote provider name"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "azureBlob",
+                "awsS3",
+                "http",
+                "custom"
+              ],
+              "description": "Remote storage type"
+            },
+            "endpoint": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri",
+              "description": "Primary remote storage endpoint URL"
+            },
+            "container": {
+              "type": "string",
+              "description": "Container/bucket name"
+            },
+            "authToken": {
+              "type": "string",
+              "description": "Authentication token (can use env variables)"
+            },
+            "region": {
+              "type": "string",
+              "description": "Primary AWS region (for S3) or Azure region"
+            },
+            "accessKey": {
+              "type": "string",
+              "description": "AWS Access Key ID (for S3)"
+            },
+            "secretKey": {
+              "type": "string",
+              "description": "AWS Secret Access Key (for S3)"
+            },
+            "username": {
+              "type": "string",
+              "description": "HTTP username for Basic Auth"
+            },
+            "password": {
+              "type": "string",
+              "description": "HTTP password for Basic Auth"
+            },
+            "modulePath": {
+              "type": "string",
+              "description": "Path to custom provider module (for custom type)"
+            },
+            "syncOnBuild": {
+              "type": "boolean",
+              "description": "Sync to remote after build"
+            },
+            "syncOnRestore": {
+              "type": "boolean",
+              "description": "Sync from remote before build"
+            },
+            "compress": {
+              "type": "boolean",
+              "description": "GZip-compress cache entries before sending to the remote store (transparent decompression on receive)"
+            },
+            "presignExpiresSeconds": {
+              "type": "integer",
+              "minimum": 60,
+              "default": 3600,
+              "description": "Expiry in seconds for S3 presigned URLs (CacheProvider.New-S3SignedUrl)."
+            },
+            "ha": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "High Availability / Disaster Recovery configuration for multi-region cache replication",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Enable HA/DR replication across regions"
+                },
+                "replicationStrategy": {
+                  "type": "string",
+                  "enum": [
+                    "async",
+                    "sync",
+                    "quorum"
+                  ],
+                  "default": "async",
+                  "description": "Replication mode: async (fire-and-forget), sync (wait for all), quorum (wait for N/2+1)"
+                },
+                "regions": {
+                  "type": "array",
+                  "description": "Secondary regions for replication (each entry mirrors primary config structure)",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Region identifier (e.g., 'us-east-2', 'westeurope')"
+                      },
+                      "endpoint": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "uri",
+                        "description": "Region-specific endpoint override"
+                      },
+                      "container": {
+                        "type": "string",
+                        "description": "Region-specific container/bucket name"
+                      },
+                      "authToken": {
+                        "type": "string",
+                        "description": "Region-specific auth token (env placeholder supported)"
+                      },
+                      "accessKey": {
+                        "type": "string",
+                        "description": "Region-specific access key (env placeholder supported)"
+                      },
+                      "secretKey": {
+                        "type": "string",
+                        "description": "Region-specific secret key (env placeholder supported)"
+                      },
+                      "priority": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 100,
+                        "description": "Failover priority (lower = preferred)"
+                      },
+                      "readOnly": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Replica is read-only (DR warm standby)"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ]
+                  }
+                },
+                "failover": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Automatic failover behavior",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true,
+                      "description": "Auto-failover on primary region failure"
+                    },
+                    "healthCheckIntervalSec": {
+                      "type": "integer",
+                      "minimum": 10,
+                      "default": 30,
+                      "description": "Primary region health check interval"
+                    },
+                    "healthCheckTimeoutSec": {
+                      "type": "integer",
+                      "minimum": 5,
+                      "default": 10,
+                      "description": "Health check timeout per region"
+                    },
+                    "maxRetries": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "default": 3,
+                      "description": "Retries before declaring region unhealthy"
+                    },
+                    "failbackEnabled": {
+                      "type": "boolean",
+                      "default": true,
+                      "description": "Auto-failback when primary recovers"
+                    },
+                    "failbackDelaySec": {
+                      "type": "integer",
+                      "minimum": 60,
+                      "default": 300,
+                      "description": "Delay before failing back to primary"
+                    }
+                  }
+                },
+                "consistency": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "description": "Cross-region consistency guarantees",
+                  "properties": {
+                    "readPreference": {
+                      "type": "string",
+                      "enum": [
+                        "primary",
+                        "nearest",
+                        "any"
+                      ],
+                      "default": "primary",
+                      "description": "Read routing preference"
+                    },
+                    "writeConcern": {
+                      "type": "string",
+                      "enum": [
+                        "acknowledged",
+                        "majority",
+                        "all"
+                      ],
+                      "default": "acknowledged",
+                      "description": "Write durability level"
+                    },
+                    "maxStalenessSec": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 300,
+                      "description": "Max acceptable replication lag for reads"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "cacheLocal": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Local build-cache eviction policy (LRU + age). All thresholds config-driven; no hardcode.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable LRU/age eviction of the local cache directory"
+            },
+            "maxEntries": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum number of cache entries to retain"
+            },
+            "maxAgeDays": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum age of a cache entry in days before eviction"
+            },
+            "maxSizeMb": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum total local cache size in MB before eviction"
+            },
+            "compress": {
+              "type": "boolean",
+              "description": "GZip-compress local cache entries (optional, best-effort)"
+            }
+          }
+        },
+        "menu": {
+          "type": "object",
+          "description": "Config-driven custom menu entries (extensibility without editing core).",
+          "properties": {
+            "customEntries": {
+              "type": "array",
+              "description": "User-defined menu items merged into the interactive build menu.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Single-character/menu key shown to the user (e.g. 'Z')."
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Menu label."
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Optional uppercase title shown when selected."
+                  },
+                  "handler": {
+                    "type": "string",
+                    "description": "Command/function name invoked when the entry is chosen."
+                  }
+                },
+                "required": [
+                  "key",
+                  "label"
+                ]
+              }
+            },
+            "dotnetTypes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Canonical .NET project types driving menu, orchestrator dispatch and non-.NET routing (Project.psm1 Get-ProjectTypes; 'Unknown' is appended automatically)."
+            },
+            "moduleMap": {
+              "type": "object",
+              "description": "Menu choice -> module names lazy-loaded on demand (Orchestrator.psm1 Get-ModuleMapFromConfig / Import-ModuleOnDemand).",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "pipeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Pipeline execution settings for the in-process engine in Orchestrator.psm1 (Resolve-PipelineSteps/Resolve-PipelineYamlSteps/Invoke-GuildPipeline; formerly PipelineRunner.psm1, now merged). A gbuild.pipeline.yml, when present, takes precedence over these steps.",
+          "properties": {
+            "timeoutSeconds": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Global pipeline timeout in seconds (0 = no limit)"
+            },
+            "retryEnabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "maxRetries": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Default retry count per step (0 = no retry)"
+            },
+            "validate": {
+              "type": "boolean",
+              "default": true,
+              "description": "Validate pipeline step definitions (both gbuild.config.json steps and gbuild.pipeline.yml) before the pipeline runs. A step with an unknown key, a missing task, a non-numeric timeout or an unparseable when: fails the build instead of being silently ignored."
+            },
+            "file": {
+              "type": "string",
+              "description": "Path to a YAML pipeline definition, relative to the build root unless rooted. When set, this file takes PRECEDENCE over build.pipeline.steps. With no value, gbuild.pipeline.yml is auto-discovered in ProjectRoot only (never ScriptRoot, never the current directory)."
+            },
+            "steps": {
+              "type": "array",
+              "description": "Config-driven pipeline steps. WARNING: when non-empty this REPLACES the built-in pipeline (RegisterPlugins → ScanProject → AffectedScan → Preflight → Build). Each entry: name + script (scriptblock body receiving $ctx); optional when (bool scriptblock, false → skip + EVT_STEP_SKIPPED), retry, timeoutSeconds.",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "script": {
+                    "type": "string",
+                    "description": "PowerShell scriptblock body"
+                  },
+                  "when": {
+                    "type": "string",
+                    "description": "Condition scriptblock (returns bool)"
+                  },
+                  "retry": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "timeoutSeconds": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "jobIsolated": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run this step in a background job with a HARD timeout (Invoke-PipelineStepJobAttempt): the child process is killed when timeoutSeconds elapses. Requires timeoutSeconds on the same step. The in-process path can only measure a breach after the body returns, so a hung step hangs the pipeline without this."
+                  }
+                },
+                "required": [
+                  "name",
+                  "script"
+                ]
+              }
+            },
+            "mode": {
+              "description": "How config steps combine with the built-in ones: replace (config steps only, default), merge (override same-named built-in steps in place and append new ones), or append (built-in steps first, then config steps).",
+              "type": "string",
+              "default": "replace",
+              "enum": [
+                "replace",
+                "merge",
+                "append"
+              ]
+            }
+          }
+        },
+        "preflight": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Pre-build validation configuration (Preflight.psm1)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Master switch for preflight validation"
+            },
+            "checkSyntax": {
+              "type": "boolean",
+              "default": true,
+              "description": "Run universal syntax check across project files"
+            },
+            "checkManifest": {
+              "type": "boolean",
+              "default": true,
+              "description": "Validate project manifest files are parseable"
+            },
+            "checkAllManifests": {
+              "type": "boolean",
+              "default": true,
+              "description": "Scan all manifests in project dir, not just the primary one"
+            },
+            "checkTools": {
+              "type": "boolean",
+              "default": true,
+              "description": "Verify required CLI tools are installed"
+            },
+            "checkDiskSpace": {
+              "type": "boolean",
+              "default": true,
+              "description": "Check free disk space meets threshold"
+            },
+            "checkModuleGraph": {
+              "type": "boolean",
+              "default": true,
+              "description": "Validate the module dependency graph for missing dependencies and import cycles"
+            },
+            "checkNetwork": {
+              "type": "boolean",
+              "default": false,
+              "description": "Ping configured endpoint URLs"
+            },
+            "minDiskSpaceMB": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 2048,
+              "description": "Minimum free space in MB"
+            },
+            "requiredTools": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "CLI tools that must exist on PATH (e.g. dotnet, node, cargo, go, docker)"
+            },
+            "endpoints": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "HTTP(S) endpoints to ping during network check"
+            }
+          }
+        },
+        "pluginDispatch": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Plugin dispatch configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "fallbackToDotnet": {
+              "type": "boolean",
+              "default": true
+            },
+            "languageOverrides": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Map language name to plugin override"
+            }
+          }
+        },
+        "plugins": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Formal plugin manifest + versioning policy (PluginSDK.psm1). Each plugin may ship a sidecar <Name>.plugin.json manifest; this section governs compatibility gates.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Master switch for versioned plugin loading. When false, no versioned plugins load."
+            },
+            "strictApiCheck": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, plugin apiVersion MAJOR+MINOR must match the SDK exactly. When false, any plugin apiVersion <= SDK apiVersion is accepted."
+            },
+            "allowPrerelease": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow prerelease plugin versions (e.g. 1.2.0-beta.1). Blocked by default for build reproducibility."
+            },
+            "requireManifest": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, plugins WITHOUT a sidecar manifest file are rejected instead of synthesized from Get-PluginInfo."
+            },
+            "disabled": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Plugin names that must never load (block-list wins over allowList)."
+            },
+            "allowList": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "When non-empty, ONLY listed plugin names may load."
+            }
+          }
+        },
+        "cluster": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Multi-cluster orchestration (ClusterOrchestrator.psm1): Kubernetes operator integration, distributed scheduling, and leader-election HA.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable multi-cluster orchestration"
+            },
+            "buildTimeoutSec": {
+              "type": "integer",
+              "minimum": 60,
+              "default": 3600,
+              "description": "Timeout for Wait-ClusterBuild (BuildConstants.ClusterBuildTimeoutSec)."
+            },
+            "operator": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "gbuild Kubernetes operator installation. install=true invokes Install-GBuildOperator (previously reachable only via a PipelineContext key nothing ever set).",
+              "properties": {
+                "install": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Install the gbuild operator and its CRDs into the cluster."
+                },
+                "namespace": {
+                  "type": "string",
+                  "default": "gbuild-system",
+                  "description": "Namespace the operator is installed into."
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "Operator image tag. ClusterOrchestrator.psm1 Install-GBuildOperator hard-fails without a tag, so operator.install=true was unsatisfiable while this key was absent from the schema (build.cluster is additionalProperties:false)."
+                },
+                "version": {
+                  "type": "string",
+                  "description": "Operator image version. Same fail-closed precondition as tag."
+                }
+              }
+            },
+            "submit": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Kubernetes job submission. enabled=true builds a ClusterBuildSpec from the resolved project and submits it (Submit-ClusterBuild -> Get-ClusterBuildStatus -> Wait-ClusterBuild).",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Submit the current build as a Kubernetes Job."
+                },
+                "builderImage": {
+                  "type": "string",
+                  "description": "Builder image for the submitted Job. Must be an explicit tag or @sha256: digest; ':latest' is rejected by Submit-ClusterBuild."
+                },
+                "command": {
+                  "type": "string",
+                  "description": "Command executed inside the Job container."
+                }
+              }
+            },
+            "stopLeaderElection": {
+              "type": "boolean",
+              "default": false,
+              "description": "Stop the coordinator leader-election background job and release the lease."
+            },
+            "coordinator": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Leader election coordinator for HA",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "leader-election",
+                    "consul",
+                    "etcd",
+                    "custom"
+                  ],
+                  "default": "leader-election",
+                  "description": "Coordinator backend type"
+                },
+                "endpoint": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uri",
+                  "description": "Coordinator endpoint (for consul/etcd/custom)"
+                },
+                "leaseName": {
+                  "type": "string",
+                  "default": "gbuild-coordinator",
+                  "description": "Kubernetes Lease name for leader election"
+                },
+                "leaseNamespace": {
+                  "type": "string",
+                  "default": "gbuild-system",
+                  "description": "Namespace for coordinator lease"
+                },
+                "electionTTL": {
+                  "type": "integer",
+                  "minimum": 5,
+                  "default": 15,
+                  "description": "Lease TTL in seconds"
+                },
+                "renewalInterval": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 5,
+                  "description": "Lease renewal interval in seconds"
+                }
+              }
+            },
+            "clusters": {
+              "type": "array",
+              "description": "Cluster fleet definitions",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Unique cluster identifier"
+                  },
+                  "endpoint": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Kubernetes API server endpoint"
+                  },
+                  "kubeconfig": {
+                    "type": "string",
+                    "description": "Path to kubeconfig file (or use KUBECONFIG env)"
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Kubectl context name"
+                  },
+                  "region": {
+                    "type": "string",
+                    "description": "Cloud region (e.g., us-east-1)"
+                  },
+                  "zone": {
+                    "type": "string",
+                    "description": "Availability zone"
+                  },
+                  "capacity": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "cpu": {
+                        "type": "string",
+                        "description": "Total CPU capacity (e.g., '8')"
+                      },
+                      "memory": {
+                        "type": "string",
+                        "description": "Total memory capacity (e.g., '32Gi')"
+                      }
+                    }
+                  },
+                  "labels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Cluster labels for affinity scheduling"
+                  },
+                  "taints": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Cluster taints for workload isolation"
+                  },
+                  "maxConcurrent": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 8,
+                    "description": "Max concurrent builds on this cluster"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            },
+            "scheduling": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Build scheduling policy across clusters",
+              "properties": {
+                "strategy": {
+                  "type": "string",
+                  "enum": [
+                    "least-loaded",
+                    "round-robin",
+                    "affinity",
+                    "custom"
+                  ],
+                  "default": "least-loaded",
+                  "description": "Scheduling algorithm"
+                },
+                "maxConcurrentPerCluster": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 8,
+                  "description": "Default max concurrent builds per cluster"
+                },
+                "resourceOverhead": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "cpu": {
+                      "type": "string",
+                      "default": "100m",
+                      "description": "Per-build CPU overhead reservation"
+                    },
+                    "memory": {
+                      "type": "string",
+                      "default": "128Mi",
+                      "description": "Per-build memory overhead reservation"
+                    }
+                  }
+                },
+                "affinityRules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Label-based affinity rules"
+                },
+                "taintsTolerations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Taint/toleration requirements"
+                }
+              }
+            },
+            "job": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Per-build Kubernetes Job sizing and target namespace. Replaces the former build.cluster.scheduling.resourceCpu/resourceMemory, which were resolved into the runtime config and then discarded while the submit manifest carried its own hardcoded values.",
+              "properties": {
+                "requestCpu": {
+                  "type": "string",
+                  "default": "500m",
+                  "description": "Container CPU request for submitted build Jobs"
+                },
+                "requestMemory": {
+                  "type": "string",
+                  "default": "1Gi",
+                  "description": "Container memory request for submitted build Jobs"
+                },
+                "limitCpu": {
+                  "type": "string",
+                  "default": "2000m",
+                  "description": "Container CPU limit for submitted build Jobs"
+                },
+                "limitMemory": {
+                  "type": "string",
+                  "default": "4Gi",
+                  "description": "Container memory limit for submitted build Jobs"
+                },
+                "ttlSecondsAfterFinished": {
+                  "type": "integer",
+                  "default": 86400,
+                  "description": "Seconds a finished Job is retained before the cluster reaps it"
+                },
+                "backoffLimit": {
+                  "type": "integer",
+                  "default": 2,
+                  "description": "Job retry backoff limit"
+                },
+                "namespace": {
+                  "type": "string",
+                  "default": "gbuild-jobs",
+                  "description": "Namespace submitted Jobs land in when the build spec does not override it"
+                }
+              }
+            },
+            "workloadIdentity": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Workload identity for build pods",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "serviceAccount": {
+                  "type": "string",
+                  "default": "gbuild-worker"
+                },
+                "namespace": {
+                  "type": "string",
+                  "default": "gbuild-system"
+                },
+                "tokenAudience": {
+                  "type": "string",
+                  "default": "gbuild"
+                }
+              }
+            },
+            "observability": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "metricsPort": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "default": 9101,
+                  "description": "Cluster metrics port (BuildConstants.ClusterMetricsPort)."
+                },
+                "healthPort": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "default": 9102,
+                  "description": "Cluster health port (BuildConstants.ClusterHealthPort)."
+                },
+                "logLevel": {
+                  "type": "string",
+                  "enum": [
+                    "Debug",
+                    "Info",
+                    "Warn",
+                    "Error"
+                  ],
+                  "default": "Info"
+                }
+              }
+            },
+            "healthMonitorIntervalSec": {
+              "type": "integer",
+              "minimum": 5,
+              "default": 30
+            },
+            "healthTimeoutSec": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            },
+            "buildPollSec": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10
+            },
+            "electionBackoffSec": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5
+            },
+            "defaultMaxConcurrent": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 8
+            },
+            "capacity": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "cpu": {
+                  "type": "string",
+                  "default": "8"
+                },
+                "memory": {
+                  "type": "string",
+                  "default": "32Gi"
+                }
+              }
+            }
+          }
+        },
+        "projectTypeActions": {
+          "type": "object",
+          "description": "Per-project-type dotnet publish args (Build.psm1 Get-ProjectTypeActions). Keys: MAUI/Web/WinForms/WPF/Console/WinExe/BlazorWasm/Library. Each entry: android/ios/windows/nonWindows/default (string[] with ${rid} placeholder) or command+args (Library).",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "android": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ios": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "windows": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "nonWindows": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "default": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "command": {
+                "type": "string"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "cacheArtifactPatterns": {
+          "type": "object",
+          "description": "OutputSubDir -> artifact glob patterns with ${exeBaseName} placeholder (Build.psm1 Get-CacheArtifactPatterns).",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "cleanTargetsPerProjectType": {
+          "type": "object",
+          "description": "ProjectType -> extra clean dirs (Clean.psm1 Get-CleanTargetsConfig).",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "additionalDirs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "platformsDirs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "targetCatalog": {
+          "type": "object",
+          "description": "Optional custom target catalog overriding the auto-derived build choices (Orchestrator.psm1 Get-TargetCatalog / Get-BuildTargetChoices) and the failure-is-fatal set (Orchestrator.psm1 Get-FatalActionChoices).",
+          "properties": {
+            "buildChoices": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "fatalChoices": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Menu choices whose non-throwing failure must abort the run (default: the RBAC privileged set plus X distributed, Z chaos drill, O cluster submit, D doctor). X/Z/O/D are execution-fatal but NOT RBAC-privileged: they need no authorization, but their failure must not report success."
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Log directory base (relative to the _Build root, resolved against ScriptRoot). Empty/absent falls back to BuildConstants LogsDir ('logs'). Supported by Orchestrator Initialize-BuildLogging."
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "Debug",
+            "Info",
+            "Warn",
+            "Error"
+          ]
+        },
+        "enableJsonLog": {
+          "type": "boolean"
+        },
+        "enableConsoleColor": {
+          "type": "boolean"
+        },
+        "maxLogFiles": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxLogSizeMB": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxLogAgeDays": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Age ceiling in days for per-run build_*.log retention (Invoke-LogRetention). The file-count cap alone never removes an old-but-fewer-than-maxLogFiles file."
+        },
+        "enableRotation": {
+          "type": "boolean"
+        },
+        "fileRetryDelayMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fileRetryAttempts": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "checkDiskSpace": {
+          "type": "boolean"
+        },
+        "checkModuleGraph": {
+          "type": "boolean"
+        },
+        "minDiskSpaceMB": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkNetwork": {
+          "type": "boolean"
+        },
+        "checkPorts": {
+          "type": "boolean"
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "uniqueItems": true,
+          "description": "Explicit port list checked by Test-PortAvailability; overrides the built-in default list"
+        },
+        "checkSDKVersions": {
+          "type": "boolean"
+        },
+        "minDotnetMajor": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "networkTimeout": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Network connectivity probe timeout in SECONDS (converted to ms internally)"
+        },
+        "requiredTools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "optionalTools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "Name",
+              "URL"
+            ],
+            "properties": {
+              "Name": {
+                "type": "string"
+              },
+              "URL": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        },
+        "autoFix": {
+          "type": "boolean"
+        },
+        "autoFixKillPorts": {
+          "type": "boolean",
+          "description": "When true, AutoFix stops the process occupying a checked port (opt-in; default report-only)"
+        },
+        "failOnInvalidConfig": {
+          "type": "boolean",
+          "description": "Abort build if config validation fails (requires Test-Json cmdlet)"
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "json",
+            "xml",
+            "html",
+            "markdown",
+            "junit"
+          ]
+        },
+        "outputDir": {
+          "type": "string"
+        },
+        "includeCharts": {
+          "type": "boolean"
+        },
+        "trackTrends": {
+          "type": "boolean"
+        },
+        "maxReportHistory": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "configuration": {
+            "type": "string"
+          },
+          "targetFramework": {
+            "type": "string"
+          },
+          "packageFormat": {
+            "type": "string"
+          },
+          "optimize": {
+            "type": "boolean"
+          },
+          "enableParallelBuild": {
+            "type": "boolean"
+          },
+          "incremental": {
+            "type": "boolean"
+          },
+          "logLevel": {
+            "type": "string",
+            "enum": [
+              "Debug",
+              "Info",
+              "Warn",
+              "Error"
+            ]
+          },
+          "nonInteractive": {
+            "type": "boolean"
+          },
+          "enableBuildCache": {
+            "type": "boolean"
+          },
+          "enableJsonLog": {
+            "type": "boolean"
+          },
+          "blockOnCriticalVulns": {
+            "type": "boolean",
+            "description": "Fail the build when critical vulnerabilities are found during security scan"
+          },
+          "extends": {
+            "type": "string",
+            "description": "Name of another profile to inherit settings from (merged before this profile)"
+          }
+        }
+      }
+    },
+    "projects": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "autoSelectStrategy": {
+          "type": "string"
+        },
+        "preferRootProject": {
+          "type": "boolean"
+        },
+        "testProjectPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Regex patterns identifying test projects excluded from auto-select (Project.psm1 Resolve-ProjectConfig)."
+        },
+        "systemDirPattern": {
+          "type": "string",
+          "description": "Regex for system/underscore directories skipped in project discovery (Project.psm1 Resolve-ProjectConfig)."
+        }
+      }
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "publishOutput": {
+          "type": "string"
+        },
+        "localeDir": {
+          "type": "string",
+          "description": "Path to locale resource files (relative to Modules/ or absolute). Defaults to ../Locales"
+        },
+        "vendoredTools": {
+          "type": "string",
+          "description": "Folder (relative to the _Build tree root) that holds the tooling this copy ships, e.g. the bundled PSScriptAnalyzer. Resolved by SharedUtils.Get-BuildVendoredToolsRoot and prepended to the session PSModulePath on demand, so a stale entry pointing at another copy cannot decide which analyzer a run gets.",
+          "default": ".tools/Modules"
+        }
+      }
+    },
+    "sdk": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "boolean",
+          "integer",
+          "number",
+          "array",
+          "object"
+        ],
+        "description": "Extensible SDK properties — any valid JSON type is accepted for forward compatibility"
+      },
+      "properties": {
+        "androidCmdLineToolsRelPath": {
+          "type": "string"
+        },
+        "cacheExpiryDays": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exeTimeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "defaultSearchDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "projectScanDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parentScanDepth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "winSearchDepthDelta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "quickMode": {
+          "type": "boolean"
+        },
+        "skipWindowsDriveScan": {
+          "type": "boolean"
+        },
+        "customPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "User-defined SDK root paths (searched first)"
+        },
+        "releaseMetadataBaseUrl": {
+          "type": "string",
+          "description": "Base URL for .NET release metadata (channel releases.json); used to learn the latest released SDK. Empty disables the remote check."
+        },
+        "maxKnownSdkVersion": {
+          "type": "string",
+          "description": "Offline fallback for the latest released SDK (e.g. 10.0.404); used when the release metadata is unreachable. Empty = unknown."
+        },
+        "releaseCacheHours": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How long a fetched latest-release version is trusted before re-checking (hours)"
+        },
+        "releaseCacheFileName": {
+          "type": "string",
+          "description": "File name of the user-local latest-release cache (next to the SDK cache)"
+        },
+        "autoProvision": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Auto-download SDK if not found (requires admin or writable installDir)"
+            },
+            "installDir": {
+              "type": "string",
+              "description": "Target install dir (supports ~), default ~/.dotnet"
+            },
+            "channel": {
+              "type": "string",
+              "description": "dotnet-install channel (e.g. STS, LTS, 8.0, 10.0)"
+            },
+            "version": {
+              "type": "string",
+              "description": "Exact SDK version to install (e.g. 10.0.300); wins over channel so a project global.json pin can be satisfied reproducibly. Empty = channel behaviour."
+            },
+            "installerSha256": {
+              "type": "string",
+              "description": "Expected SHA-256 of the dotnet-install script; mismatch fails closed. Empty (default, compat) proceeds with a warning."
+            }
+          }
+        },
+        "searchPaths": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "SDK search path groups for discovery waterfall",
+          "properties": {
+            "primary": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Primary search paths (user-local)"
+            },
+            "fallback": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fallback search paths (system-wide)"
+            }
+          }
+        },
+        "gbuildDotSdkAndroidSdk": {
+          "type": "string",
+          "default": ".sdk/android-sdk",
+          "description": "gbuild-specific SDK probe path (BuildConstants.SdkGbuildDotSdkAndroidSdk)."
+        },
+        "gbuildDotSdk": {
+          "type": "string",
+          "default": ".sdk",
+          "description": "gbuild-specific SDK root probe path (BuildConstants.SdkGbuildDotSdk)."
+        },
+        "gbuildParentDotSdkAndroidSdk": {
+          "type": "string",
+          "default": "../.sdk/android-sdk",
+          "description": "Parent gbuild-specific SDK probe path (BuildConstants.SdkGbuildParentDotSdkAndroidSdk)."
+        },
+        "ghostDetection": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Detect stub/fake SDK executables that are not real SDKs",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable ghost detection"
+            },
+            "ghostPatterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Regex patterns that identify ghost executables"
+            }
+          }
+        }
+      }
+    },
+    "versioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "git",
+            "file",
+            "none"
+          ]
+        },
+        "autoIncrement": {
+          "type": "string",
+          "enum": [
+            "major",
+            "minor",
+            "patch",
+            "none"
+          ]
+        },
+        "embedCommitHash": {
+          "type": "boolean"
+        },
+        "generateChangelog": {
+          "type": "boolean"
+        },
+        "commitCount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 20,
+          "description": "Number of git commits included in generated changelog (New-Changelog)."
+        },
+        "versionFile": {
+          "type": "string"
+        },
+        "defaultVersion": {
+          "type": "string",
+          "default": "0.1.0",
+          "description": "Fallback project version when no version file/manifest exists (BuildConstants.DefaultProjectVersion)."
+        },
+        "searchDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Directory recursion depth for version.json / csproj scan (Versioning.psm1)."
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vulnerabilityTimeoutSec": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 120,
+          "description": "Per-invocation timeout in seconds for each vulnerable-package audit (npm audit, dotnet list --vulnerable, govulncheck, pip-audit, cargo audit). On timeout the audit is killed and the step degrades to Skipped instead of hanging the build. 0 disables the timeout. Distinct from security.sast.timeoutSec, which bounds the SAST scanners rather than the package audits. Read by Security.psm1 via Get-SecurityConfigValue -Path 'security.vulnerabilityTimeoutSec'."
+        },
+        "vulnerabilityAllowlist": {
+          "type": "array",
+          "default": [],
+          "description": "Per-advisory accepted-risk list. An entry exempts matching findings from blocking the build, but ONLY while two invariants hold: (1) `reason` holds a non-empty human-readable justification that also names a reviewer or owner; (2) `until` (ISO date YYYY-MM-DD) is in the future. EXPIRED entries stop being honored and the findings they covered fall back to blocking, so a stale entry fails the build rather than silently disappearing. gbuild writes every accepted decision to the audit ledger with advisory/package/reason/until so a security review can audit it. _Build does NOT guess patched versions or auto-bump deps - decisions about upgrading or accepting risk belong to the project; _Build only enforces transparency.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "advisory",
+              "reason",
+              "until"
+            ],
+            "properties": {
+              "advisory": {
+                "type": "string",
+                "pattern": "^(GHSA|CVE)-[A-Za-z0-9-]+$",
+                "description": "Advisory identifier, as reported by the scanner (e.g. 'GHSA-846f-f764-76mx' or 'CVE-2025-79xxx'). Must match an actual finding; otherwise the entry is reported stale."
+              },
+              "package": {
+                "type": "string",
+                "description": "Optional substring/scope applied to Vuln.Package. Present = requires the advisory to match on this package too; absent = any matching advisory anywhere."
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "Critical",
+                  "High",
+                  "Medium",
+                  "Low"
+                ],
+                "description": "Optional scope to a single severity. Absent = any severity presenting that advisory."
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 20,
+                "description": "Non-empty justification (min 20 chars) naming WHY the risk is accepted and WHO owns the follow-up. Surfaced verbatim in the audit ledger entry."
+              },
+              "until": {
+                "type": "string",
+                "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                "description": "ISO date (YYYY-MM-DD). While before today, the entry is active; once it lapses the covered vulns block again (and _Build prints a 'stale allowlist entry' notice). This is the time-box mechanism - a 1-year 'until' is not a long-term solution."
+              }
+            }
+          }
+        },
+        "vulnerabilitySeverityThreshold": {
+          "type": "string",
+          "enum": [
+            "critical",
+            "high",
+            "medium",
+            "low",
+            "none"
+          ],
+          "default": "high",
+          "description": "Blocking threshold: a finding whose severity rank meets or exceeds this blocks the build. 'none' disables blocking on severity (still logged to audit ledger). Replaces the old binary 'block/all' behaviour."
+        },
+        "scanOnBuild": {
+          "type": "boolean",
+          "description": "Run the security gate (secret scan, vulnerable-package audit, license compliance) as part of the standard build pipeline. Ships TRUE: a gate nobody runs is not a gate. Set false only for local exploratory builds - a failing scan then still fails the build with exit code 2."
+        },
+        "scanSecrets": {
+          "type": "boolean"
+        },
+        "checkVulnerablePackages": {
+          "type": "boolean"
+        },
+        "validateLicenses": {
+          "type": "boolean"
+        },
+        "reportCodeSigning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Report code-signing status (Signed / NotSigned) during the security scan. INFORMATIONAL ONLY - never fails the build. SmartScreen warns on unsigned binaries but they can still be distributed, so this is a status line, not a gate."
+        },
+        "allowedActions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "description": "Allow-list of privileged menu actions (e.g. '13' for GitHub Actions). When present, only listed actions are permitted; empty = deny all privileged. Omitted = allow all (backward compatible)."
+        },
+        "sbom": {
+          "type": "object",
+          "description": "CycloneDX SBOM generation after build (SupplyChain.psm1)",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "cyclonedx"
+              ],
+              "default": "cyclonedx"
+            },
+            "policy": {
+              "type": "object",
+              "description": "SBOM policy gate: allow/deny package lists evaluated against generated components",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "allowList": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "denyList": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "enforcement": {
+                  "type": "string",
+                  "enum": [
+                    "warn",
+                    "block",
+                    "fail"
+                  ],
+                  "default": "warn"
+                }
+              }
+            }
+          }
+        },
+        "provenance": {
+          "type": "object",
+          "description": "SLSA provenance attestation (in-toto statement) after build",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "artifactSign": {
+          "type": "object",
+          "description": "Artifact signing via cosign sign-blob or notation. FAIL-CLOSED: when enabled and the signing CLI is absent the build is blocked (see SupplyChain.Tests.ps1 'P0 fail-closed regressions'). Disabled by default so a machine without a signing keypair is not blocked; enable it once cosign is installed and configured.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "tool": {
+              "type": "string",
+              "enum": [
+                "cosign",
+                "notation"
+              ],
+              "default": "cosign"
+            },
+            "key": {
+              "type": "string",
+              "description": "cosign private key path, supports ${env:VAR}"
+            },
+            "identity": {
+              "type": "string",
+              "description": "notation signing identity/key name"
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Container image refs for notation signing"
+            }
+          }
+        },
+        "containerScan": {
+          "type": "object",
+          "description": "Container/filesystem vulnerability scanning via trivy. FAIL-CLOSED: when enabled and the trivy CLI is absent the build is blocked, matching security.artifactSign - a gate you enabled must be able to give a verdict. Disabled by default so a machine without trivy is not blocked; enable it once the scanner is installed.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "tool": {
+              "type": "string",
+              "default": "trivy",
+              "description": "Scanner CLI used for container/filesystem vulnerability scanning"
+            },
+            "images": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "severity": {
+              "type": "string",
+              "default": "HIGH,CRITICAL"
+            },
+            "failOnSeverity": {
+              "type": "string",
+              "enum": [
+                "HIGH",
+                "CRITICAL"
+              ],
+              "default": "CRITICAL"
+            }
+          }
+        },
+        "sast": {
+          "type": "object",
+          "description": "Multi-language static analysis (Sast.psm1): routes to language-specific scanners (dotnet list --vulnerable, npm audit, bandit, cargo-audit, gosec, cppcheck, brakeman, phpcs, Invoke-ScriptAnalyzer). Graceful-degrade when the scanner tool is missing.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "severityThreshold": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ],
+              "default": "high"
+            },
+            "failOnFindings": {
+              "type": "boolean",
+              "default": true
+            },
+            "tools": {
+              "type": "object",
+              "description": "Optional per-language override map: { \"<Language>\": \"<custom command>\" }. Omitted languages fall back to the built-in tool map.",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "dotnetIgnoreNoFindingsExitCode": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, 'dotnet list package --vulnerable' exit code 1 (no vulnerabilities found) is treated as success (BuildConstants.SastDotnetIgnoreNoFindingsExitCode)."
+            },
+            "timeoutSec": {
+              "type": "integer",
+              "default": 120,
+              "minimum": 0,
+              "description": "Per-tool SAST execution timeout in seconds. dotnet list --vulnerable can stall on NuGet restore; on timeout the tool is killed and the step degrades to Skipped instead of hanging the build. 0 disables the timeout (BuildConstants.SastTimeoutSec)."
+            },
+            "bundledAnalyzerVersion": {
+              "type": "string",
+              "default": "1.25.0",
+              "description": "PSScriptAnalyzer version this _Build copy bundles under paths.vendoredTools. SharedUtils.Resolve-VendoredToolModule imports it when Invoke-ScriptAnalyzer does not already resolve, so PowerShell SAST and lint run without the project installing anything (BuildConstants.ScriptAnalyzerVersion)."
+            },
+            "toolUnavailablePolicy": {
+              "description": "Behaviour when an optional SAST tool is not installed.",
+              "type": "string",
+              "default": "fail",
+              "enum": [
+                "fail",
+                "block",
+                "warn",
+                "skip"
+              ]
+            }
+          }
+        },
+        "policy": {
+          "type": "object",
+          "description": "Policy-as-code gate (Policy.psm1): evaluates OPA/Rego files under security.policy.dir (data.<package>.deny). Falls back to a built-in rule engine when OPA is not installed. Enforcement: warn (non-blocking) / block (fail build) / fail (throw).",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "dir": {
+              "type": "string",
+              "description": "Directory containing .rego files (OPA). Empty = built-in rules only."
+            },
+            "package": {
+              "type": "string",
+              "default": "gbuild.policy",
+              "description": "OPA Rego package name whose 'deny' set is evaluated"
+            },
+            "enforcement": {
+              "type": "string",
+              "enum": [
+                "warn",
+                "block",
+                "fail"
+              ],
+              "default": "warn"
+            },
+            "opaServerUrl": {
+              "type": "string",
+              "description": "OPA server base URL for enterprise sidecar (e.g. http://opa:8181). Empty = disabled; supports ${env:VAR}. (BuildConstants.PolicyOpaServerUrl)."
+            },
+            "opaServerTimeoutSec": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 120,
+              "default": 10,
+              "description": "OPA server HTTP timeout seconds (BuildConstants.PolicyOpaServerTimeoutSec)."
+            },
+            "rules": {
+              "type": "array",
+              "description": "Built-in rules when OPA/Rego unavailable: [{ rule, match, path, value, action(deny/allow), excludePaths[] }]. match = '*' (any path) or 'key=value' pattern. excludePaths = wildcard entry-keys the rule never applies to (e.g. the single-source constants file).",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "match": {
+                    "type": "string",
+                    "default": "*"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "deny",
+                      "allow"
+                    ],
+                    "default": "deny"
+                  },
+                  "excludePaths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Wildcard entry-keys exempt from this rule (single-source-of-truth files that legitimately centralize literals)."
+                  }
+                },
+                "required": [
+                  "rule"
+                ]
+              }
+            },
+            "allowExternalDir": {
+              "description": "When true, policy.dir may point outside the project root (centrally managed policy). Defaults to false (project-contained policy only).",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "siem": {
+          "type": "object",
+          "description": "SIEM export (Siem.psm1): forwards security audit events to a SIEM aggregator. format: cef (ArcSight) / syslog (RFC5424) / json. transport: file (graceful-degrade) / udp / http.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "cef",
+                "syslog",
+                "json"
+              ],
+              "default": "cef"
+            },
+            "transport": {
+              "type": "string",
+              "enum": [
+                "file",
+                "udp",
+                "http"
+              ],
+              "default": "file"
+            },
+            "endpoint": {
+              "type": "string",
+              "description": "Syslog host or HTTP URL. Supports ${env:VAR} placeholders."
+            },
+            "port": {
+              "type": "integer",
+              "default": 514
+            },
+            "outputFile": {
+              "type": "string",
+              "default": "siem-events.log"
+            },
+            "enterpriseId": {
+              "type": "integer",
+              "default": 32473,
+              "description": "Private enterprise number for [gbuild@<id> ...] structured data (RFC5424, BuildConstants.SiemEnterpriseId)."
+            },
+            "timeoutSec": {
+              "description": "HTTP transport timeout in seconds for SIEM export.",
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "blockOnCriticalVulns": {
+          "type": "boolean"
+        },
+        "allowedLicenseTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "excludeDirs": {
+          "type": "array",
+          "description": "Static directories excluded from secret scanning (build artifacts, VCS metadata). Test directories are auto-detected by containing *.Tests.ps1 files — do NOT list them here.",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "scanMaxFileMB": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Skip files larger than this size (MB) during secret scanning."
+        },
+        "scanDepth": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2,
+          "description": "Directory recursion depth for security scans (BuildConstants.SecurityScanDepth)."
+        },
+        "secretPatterns": {
+          "type": "array",
+          "description": "Custom search patterns for secret scanning (used by Security.psm1). Merged with built-in patterns.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "Low",
+                  "Medium",
+                  "High",
+                  "Critical"
+                ]
+              }
+            },
+            "required": [
+              "pattern"
+            ]
+          }
+        },
+        "gpgSign": {
+          "type": [
+            "boolean",
+            "object"
+          ],
+          "description": "Enable GPG signing for deploy artifacts. Boolean shorthand or object { enabled, keyId }.",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "keyId": {
+              "type": "string",
+              "description": "Optional GPG key id to sign with"
+            },
+            "artifactExtensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "GPG artifacts eligible for signing, dot-prefixed and lower-case. Cross-platform by default: Windows forms (.exe/.dll/.msi/.msix), archives (.zip/.nupkg/.jar/.war), native Unix libraries (.so/.dylib/.a), mobile bundles (.apk/.aab/.ipa/.pkg/.app) and (.wasm/.deb/.rpm). Debug output (.pdb/.xml/.map) is deliberately absent. This list is separate from build.clean.artifactExtensions because signing and cleaning are different questions; narrowing it is how you stop signing a whole platform by accident."
+            }
+          }
+        },
+        "licenseEnforcement": {
+          "type": "string",
+          "enum": [
+            "off",
+            "warn",
+            "block"
+          ],
+          "description": "License enforcement policy"
+        },
+        "vaultKeyFile": {
+          "type": "string",
+          "description": "Path to vault encryption key file, supports ${env:VAR}"
+        },
+        "vault": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "CredentialVault cryptographic parameters (CredentialVault.psm1). All support ${env:VAR} placeholders. Defaults come from BuildConstants (pbkdf2Iterations >= 100000 per NIST).",
+          "properties": {
+            "pbkdf2Iterations": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "description": "PBKDF2 iterations for AES key derivation (>= 100000 recommended). Numeric string OK (env placeholder)."
+            },
+            "VaultStaticSalt": {
+              "type": "string",
+              "description": "Static salt used when no salt is supplied to Get-DerivedKey. Supports ${env:VAR}."
+            },
+            "VaultMachineSalt": {
+              "type": "string",
+              "description": "Machine-scoped salt for the ephemeral fallback key. Supports ${env:VAR}."
+            },
+            "allowLegacyCbc": {
+              "description": "Allow reading legacy (pre-v2) unauthenticated AES-CBC payloads. Must be explicitly opted in; default-disabled for crypto safety.",
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "auditLogPath": {
+          "type": "string",
+          "description": "Path for security audit log output"
+        },
+        "auditLogMaxSizeMB": {
+          "type": "integer",
+          "description": "Max audit log size before rotation (renames to audit-<timestamp>.log)",
+          "default": 10
+        },
+        "redactPatterns": {
+          "type": "array",
+          "description": "Credential patterns redacted from logs by Remove-Credentials (config-driven, extensible).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "replacement": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "pattern"
+            ]
+          }
+        },
+        "encryptedValue": {
+          "type": "string",
+          "description": "Prefix convention: config values produced by CredentialVault (Protect-CredentialValue / ConvertTo-EncryptedSecret) are prefixed with 'enc:'. At runtime Resolve-SecretValue transparently decrypts them via DPAPI (Windows). Values already encrypted this way are NOT flagged as plaintext secrets by the scanner."
+        },
+        "rbac": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Role-Based Access Control (RBAC.psm1): enterprise-grade authorization with roles, permissions, resource scoping, and policy-as-code integration.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable RBAC authorization (when false, falls back to security.allowedActions only)"
+            },
+            "enforcement": {
+              "type": "string",
+              "enum": [
+                "permissive",
+                "strict",
+                "audit"
+              ],
+              "default": "permissive",
+              "description": "RBAC/policy fail-open vs fail-closed (RBAC.psm1 Get-RbacEnforcementMode): permissive skips missing engine with audit log; strict denies. Additive, defaults to permissive for compat."
+            },
+            "enforceInCI": {
+              "type": "boolean",
+              "default": true,
+              "description": "L5 CI deny-by-default: non-interactive runs deny privileged actions without an explicit allow-list or full RBAC. Read-only actions (ciReadOnlyActions) stay available."
+            },
+            "ciReadOnlyActions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "D",
+                "H",
+                "R"
+              ],
+              "description": "Menu actions still allowed in CI when enforceInCI is on and no allow-list is configured (diagnostics only)."
+            },
+            "defaultRole": {
+              "type": "string",
+              "default": "Viewer",
+              "description": "Default role assigned to users without explicit mapping"
+            },
+            "privilegedActions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [
+                "A",
+                "B",
+                "V",
+                "G",
+                "P",
+                "F",
+                "E",
+                "K",
+                "Y",
+                "S",
+                "L",
+                "C",
+                "13"
+              ],
+              "description": "Single source of truth for the privileged menu-action set. Orchestrator gates on this list and Menu.psm1 greys out entries that security.allowedActions denies, so the UI never advertises a rejected choice."
+            },
+            "userRoles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "Direct user-to-role mappings: { \"username\": [\"Role1\", \"Role2\"] }"
+            },
+            "groupRoles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "Group-to-role mappings (AD/LDAP groups): { \"group-name\": [\"Role1\"] }"
+            },
+            "roles": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Custom role definitions (merges with built-in: Viewer, Developer, BuildEngineer, SecurityOfficer, ReleaseManager, PlatformAdmin, Auditor)",
+              "patternProperties": {
+                "^[A-Za-z][A-Za-z0-9]*$": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "description": {
+                      "type": "string"
+                    },
+                    "permissions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Permission strings (e.g., 'build:execute', 'deploy:*', 'security:read')"
+                    },
+                    "inherits": {
+                      "type": "string",
+                      "description": "Parent role name for inheritance"
+                    }
+                  }
+                }
+              }
+            },
+            "resources": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Custom resource hierarchy (merges with built-in: build, test, deploy, cache, security, report, log, metric, artifact, version, release, promote, audit, trail, scan, policy, vuln, sbom, provenance, secret)",
+              "patternProperties": {
+                "^[a-z][a-z0-9]*$": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "tenantRoles": {
+              "type": "object",
+              "description": "Per-tenant role overrides applied over the built-in RBAC role table (RBAC.psm1). Omitted = no tenant-specific roles."
+            },
+            "trustEnvironmentRoles": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, role names listed in trustedEnvRoles are honoured from the process environment. Fail-closed default."
+            },
+            "trustedEnvRoles": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": [],
+              "description": "Role names accepted from the process environment when trustEnvironmentRoles is true. Empty = deny all."
+            }
+          }
+        },
+        "auditLedger": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Immutable audit trail with WORM/ledger support (AuditLedger.psm1): hash-chained entries, Merkle tree checkpoints, cryptographic signing, compliance export.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Enable audit ledger"
+            },
+            "backend": {
+              "type": "string",
+              "enum": [
+                "file",
+                "s3",
+                "azureBlob",
+                "ledger",
+                "custom"
+              ],
+              "default": "file",
+              "description": "Storage backend"
+            },
+            "memoryCap": {
+              "type": "integer",
+              "minimum": 100,
+              "default": 5000,
+              "description": "Max entries retained in the in-memory ring used by the 'ledger' backend"
+            },
+            "file": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "default": "audit-ledger.jsonl",
+                  "description": "Ledger file path (relative to project root)"
+                },
+                "maxSizeMB": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 100,
+                  "description": "Max file size before rotation"
+                },
+                "maxFiles": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 100,
+                  "description": "Max rotated files to retain"
+                },
+                "immutable": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "WORM: prevent overwrite/delete (Windows ACL-based)"
+                }
+              }
+            },
+            "s3": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "bucket": {
+                  "type": "string",
+                  "description": "S3 bucket name"
+                },
+                "region": {
+                  "type": "string",
+                  "description": "AWS region"
+                },
+                "prefix": {
+                  "type": "string",
+                  "default": "audit-ledger/",
+                  "description": "Object key prefix"
+                },
+                "objectLock": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable S3 Object Lock for WORM"
+                },
+                "retentionDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 2555,
+                  "description": "Retention period in days (7 years default)"
+                }
+              }
+            },
+            "azureBlob": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "container": {
+                  "type": "string",
+                  "default": "audit-ledger",
+                  "description": "Blob container name"
+                },
+                "immutableStorage": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable Azure Immutable Blob Storage"
+                },
+                "retentionDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 2555,
+                  "description": "Retention period in days"
+                }
+              }
+            },
+            "ledger": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "merkle",
+                    "hashchain",
+                    "custom"
+                  ],
+                  "default": "merkle",
+                  "description": "Ledger structure type"
+                },
+                "hashAlgorithm": {
+                  "type": "string",
+                  "default": "SHA256",
+                  "description": "Hash algorithm for chaining"
+                },
+                "checkpointInterval": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 1000,
+                  "description": "Entries between Merkle root checkpoints"
+                },
+                "signingKey": {
+                  "type": "string",
+                  "description": "Path to signing private key (env placeholder supported)"
+                }
+              }
+            },
+            "signing": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable cryptographic signing of entries"
+                },
+                "requireKey": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "L5 fail-closed: signing enabled without a usable key throws at init. Set signing.enabled=false to explicitly accept an unsigned ledger."
+                },
+                "algorithm": {
+                  "type": "string",
+                  "enum": [
+                    "RSA-SHA256",
+                    "ECDSA-SHA256",
+                    "Ed25519"
+                  ],
+                  "default": "RSA-SHA256",
+                  "description": "Signing algorithm"
+                },
+                "keyPath": {
+                  "type": "string",
+                  "description": "Path to private key (env placeholder supported)"
+                },
+                "keyPassword": {
+                  "type": "string",
+                  "description": "Key password (env placeholder supported)"
+                },
+                "certPath": {
+                  "type": "string",
+                  "description": "Optional certificate for verification"
+                }
+              }
+            },
+            "verification": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable periodic verification"
+                },
+                "schedule": {
+                  "type": "string",
+                  "default": "0 2 * * *",
+                  "description": "Cron schedule for verification (daily 2 AM default)"
+                },
+                "onStartup": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Verify on gbuild startup"
+                },
+                "onDemand": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Allow manual verification"
+                },
+                "alertOnFailure": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Alert on verification failure"
+                }
+              }
+            },
+            "retention": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "defaultDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "default": 2555,
+                  "description": "Default retention period (7 years)"
+                },
+                "perCategory": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "description": "Per-category retention overrides"
+                },
+                "legalHold": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "Categories under legal hold (never expire)"
+                }
+              }
+            },
+            "compliance": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "standards": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "SOX",
+                    "GDPR",
+                    "HIPAA",
+                    "PCI-DSS"
+                  ],
+                  "description": "Compliance standards to support"
+                },
+                "exportFormat": {
+                  "type": "string",
+                  "enum": [
+                    "jsonl",
+                    "csv",
+                    "cef",
+                    "syslog"
+                  ],
+                  "default": "jsonl",
+                  "description": "Export format for compliance reports"
+                },
+                "includeHashChain": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Include hash chain in exports"
+                },
+                "includeSignatures": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Include signatures in exports"
+                }
+              }
+            }
+          }
+        },
+        "vulnerabilityToolPolicy": {
+          "description": "How a missing optional vulnerability scanner is handled.",
+          "type": "string",
+          "default": "fail",
+          "enum": [
+            "fail",
+            "block",
+            "warn",
+            "skip"
+          ]
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflowFile": {
+          "type": "string",
+          "default": "build.yml"
+        },
+        "packageFormatNonInteractive": {
+          "type": "string",
+          "default": "aab"
+        },
+        "packageFormatInteractive": {
+          "type": "string",
+          "default": "apk"
+        },
+        "defaultBranch": {
+          "type": "string",
+          "default": "main"
+        },
+        "azure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pipelineFile": {
+              "type": "string"
+            },
+            "projectName": {
+              "type": "string",
+              "description": "Azure DevOps project name"
+            },
+            "orgUrl": {
+              "type": "string",
+              "description": "Azure DevOps organization URL"
+            }
+          }
+        },
+        "docker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "registry": {
+              "type": "string"
+            },
+            "autoTag": {
+              "type": "boolean"
+            },
+            "imagePrefix": {
+              "type": "string",
+              "description": "Docker image name prefix (e.g. username)"
+            },
+            "useGhcr": {
+              "type": "boolean",
+              "description": "Push to GitHub Container Registry"
+            },
+            "ghcrOwner": {
+              "type": "string",
+              "description": "GHCR owner (org or user)"
+            },
+            "composeServices": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Docker Compose services to deploy"
+            }
+          }
+        },
+        "notifications": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "providers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "webhookUrl": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "anonymousOnly": {
+          "type": "boolean"
+        },
+        "collectBuildTimes": {
+          "type": "boolean"
+        },
+        "collectErrorStats": {
+          "type": "boolean"
+        },
+        "prometheus": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "bindAddress": {
+              "type": "string",
+              "default": "localhost",
+              "description": "Bind address: 'localhost' (secure, no admin needed) or '+' (all interfaces, requires URL reservation)"
+            },
+            "altPorts": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "default": [
+                9101,
+                9102,
+                9200,
+                9300
+              ],
+              "description": "Fallback ports tried when the primary port cannot be bound"
+            },
+            "metricsPath": {
+              "type": "string",
+              "default": "/metrics/",
+              "description": "Prometheus scrape path (BuildConstants.PrometheusMetricsPath)."
+            }
+          }
+        },
+        "otel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "endpoint": {
+              "type": "string",
+              "description": "OTLP exporter endpoint, supports ${env:VAR}"
+            },
+            "metricsPath": {
+              "type": "string",
+              "default": "/v1/metrics",
+              "description": "OTLP HTTP metrics path (BuildConstants.OtlpMetricsPath)."
+            },
+            "tracesPath": {
+              "type": "string",
+              "default": "/v1/traces",
+              "description": "OTLP HTTP traces path (BuildConstants.OtlpTracesPath)."
+            },
+            "jsonDepth": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 10,
+              "description": "ConvertTo-Json depth for OTLP payload (BuildConstants.OtlpJsonDepth)."
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Chạy InfraVerification trong pipeline build. Switch -VerifyInfra chạy độc lập (không cần bật)."
+        },
+        "ssh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Probe từng host trong distributed.hosts"
+        },
+        "remoteCache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Kiểm tra cấu hình remote cache (read-only)"
+        },
+        "otel": {
+          "type": "boolean",
+          "default": true,
+          "description": "Probe collector OTLP bằng 1 counter tối thiểu"
+        },
+        "webhook": {
+          "type": "boolean",
+          "default": true,
+          "description": "Kiểm tra alerting.webhookUrl đã cấu hình hợp lệ"
+        },
+        "webhookSendTest": {
+          "type": "boolean",
+          "default": false,
+          "description": "Gửi test alert thật tới webhook (thận trọng)"
+        },
+        "sdk": {
+          "type": "boolean",
+          "default": true,
+          "description": "Xác minh dotnet --list-sdks (phát hiện ghost stub)"
+        },
+        "connectTimeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10,
+          "description": "SSH connect timeout (giây)"
+        },
+        "requestTimeout": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "HTTP request timeout cho OTLP/webhook (giây)"
+        },
+        "outputDir": {
+          "type": "string",
+          "default": "build-reports",
+          "description": "Thư mục báo cáo (tương đối từ ProjectRoot)"
+        }
+      }
+    },
+    "dotnet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaultTfm": {
+          "type": "string"
+        },
+        "useMSBuild": {
+          "type": "boolean"
+        },
+        "restoreParallel": {
+          "type": "boolean"
+        },
+        "noRestore": {
+          "type": "boolean"
+        },
+        "noIncremental": {
+          "type": "boolean"
+        },
+        "verbosity": {
+          "type": "string",
+          "enum": [
+            "quiet",
+            "minimal",
+            "normal",
+            "detailed",
+            "diagnostic"
+          ]
+        },
+        "diagnostics": {
+          "type": "boolean"
+        }
+      }
+    },
+    "android": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Android debug keystore + default ApplicationId defaults (single source, config-overridable).",
+      "properties": {
+        "defaultApplicationId": {
+          "type": "string",
+          "description": "Fallback ApplicationId used when a project does not declare <ApplicationId>."
+        },
+        "adbUninstallDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Delay (ms) after adb uninstall before install."
+        },
+        "adbConnectTimeoutMs": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2000,
+          "description": "Timeout (ms) for ADB connect attempts (BuildConstants.AdbConnectTimeoutMs)."
+        },
+        "adbAutoConnectEndpoints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "ADB endpoints (host:port) to auto-connect when no device is detected. Covers emulators, physical devices reachable over TCP/IP, and cross-OS bridges."
+        },
+        "keystore": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "alias": {
+              "type": "string",
+              "description": "Keystore alias for the generated debug key."
+            },
+            "distinguishedName": {
+              "type": "string"
+            },
+            "keySize": {
+              "type": "integer",
+              "minimum": 1024
+            },
+            "validityDays": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "boolean",
+          "integer",
+          "number",
+          "array",
+          "object"
+        ],
+        "description": "Extensible deploy properties — any valid JSON type is accepted for forward compatibility"
+      },
+      "properties": {
+        "webReadinessAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Polling attempts (WebAppLaunchDelayMs apart) waiting for a launched web app to listen on its port."
+        },
+        "webAppLaunchDelayMs": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "Base probe interval (ms) between readiness polls, growing adaptively up to a cap."
+        },
+        "webAppLaunchDelayMinMs": {
+          "type": "integer",
+          "minimum": 10,
+          "description": "Minimum probe interval (ms) during the fast port-listen phase of readiness detection."
+        },
+        "webPortProbe": {
+          "type": "boolean",
+          "description": "When true, probe for TCP port-listen first (fast) before confirming an HTTP response, then wait for HTTP serving."
+        },
+        "webAppLaunchMaxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total web-apphost launch attempts (first try plus fresh-process retries) before reporting not-ready. A transient slow start is retried with a new process rather than failing immediately."
+        },
+        "requiredFields": {
+          "type": "object",
+          "description": "Override required-field maps per deploy target (key=target name, value=array of required property names).",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "environments": {
+          "type": "object",
+          "description": "Named deployment environments with branch mapping and approval rules",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "branch": {
+                "type": "string",
+                "description": "Git branch pattern for this environment"
+              },
+              "requiresApproval": {
+                "type": "boolean"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "autoDeploy": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "rollback": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "backupDir": {
+              "type": "string",
+              "description": "Backup directory for rollback state"
+            }
+          }
+        },
+        "health": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "url": {
+              "type": "string"
+            },
+            "expectedStatus": {
+              "type": "integer"
+            },
+            "retries": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "delayMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "order": {
+          "type": "object",
+          "properties": {
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "failFast": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "concurrency": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "lockTimeoutMs": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "blueGreen": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "manifest": {
+              "type": "string"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "imageRepo": {
+              "type": "string"
+            }
+          }
+        },
+        "azure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "resourceGroup": {
+              "type": "string"
+            },
+            "appName": {
+              "type": "string"
+            },
+            "plan": {
+              "type": "string"
+            },
+            "location": {
+              "type": "string"
+            }
+          }
+        },
+        "aws": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "bucket": {
+              "type": "string"
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "distributionId": {
+              "type": "string",
+              "description": "CloudFront distribution id (can use env var)"
+            }
+          }
+        },
+        "vercel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "project": {
+              "type": "string"
+            }
+          }
+        },
+        "gcp": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "project": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "service": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            },
+            "allowUnauthenticated": {
+              "type": "boolean"
+            }
+          }
+        },
+        "kubernetes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "namespace": {
+              "type": "string"
+            },
+            "manifest": {
+              "type": "string"
+            },
+            "imageRepo": {
+              "type": "string"
+            },
+            "context": {
+              "type": "string"
+            },
+            "registry": {
+              "type": "string"
+            }
+          }
+        },
+        "azureFunctions": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "resourceGroup": {
+              "type": "string"
+            },
+            "appName": {
+              "type": "string"
+            },
+            "runtime": {
+              "type": "string"
+            },
+            "workingDirectory": {
+              "type": "string"
+            }
+          }
+        },
+        "awsLambda": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "functionName": {
+              "type": "string"
+            },
+            "region": {
+              "type": "string"
+            },
+            "runtime": {
+              "type": "string"
+            },
+            "handler": {
+              "type": "string"
+            },
+            "workingDirectory": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "errorHandling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "baseDelayMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxDelayMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retryTimeoutSec": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "enrichContext": {
+          "type": "boolean"
+        },
+        "circuitBreaker": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "failureThreshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "resetTimeoutMs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "persistState": {
+              "type": "boolean",
+              "description": "Persist breaker state across sessions"
+            },
+            "statePath": {
+              "type": "string",
+              "description": "Optional explicit path for breaker state file"
+            }
+          }
+        }
+      }
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deny": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "blockOnViolation": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tenancy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant id, supports ${env:VAR} placeholder"
+        },
+        "defaultTenant": {
+          "type": "string"
+        },
+        "isolation": {
+          "type": "string",
+          "enum": [
+            "directory",
+            "none"
+          ]
+        },
+        "overrides": {
+          "type": "object",
+          "description": "Per-tenant config overlay: deep-merges tenancy.overrides.<tenantId> over the effective config at pipeline bootstrap",
+          "additionalProperties": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "before-build": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "after-build": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "afterBuild": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "apply": {
+              "type": "boolean",
+              "description": "Run the after-build remediation action (e.g. CHANGELOG generation) even when the hook was invoked without -Apply. Default false keeps post-build runs read-only."
+            }
+          }
+        }
+      }
+    },
+    "alerting": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "minSeverity": {
+          "type": "string",
+          "enum": [
+            "Info",
+            "Warning",
+            "Error",
+            "Critical"
+          ]
+        },
+        "webhookUrl": {
+          "type": "string",
+          "description": "Alert webhook URL, supports ${env:VAR} placeholder"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "generic",
+            "slack",
+            "teams",
+            "discord"
+          ],
+          "default": "generic",
+          "description": "Webhook payload format. 'generic' sends a gbuild JSON envelope; 'slack'/'teams'/'discord' format natively and auto-detects from webhookUrl when set to generic."
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "rotateTokens": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable time-based webhook token rotation; rotated token is sent in the X-Gbuild-Token header."
+        },
+        "rotationIntervalHours": {
+          "type": "number",
+          "minimum": 0.1,
+          "default": 24,
+          "description": "Token rotation TTL in hours."
+        },
+        "tokenByteLength": {
+          "type": "integer",
+          "minimum": 8,
+          "default": 24,
+          "description": "Byte length of generated webhook tokens (BuildConstants.WebhookTokenByteLength)."
+        },
+        "timeoutSec": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        },
+        "retryAttempts": {
+          "maximum": 10,
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "retryDelayMs": {
+          "maximum": 10000,
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    },
+    "distributed": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Multi-host distributed build execution via SSH (cross-platform, PS 5.1 safe). Remote hosts must already have the repository cloned and build SDKs installed — no file sync is performed.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable distributed build execution across remote hosts"
+        },
+        "strategy": {
+          "type": "string",
+          "enum": [
+            "round-robin",
+            "tag-based"
+          ],
+          "description": "Task distribution strategy: round-robin cycles hosts, tag-based matches task tags to host tags then falls back to round-robin"
+        },
+        "sshPort": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 22,
+          "description": "Default SSH port for distributed hosts (BuildConstants.SshDefaultPort)."
+        },
+        "repoRoot": {
+          "type": "string",
+          "description": "Absolute path to the project root on each remote host (assumes repo already cloned)"
+        },
+        "strictHostKeyChecking": {
+          "type": "string",
+          "default": "accept-new",
+          "description": "SSH StrictHostKeyChecking value: 'accept-new' (secure), 'no' (insecure, legacy), or 'yes' (strict). Defaults to 'accept-new' for first-use trust."
+        },
+        "hosts": {
+          "type": "array",
+          "description": "List of remote build agent hosts",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "hostname",
+              "user"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Logical name for the host"
+              },
+              "hostname": {
+                "type": "string",
+                "description": "IP or DNS name of the host"
+              },
+              "user": {
+                "type": "string",
+                "description": "SSH username"
+              },
+              "port": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535,
+                "description": "SSH port (default 22)"
+              },
+              "identityFile": {
+                "type": "string",
+                "description": "Path to SSH private key, supports ~ expansion"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "uniqueItems": true,
+                "description": "Labels used for tag-based task affinity"
+              },
+              "maxConcurrent": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Max parallel tasks on this host"
+              },
+              "certificateThumbprint": {
+                "type": "string",
+                "pattern": "^([0-9A-Fa-f]{40,128}|\\$\\{env:[A-Za-z0-9_]+\\})$",
+                "description": "A2: X.509 thumbprint in Windows/macOS cert store; supports ${env:VAR} placeholder (resolved at runtime); validated as pre-flight"
+              },
+              "certificatePath": {
+                "type": "string",
+                "description": "A2: path to PEM certificate file (e.g. Linux); validated as pre-flight"
+              },
+              "certificatePassword": {
+                "type": "string",
+                "description": "A2: certificate password, supports ${env:VAR} placeholder"
+              },
+              "requireCert": {
+                "type": "boolean",
+                "description": "A2 hard-gate: when true and the host declares a certificate, an invalid certificate EXCLUDES the host from the build pool"
+              }
+            }
+          }
+        },
+        "minConcurrent": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Minimum concurrent tasks for distributed build (BuildConstants.DistributedMinConcurrent)."
+        },
+        "maxTotalConcurrency": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 64,
+          "description": "Global runspace-pool ceiling for distributed dispatch (backpressure for 10+ hosts, BuildConstants.DistributedMaxTotalConcurrency)."
+        },
+        "probeBatchSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 8,
+          "description": "SSH probe batch size for large fleets (BuildConstants.DistributedProbeBatchSize)."
+        },
+        "taskMaxRetries": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 2,
+          "description": "Per-task retry for transient SSH failures (BuildConstants.DistributedTaskMaxRetries)."
+        },
+        "reportPath": {
+          "type": "string",
+          "default": "distributed-report",
+          "description": "Directory (under ScriptRoot) for the distributed build result aggregation dashboard, JSON + Markdown (BuildConstants.DistributedReportPath)."
+        },
+        "timeout": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "SSH timeouts (seconds)",
+          "properties": {
+            "connect": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Connection timeout"
+            },
+            "execution": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Remote command execution timeout"
+            }
+          }
+        }
+      }
+    },
+    "releases": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "SLSA provenance release metadata (SupplyChain.psm1)",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "Repository URL for provenance attestation"
+        },
+        "builder": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Builder identifier URI for SLSA provenance"
+            },
+            "type": {
+              "type": "string",
+              "description": "Build type URI for SLSA provenance"
+            }
+          }
+        }
+      }
+    },
+    "supplyChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Supply-chain tooling identity (SupplyChain.psm1). Config-overridable tool name for attestation/signing.",
+      "properties": {
+        "toolName": {
+          "type": "string",
+          "default": "gbuild",
+          "description": "Tool name stamped in SBOM/provenance metadata (BuildConstants.SupplyChainToolName)."
+        }
+      }
+    },
+    "rootCause": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Auto root-cause analysis for build failures (RootCause.psm1). Pattern-based diagnosis with confidence-scored suggestions and history persistence.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "historyPath": {
+          "type": "string",
+          "default": "build-reports/root-cause.jsonl"
+        },
+        "maxHistoryEntries": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 500
+        }
+      }
+    },
+    "autoTune": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Self-optimizing build performance (AutoTuner.psm1). Analyzes historical build metrics and suggests/applies configuration optimizations for parallelism, cache, and timeouts. Opt-in; never mutates safety margins without explicit autoApply=true.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "autoApply": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, recommendations are applied to State.BuildConfig automatically. When false, they are only logged."
+        },
+        "historyPath": {
+          "type": "string",
+          "default": "build-reports/autotune-history.jsonl"
+        },
+        "maxHistoryEntries": {
+          "type": "integer",
+          "minimum": 10,
+          "default": 200
+        },
+        "minSamplesBeforeTune": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5
+        },
+        "defaultParallelMax": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8
+        },
+        "parallelCeiling": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 16
+        },
+        "cacheMaxEntriesDefault": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 256
+        },
+        "cacheMaxSizeMbDefault": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 512
+        },
+        "defaultTimeoutMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "failRateThresholdLow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.1
+        },
+        "failRateThresholdHigh": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        },
+        "avgDurationThreshold": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 300
+        },
+        "timeoutMultiplier": {
+          "type": "number",
+          "minimum": 1,
+          "default": 1.5
+        },
+        "timeoutRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.8
+        },
+        "incrementalRatio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7
+        },
+        "verifyEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify tuned values against guardrails before apply (BuildConstants.AutoTuneVerifyEnabled)."
+        },
+        "rollbackEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Keep backup for Undo-AutoTuneApply rollback (BuildConstants.AutoTuneRollbackEnabled)."
+        },
+        "ewmaAlpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3,
+          "description": "EWMA smoothing factor for the duration regressor (BuildConstants.AutoTuneEwmaAlpha)."
+        },
+        "cacheHitRateLow": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Hit-rate below which cache size grows (BuildConstants.AutoTuneCacheHitRateLow)."
+        },
+        "cacheHitRateHigh": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.9,
+          "description": "Hit-rate at/above which cache size stays at default (BuildConstants.AutoTuneCacheHitRateHigh)."
+        }
+      }
+    },
+    "chaos": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Chaos/resilience testing (Chaos.psm1). Injects controlled failures to validate retry, rollback, circuit breaker, and graceful degradation. Never enabled in production by default.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "scenarios": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "TransientNetwork",
+              "ToolMissing",
+              "DiskFull",
+              "PermissionDenied",
+              "RetryExhausted",
+              "RollbackTrigger"
+            ]
+          }
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 42
+        }
+      }
+    },
+    "anomaly": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Statistical anomaly detection on build metrics (AnomalyDetector.psm1). Uses z-score, EWMA, and trend analysis on the AutoTuner history to surface performance regressions and stability issues before they block the pipeline.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "zScoreThreshold": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3.0,
+          "description": "Z-score above which a build metric is treated as anomalous."
+        },
+        "ewmaAlpha": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "default": 0.3,
+          "description": "Smoothing factor for EWMA trend detection (higher = more reactive)."
+        },
+        "minSamples": {
+          "type": "integer",
+          "minimum": 3,
+          "default": 10,
+          "description": "Minimum history samples before anomaly detection activates."
+        },
+        "historyPath": {
+          "type": "string",
+          "default": "build-reports/anomaly-history.jsonl"
+        },
+        "alertOnAnomaly": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, anomalous builds emit an alert via Alerting.psm1 in addition to the log line."
+        },
+        "defaultWindowSize": {
+          "type": "integer",
+          "minimum": 2,
+          "default": 20
+        },
+        "failureRateThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.3
+        },
+        "failureRateZScoreHigh": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 2.5
+        },
+        "failureRateZScoreCrit": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 4.0
+        },
+        "trendSlopeThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.5
+        },
+        "trendR2Threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.4
+        },
+        "trendHighSlope": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2.0
+        },
+        "criticalZScore": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 5.0,
+          "description": "Critical z-score for duration anomalies (BuildConstants.AnomalyCriticalZScore)."
+        },
+        "highZScore": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 4.0,
+          "description": "High z-score for duration anomalies (BuildConstants.AnomalyHighZScore)."
+        },
+        "ewmaMultiplier": {
+          "type": "number",
+          "minimum": 1,
+          "default": 2.0,
+          "description": "EWMA exceed multiplier for drift detection (BuildConstants.AnomalyEwmaMultiplier)."
+        },
+        "failureRateHighZScore2": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3.0,
+          "description": "High threshold (second tier) for failure-rate anomalies (BuildConstants.AnomalyFailureRateHighZScore2)."
+        }
+      }
+    },
+    "slo": {
+      "type": "object",
+      "description": "SLO and error budget definitions",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "preflightPassRateTarget": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.95
+        },
+        "preflightPassRateWindowDays": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "secretScanFalsePositiveRateTarget": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.01
+        },
+        "secretScanFalsePositiveRateWindowDays": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "buildSuccessRateTarget": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.9
+        },
+        "buildSuccessRateWindowDays": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "mttrSecondsTargetMedian": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 300
+        },
+        "maxBurnRatePerSprint": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.2
+        },
+        "doraWindowHours": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 24,
+          "description": "DORA measurement window in hours (Metrics.Get-DoraMetrics)."
+        }
+      }
+    },
+    "stepTimeoutSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Step watchdog in seconds for the pipeline step SLA (0 = disabled, the default). When enabled, a step whose wall-clock exceeds this is failed AFTER it returns - it cannot rescue a hung step (use per-step job:true for preemptive kill) and it fails already-succeeded slow steps, so leave 0 unless you need an explicit SLA."
+    },
+    "baseline": {
+      "type": "object",
+      "description": "Baseline drift detection configuration",
+      "additionalProperties": false,
+      "properties": {
+        "driftEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable baseline drift detection"
+        },
+        "driftThresholdPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "default": 10,
+          "description": "Percentage threshold for drift detection"
+        },
+        "driftMinDeltaSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.5,
+          "description": "Absolute floor in seconds: histogram (timing) series must clear it as well as the percentage before drift is reported"
+        },
+        "alertOnImprovement": {
+          "type": "boolean",
+          "default": false,
+          "description": "When false (default), a faster-than-baseline timing is not reported as drift; only regressions alert. Set true to restore symmetric alerting."
+        },
+        "historySize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 5,
+          "description": "Rolling window for the median baseline: comparisons run against the median of the last N persisted runs instead of the single most recent run"
+        },
+        "excludedSteps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Pipeline step names excluded from drift comparison (high-variance infrastructure steps whose timing is not a product signal)"
+        }
+      }
+    }
+  }
+}

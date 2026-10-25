@@ -1,0 +1,35 @@
+# Recommended .gitignore for projects using gbuild (_Build) and gsync (_Sync).
+# Copy this file to your project root as .gitignore (merge with existing).
+
+# _Build / _Sync tool folders (if vendored) - do not commit
+_Build/
+_Sync/
+
+# gbuild runtime artifacts (written into ProjectRoot)
+.gbuild/
+.gbuildcache/
+.gbuild-state.gbuildstate
+*.gbuildstate
+.gbuild-circuitbreaker.gbuildstate
+*.lock
+build-reports/
+distributed-report/
+reports/
+logs/
+publish-output/
+TestResults/
+Tests/TestResults/
+test-results*.xml
+testResults.xml
+suite-progress-*.log
+Tests/suite-progress-*.log
+
+# Secrets
+vault.key
+*.vault.key
+*.vault.salt
+*.salt
+
+# Misc
+gbuild-standalone-*/
+nul*

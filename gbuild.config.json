@@ -1,0 +1,1526 @@
+{
+    "$schema": "./gbuild.config.schema.json",
+    "version": "2.0.0",
+    "description": "Declarative configuration for gbuild system",
+    "_securityNote": "All credential fields use ${env:VAR} placeholders (e.g. ${env:AZURE_STORAGE_SAS_TOKEN}). Real secrets are supplied via environment variables or a secret manager at runtime - never commit real credentials to this file. The secret scanner (Security.psm1) blocks Critical findings in CI.\n\nUSAGE MODES:\n  1. Embedded (default): place _Build/ inside your project root.\n     Run: .\\_Build\\gbuild.ps1  or  ./_Build/gbuild\n\n  2. Portable/USB: copy _Build/ to USB or any folder outside the project.\n     Run: .\\_Build\\gbuild.ps1 -Project <path-to-project>\n     Or:   export GBUILD_PROJECT=/path/to/project; ./_Build/gbuild\n\n  3. Auto-detect: run from inside the project directory (or any subdirectory).\n     Run: ./_Build/gbuild\n     gbuild walks up from cwd looking for *.csproj, package.json, Cargo.toml, etc.\n",
+    "build": {
+        "defaultConfiguration": "Release",
+        "enableParallelBuild": true,
+        "maxParallelJobs": 8,
+        "maxJobsMax": 16,
+        "parallelMaxJobsScaleFactor": 4,
+        "msBuildParallelArgs": [
+            "-p:BuildInParallel=true",
+            "-m"
+        ],
+        "processKillList": [
+            "dotnet",
+            "iisexpress"
+        ],
+        "projectRootMaxDepth": 10,
+        "compatMaxDepth": 2,
+        "relativeDepthErrorSentinel": 999999,
+        "progressPollIntervalMs": 200,
+        "progress": {
+            "enabled": true,
+            "streamOutput": true,
+            "throttleMs": 300,
+            "elapsedIntervalSec": 5,
+            "pollMs": 100,
+            "killWaitMs": 5000
+        },
+        "searchMaxDepth": 3,
+        "enableIncremental": true,
+        "enableBuildCache": true,
+        "test": {
+            "enabled": true,
+            "lintEnabled": false
+        },
+        "affected": {
+            "enabled": false,
+            "skipUnchanged": false
+        },
+        "scopedLogging": true,
+        "openOutput": true,
+        "pluginDirs": [],
+        "languageMap": [],
+        "cacheDirectory": ".gbuildcache",
+        "maxCacheSizeMB": 2048,
+        "cache": {
+            "shortHashLength": 8,
+            "hashDepth": 5,
+            "pluginHashLength": 12
+        },
+        "clean": {
+            "targetDirNames": [
+                "bin",
+                "obj",
+                ".vs",
+                ".idea",
+                ".fleet"
+            ],
+            "artifactExtensions": [
+                ".dll",
+                ".exe",
+                ".pdb",
+                ".deps.json",
+                ".runtimeconfig.json",
+                ".xml",
+                ".staticwebassets.runtime.json",
+                ".so",
+                ".dylib",
+                ".apk",
+                ".aab",
+                ".msix",
+                ".appxbundle",
+                ".pkg",
+                ".ipa",
+                ".wasm",
+                ".blat",
+                ".dat",
+                ".map"
+            ],
+            "outputFolderNames": [
+                "wwwroot",
+                "bin",
+                "obj",
+                "_framework"
+            ]
+        },
+        "correlationIdLength": 12,
+        "deployChoiceArgs": {
+            "apk": [
+                "-p:AndroidPackageFormat=apk"
+            ],
+            "ios": [
+                "-p:ArchiveOnBuild=true"
+            ],
+            "winMsix": [
+                "-p:WindowsPackageType=None",
+                "-p:PublishSingleFile=false",
+                "--self-contained",
+                "true"
+            ],
+            "aot": [
+                "-p:PublishAot=true",
+                "--self-contained",
+                "true"
+            ],
+            "consoleSelfContained": "true",
+            "defaultRid": "win-x64"
+        },
+        "projectMarkers": [
+            "*.csproj",
+            "*.fsproj",
+            "*.vbproj",
+            "*.sln",
+            "package.json",
+            "Cargo.toml",
+            "go.mod",
+            "pyproject.toml",
+            "setup.py",
+            "setup.cfg",
+            "pom.xml",
+            "build.gradle",
+            "build.gradle.kts",
+            "build.sbt",
+            "CMakeLists.txt",
+            "Makefile",
+            "Gemfile",
+            "composer.json",
+            "mix.exs",
+            "Package.swift",
+            "Dockerfile"
+        ],
+        "primaryLanguagePriority": [
+            "Avalonia",
+            "C#",
+            "F#",
+            "VB.NET",
+            "TypeScript",
+            "Node.js",
+            "Python",
+            "Rust",
+            "Java",
+            "Kotlin",
+            "Scala",
+            "Go",
+            "Ruby",
+            "PHP",
+            "C/C++",
+            "C",
+            "Swift",
+            "Elixir",
+            "PowerShell",
+            "Docker"
+        ],
+        "timeoutMinutes": 30,
+        "defaultPort": 5000,
+        "portWaitAttempts": 20,
+        "portWaitDelayMs": 1000,
+        "locale": {
+            "default": "en"
+        },
+        "standalone": {
+            "enabled": false,
+            "outputFile": "gbuild-standalone.ps1",
+            "includeConfig": false,
+            "embedLocales": true,
+            "bundleVersion": "1.0.0"
+        },
+        "publishArtifact": {
+            "enabled": false
+        },
+        "envFile": "",
+        "menu": {
+            "customEntries": [
+                {
+                    "key": "Q",
+                    "label": "Print build environment summary",
+                    "handler": "Show-BuildEnvironmentSummary"
+                }
+            ],
+            "dotnetTypes": [
+                "Web",
+                "BlazorWasm",
+                "MAUI",
+                "WinForms",
+                "WPF",
+                "WinExe",
+                "Console",
+                "Library",
+                "Avalonia",
+                "WinUI"
+            ],
+            "moduleMap": {
+                "D": [
+                    "HealthCheck"
+                ],
+                "S": [
+                    "Security"
+                ],
+                "1": [
+                    "Build",
+                    "Android"
+                ],
+                "2": [
+                    "Build",
+                    "Deploy"
+                ],
+                "3": [
+                    "Deploy",
+                    "Android"
+                ],
+                "4": [
+                    "Build",
+                    "Deploy"
+                ],
+                "5": [
+                    "Build",
+                    "Deploy"
+                ],
+                "6": [
+                    "Build",
+                    "Deploy"
+                ],
+                "7": [
+                    "Deploy"
+                ],
+                "8": [
+                    "Deploy"
+                ],
+                "9": [
+                    "Build",
+                    "Deploy"
+                ],
+                "10": [
+                    "Build",
+                    "Deploy"
+                ],
+                "11": [
+                    "Build",
+                    "Deploy"
+                ],
+                "12": [
+                    "Build",
+                    "Deploy"
+                ],
+                "13": [
+                    "Build"
+                ],
+                "14": [
+                    "Build",
+                    "Parallel"
+                ],
+                "15": [
+                    "Build",
+                    "Deploy"
+                ],
+                "A": [
+                    "DeployTargets"
+                ],
+                "B": [
+                    "DeployTargets"
+                ],
+                "V": [
+                    "DeployTargets"
+                ],
+                "G": [
+                    "DeployTargets"
+                ],
+                "P": [
+                    "DeployTargets"
+                ],
+                "F": [
+                    "DeployTargets"
+                ],
+                "E": [
+                    "DeployTargets"
+                ],
+                "K": [
+                    "DeployTargets"
+                ],
+                "Y": [
+                    "DeployTargets"
+                ],
+                "H": [
+                    "Documentation"
+                ],
+                "R": [
+                    "Report"
+                ],
+                "C": [
+                    "Cache"
+                ],
+                "L": [
+                    "Versioning"
+                ],
+                "W": [
+                    "HotReload",
+                    "Clean"
+                ],
+                "X": [
+                    "Build",
+                    "Distributed"
+                ],
+                "16": [
+                    "Build",
+                    "Deploy"
+                ],
+                "N": [
+                    "DeployTargets"
+                ],
+                "Z": [
+                    "Chaos"
+                ],
+                "M": [
+                    "AnomalyDetector"
+                ],
+                "T": [
+                    "Loader"
+                ],
+                "I": [
+                    "Loader"
+                ],
+                "O": [
+                    "ClusterOrchestrator"
+                ]
+            },
+            "defaultActions": {
+                "MAUI": {
+                    "androidTfm": "2",
+                    "windowsTfm": "8",
+                    "default": "12"
+                },
+                "Web": "7",
+                "BlazorWasm": "7",
+                "WinForms": "8",
+                "WinExe": "8",
+                "WPF": "9",
+                "WinUI": "8",
+                "Console": "10",
+                "Library": "11",
+                "Avalonia": "16",
+                "Python": "12",
+                "Node.js": "12",
+                "TypeScript": "12",
+                "Rust": "12",
+                "Go": "12",
+                "Java": "12",
+                "Kotlin": "12",
+                "Ruby": "12",
+                "PHP": "12",
+                "C/C++": "12",
+                "C": "12",
+                "Docker": "12",
+                "Elixir": "12",
+                "Swift": "12",
+                "PowerShell": "12",
+                "default": "12"
+            }
+        },
+        "cacheRemote": {
+            "enabled": true,
+            "name": "AzureBlobStorage",
+            "type": "azureBlob",
+            "endpoint": "${env:GBUILD_CACHE_REMOTE_ENDPOINT}",
+            "container": "build-artifacts",
+            "authToken": "${env:AZURE_STORAGE_SAS_TOKEN}",
+            "presignExpiresSeconds": 3600,
+            "syncOnBuild": true,
+            "syncOnRestore": true,
+            "compress": true,
+            "ha": {
+                "enabled": true,
+                "replicationStrategy": "async",
+                "regions": [
+                    {
+                        "name": "${env:GBUILD_CACHE_REGION_PRIMARY}",
+                        "priority": 100
+                    },
+                    {
+                        "name": "${env:GBUILD_CACHE_REGION_SECONDARY}",
+                        "priority": 200
+                    }
+                ],
+                "failover": {
+                    "enabled": true,
+                    "healthCheckIntervalSec": 30,
+                    "healthCheckTimeoutSec": 10,
+                    "maxRetries": 3,
+                    "failbackEnabled": true,
+                    "failbackDelaySec": 300
+                },
+                "consistency": {
+                    "readPreference": "primary",
+                    "writeConcern": "acknowledged",
+                    "maxStalenessSec": 300
+                }
+            }
+        },
+        "cacheLocal": {
+            "enabled": true,
+            "maxEntries": 256,
+            "maxAgeDays": 30,
+            "maxSizeMb": 512,
+            "compress": false
+        },
+        "pluginDispatch": {
+            "enabled": true,
+            "fallbackToDotnet": false,
+            "languageOverrides": {}
+        },
+        "plugins": {
+            "enabled": true,
+            "strictApiCheck": false,
+            "allowPrerelease": false,
+            "requireManifest": false,
+            "disabled": [],
+            "allowList": []
+        },
+        "cluster": {
+            "enabled": false,
+            "buildTimeoutSec": 3600,
+            "healthMonitorIntervalSec": 30,
+            "healthTimeoutSec": 10,
+            "buildPollSec": 10,
+            "electionBackoffSec": 5,
+            "defaultMaxConcurrent": 8,
+            "operator": {
+                "install": false,
+                "namespace": "gbuild-system"
+            },
+            "submit": {
+                "enabled": false,
+                "builderImage": "${env:GBUILD_CLUSTER_BUILDER_IMAGE}",
+                "command": ""
+            },
+            "stopLeaderElection": false,
+            "capacity": {
+                "cpu": "8",
+                "memory": "32Gi"
+            },
+            "coordinator": {
+                "type": "leader-election",
+                "endpoint": "${env:GBUILD_CLUSTER_COORDINATOR_ENDPOINT}",
+                "leaseName": "gbuild-coordinator",
+                "leaseNamespace": "gbuild-system",
+                "electionTTL": 15,
+                "renewalInterval": 5
+            },
+            "clusters": [
+                {
+                    "name": "primary-cluster",
+                    "kubeconfig": "${env:GBUILD_CLUSTER_KUBECONFIG}",
+                    "context": "primary",
+                    "maxConcurrent": 8,
+                    "region": "us-east-1",
+                    "zone": "us-east-1a"
+                },
+                {
+                    "name": "secondary-cluster",
+                    "kubeconfig": "${env:GBUILD_CLUSTER_KUBECONFIG}",
+                    "context": "secondary",
+                    "maxConcurrent": 4,
+                    "region": "us-west-2",
+                    "zone": "us-west-2a"
+                }
+            ],
+            "scheduling": {
+                "strategy": "least-loaded",
+                "maxConcurrentPerCluster": 8
+            },
+            "job": {
+                "requestCpu": "500m",
+                "requestMemory": "1Gi",
+                "limitCpu": "2000m",
+                "limitMemory": "4Gi",
+                "ttlSecondsAfterFinished": 86400,
+                "backoffLimit": 2,
+                "namespace": "gbuild-jobs"
+            },
+            "workloadIdentity": {
+                "enabled": true,
+                "serviceAccount": "gbuild-worker",
+                "namespace": "gbuild-system",
+                "tokenAudience": "gbuild"
+            },
+            "observability": {
+                "metricsPort": 9101,
+                "healthPort": 9102,
+                "logLevel": "Info"
+            }
+        },
+        "pipeline": {
+            "timeoutSeconds": 0,
+            "retryEnabled": true,
+            "maxRetries": 0,
+            "validate": true,
+            "file": "",
+            "steps": []
+        },
+        "preflight": {
+            "enabled": true,
+            "checkSyntax": true,
+            "checkManifest": true,
+            "checkAllManifests": true,
+            "checkTools": true,
+            "checkDiskSpace": true,
+            "checkModuleGraph": true,
+            "checkNetwork": false,
+            "minDiskSpaceMB": 2048,
+            "requiredTools": [],
+            "endpoints": []
+        },
+        "projectTypeActions": {
+            "MAUI": {
+                "android": [
+                    "-p:AndroidUseSharedRuntime=false",
+                    "-p:EmbedAssembliesIntoApk=true"
+                ]
+            },
+            "Web": {
+                "nonWindows": [
+                    "-r",
+                    "${rid}",
+                    "--self-contained",
+                    "true",
+                    "-p:PublishSingleFile=true",
+                    "-p:IncludeAllContentForSelfExtract=true"
+                ]
+            },
+            "WinForms": {
+                "default": [
+                    "--self-contained",
+                    "-r",
+                    "${rid}"
+                ]
+            },
+            "WPF": {
+                "default": [
+                    "--self-contained",
+                    "-r",
+                    "${rid}"
+                ]
+            },
+            "Console": {
+                "default": [
+                    "--self-contained",
+                    "${consoleSelfContained}",
+                    "-r",
+                    "${rid}"
+                ]
+            },
+            "WinExe": {
+                "default": [
+                    "--self-contained",
+                    "-r",
+                    "${rid}"
+                ]
+            },
+            "BlazorWasm": {
+                "default": [
+                    "-r",
+                    "browser-wasm"
+                ]
+            },
+            "Library": {
+                "command": "build",
+                "args": []
+            }
+        },
+        "cacheArtifactPatterns": {
+            "apk": [
+                "*.apk"
+            ],
+            "aab": [
+                "*.aab"
+            ],
+            "ios": [
+                "*.ipa"
+            ],
+            "mac": [
+                "*.app"
+            ],
+            "web": [
+                "${exeBaseName}.*"
+            ],
+            "win": [
+                "*.exe"
+            ],
+            "winforms": [
+                "*.exe"
+            ],
+            "wpf": [
+                "*.exe"
+            ],
+            "console": [
+                "${exeBaseName}.*"
+            ],
+            "default": [
+                "*.dll"
+            ]
+        },
+        "cleanTargetsPerProjectType": {
+            "Web": {
+                "additionalDirs": [
+                    "wwwroot/_framework",
+                    "wwwroot/_content",
+                    ".vite",
+                    "node_modules"
+                ]
+            },
+            "MAUI": {
+                "additionalDirs": [
+                    ".maui",
+                    "MauiAssets"
+                ],
+                "platformsDirs": [
+                    "bin",
+                    "obj"
+                ]
+            },
+            "Node.js": {
+                "additionalDirs": [
+                    "node_modules",
+                    "dist",
+                    "build",
+                    "coverage"
+                ]
+            },
+            "TypeScript": {
+                "additionalDirs": [
+                    "node_modules",
+                    "dist",
+                    "build",
+                    "coverage"
+                ]
+            },
+            "Python": {
+                "additionalDirs": [
+                    "__pycache__",
+                    "build",
+                    "dist",
+                    ".pytest_cache"
+                ]
+            },
+            "Rust": {
+                "additionalDirs": [
+                    "target"
+                ]
+            },
+            "Java": {
+                "additionalDirs": [
+                    "target",
+                    "build"
+                ]
+            },
+            "Kotlin": {
+                "additionalDirs": [
+                    "target",
+                    "build"
+                ]
+            },
+            "Scala": {
+                "additionalDirs": [
+                    "target",
+                    "build"
+                ]
+            },
+            "Elixir": {
+                "additionalDirs": [
+                    "_build"
+                ]
+            },
+            "Swift": {
+                "additionalDirs": [
+                    ".build"
+                ]
+            },
+            "C/C++": {
+                "additionalDirs": [
+                    "build",
+                    "out"
+                ]
+            },
+            "C": {
+                "additionalDirs": [
+                    "build",
+                    "out"
+                ]
+            },
+            "Go": {
+                "additionalDirs": [
+                    "dist"
+                ]
+            },
+            "PHP": {
+                "additionalDirs": [
+                    "vendor"
+                ]
+            },
+            "Ruby": {
+                "additionalDirs": [
+                    "vendor/bundle",
+                    "tmp"
+                ]
+            }
+        },
+        "targetCatalog": {
+            "buildChoices": [
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "10",
+                "11",
+                "12",
+                "14",
+                "15",
+                "16"
+            ],
+            "fatalChoices": [
+                "A",
+                "B",
+                "V",
+                "G",
+                "P",
+                "F",
+                "E",
+                "K",
+                "Y",
+                "N",
+                "S",
+                "L",
+                "C",
+                "13",
+                "X",
+                "Z",
+                "O",
+                "D"
+            ]
+        }
+    },
+    "ci": {
+        "workflowFile": "build.yml",
+        "packageFormatNonInteractive": "aab",
+        "packageFormatInteractive": "apk",
+        "defaultBranch": "main",
+        "azure": {
+            "pipelineFile": "azure-pipelines.yml",
+            "projectName": "${env:GBUILD_AZURE_PROJECT}",
+            "orgUrl": "${env:GBUILD_AZURE_ORG_URL}"
+        },
+        "docker": {
+            "enabled": true,
+            "registry": "",
+            "autoTag": true,
+            "imagePrefix": "${env:GBUILD_IMAGE_PREFIX}",
+            "useGhcr": true,
+            "ghcrOwner": "${env:GBUILD_GHCR_OWNER}",
+            "composeServices": []
+        }
+    },
+    "logging": {
+        "level": "Info",
+        "enableJsonLog": true,
+        "maxLogFiles": 5,
+        "maxLogSizeMB": 10,
+        "enableRotation": true,
+        "fileRetryAttempts": 3,
+        "fileRetryDelayMs": 1000,
+        "maxLogAgeDays": 30
+    },
+    "health": {
+        "checkDiskSpace": true,
+        "minDiskSpaceMB": 2048,
+        "checkNetwork": true,
+        "checkPorts": true,
+        "ports": [
+            5000,
+            5001,
+            7000,
+            7001,
+            8080,
+            8443
+        ],
+        "checkSDKVersions": true,
+        "minDotnetMajor": 8,
+        "networkTimeout": 15,
+        "requiredTools": [
+            "dotnet",
+            "git"
+        ],
+        "optionalTools": [
+            "node",
+            "npm",
+            "java",
+            "javac",
+            "adb",
+            "gh",
+            "docker",
+            "keytool"
+        ],
+        "autoFix": true,
+        "autoFixKillPorts": false,
+        "failOnInvalidConfig": true,
+        "endpoints": [
+            {
+                "Name": "NuGet",
+                "URL": "https://api.nuget.org/v3/index.json"
+            },
+            {
+                "Name": "NPM Registry",
+                "URL": "https://registry.npmjs.org/"
+            },
+            {
+                "Name": "GitHub",
+                "URL": "https://api.github.com"
+            }
+        ]
+    },
+    "versioning": {
+        "source": "git",
+        "autoIncrement": "patch",
+        "embedCommitHash": true,
+        "generateChangelog": true,
+        "commitCount": 20,
+        "versionFile": "version.json",
+        "defaultVersion": "0.1.0",
+        "searchDepth": 2
+    },
+    "report": {
+        "format": "json",
+        "outputDir": "build-reports",
+        "trackTrends": true,
+        "maxReportHistory": 20
+    },
+    "security": {
+        "vulnerabilityTimeoutSec": 120,
+        "scanOnBuild": true,
+        "scanSecrets": true,
+        "checkVulnerablePackages": true,
+        "validateLicenses": true,
+        "allowedActions": [
+            "A",
+            "B",
+            "V",
+            "G",
+            "P",
+            "F",
+            "E",
+            "K",
+            "Y",
+            "S",
+            "L",
+            "C",
+            "13"
+        ],
+        "sbom": {
+            "enabled": true,
+            "format": "cyclonedx",
+            "policy": {
+                "enabled": true,
+                "allowList": [],
+                "denyList": [
+                    "commons-collections:3.2.1",
+                    "commons-collections:3.2.2",
+                    "org.apache.commons:commons-collections4:4.0",
+                    "org.apache.commons:commons-collections4:4.1",
+                    "log4j:1.2.17",
+                    "org.apache.logging.log4j:log4j-core:2.0",
+                    "org.apache.logging.log4j:log4j-core:2.17.0"
+                ],
+                "enforcement": "block"
+            }
+        },
+        "provenance": {
+            "enabled": true
+        },
+        "artifactSign": {
+            "enabled": false,
+            "tool": "cosign",
+            "key": "${env:GBUILD_COSIGN_KEY}",
+            "identity": "${env:GBUILD_COSIGN_IDENTITY}",
+            "images": [
+                "${env:GBUILD_IMAGE_PREFIX}/*"
+            ]
+        },
+        "containerScan": {
+            "enabled": false,
+            "tool": "trivy",
+            "images": [
+                "${env:GBUILD_IMAGE_PREFIX}/*"
+            ],
+            "severity": "HIGH,CRITICAL",
+            "failOnSeverity": "CRITICAL"
+        },
+        "sast": {
+            "enabled": true,
+            "severityThreshold": "high",
+            "failOnFindings": true,
+            "dotnetIgnoreNoFindingsExitCode": true,
+            "tools": {},
+            "timeoutSec": 120,
+            "bundledAnalyzerVersion": "1.25.0"
+        },
+        "policy": {
+            "enabled": true,
+            "dir": "",
+            "package": "gbuild.policy",
+            "enforcement": "block",
+            "opaServerUrl": "",
+            "opaServerTimeoutSec": 10,
+            "rules": [
+                {
+                    "rule": "DenyHardcodedSecrets",
+                    "match": "FileContent",
+                    "path": "**/*.ps1,**/*.cs,**/*.json,**/*.yaml,**/*.yml",
+                    "value": "(?i)(password|secret|api[_-]?key|token)\\s*[=: ]\\s*[\"'][^\"'\\s]{8,}",
+                    "action": "deny"
+                },
+                {
+                    "rule": "RequireConfigDrivenDefaults",
+                    "match": "ConfigKey",
+                    "path": "build.*",
+                    "value": "Get-BuildConstant",
+                    "action": "allow"
+                },
+                {
+                    "rule": "DenyHardcodedPaths",
+                    "match": "FileContent",
+                    "path": "**/*.ps1,**/*.psm1",
+                    "value": "(?i)(?<![A-Za-z0-9_])([A-Za-z]:\\\\|/home/|/Users/|/opt/|/var/|/tmp/|Program Files)",
+                    "action": "deny",
+                    "excludePaths": [
+                        "**/Modules/BuildConstants.psm1",
+                        "**/_Tests/**",
+                        "**/Tests/**",
+                        "**/test/**",
+                        "**/tests/**",
+                        "**/testdata/**",
+                        "**/fixtures/**"
+                    ]
+                },
+                {
+                    "rule": "DenyHardcodedPorts",
+                    "match": "FileContent",
+                    "path": "**/*.ps1,**/*.psm1",
+                    "value": "(?i)(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|:\\s*|port\\s*=\\s*|port\\s+)(5000|9100|9101|9102|9200|9300|8080|8443)\\b",
+                    "action": "deny",
+                    "excludePaths": [
+                        "**/Modules/BuildConstants.psm1",
+                        "**/_Tests/**",
+                        "**/Tests/**",
+                        "**/test/**",
+                        "**/tests/**",
+                        "**/testdata/**",
+                        "**/fixtures/**"
+                    ]
+                },
+                {
+                    "rule": "AllowSafeColorResolution",
+                    "match": "FileContent",
+                    "path": "**/*.ps1,**/*.psm1",
+                    "value": "Resolve-SafeColor",
+                    "action": "allow"
+                }
+            ]
+        },
+        "siem": {
+            "enabled": true,
+            "format": "cef",
+            "transport": "http",
+            "endpoint": "${env:GBUILD_SIEM_ENDPOINT}",
+            "port": 514,
+            "outputFile": "siem-events.log",
+            "enterpriseId": 32473
+        },
+        "blockOnCriticalVulns": true,
+        "vulnerabilitySeverityThreshold": "high",
+        "vulnerabilityAllowlist": [],
+        "allowedLicenseTypes": [
+            "MIT",
+            "Apache-2.0",
+            "BSD-2-Clause",
+            "BSD-3-Clause",
+            "ISC",
+            "MPL-2.0",
+            "Unlicense"
+        ],
+        "excludeDirs": [
+            "bin",
+            "obj",
+            "node_modules",
+            ".git",
+            "publish-output",
+            ".gbuildcache",
+            "build-reports",
+            "wwwroot/lib",
+            "packages",
+            "TestResults",
+            "_Build"
+        ],
+        "scanMaxFileMB": 5,
+        "scanDepth": 2,
+        "secretPatterns": [],
+        "gpgSign": {
+            "enabled": false,
+            "keyId": "",
+            "artifactExtensions": [
+                ".exe",
+                ".dll",
+                ".msi",
+                ".msix",
+                ".appx",
+                ".appxbundle",
+                ".zip",
+                ".nupkg",
+                ".snupkg",
+                ".jar",
+                ".war",
+                ".so",
+                ".dylib",
+                ".a",
+                ".o",
+                ".apk",
+                ".aab",
+                ".ipa",
+                ".pkg",
+                ".app",
+                ".wasm",
+                ".deb",
+                ".rpm"
+            ]
+        },
+        "licenseEnforcement": "block",
+        "vaultKeyFile": "${env:GBUILD_VAULT_KEY_FILE}",
+        "vault": {
+            "pbkdf2Iterations": "${env:GBUILD_VAULT_PBKDF2_ITERATIONS}",
+            "VaultStaticSalt": "${env:GBUILD_VAULT_STATIC_SALT}",
+            "VaultMachineSalt": "${env:GBUILD_VAULT_MACHINE_SALT}"
+        },
+        "rbac": {
+            "enabled": false,
+            "enforcement": "strict",
+            "enforceInCI": true,
+            "defaultRole": "Viewer",
+            "privilegedActions": [
+                "A",
+                "B",
+                "V",
+                "G",
+                "P",
+                "F",
+                "E",
+                "K",
+                "Y",
+                "N",
+                "S",
+                "L",
+                "C",
+                "13"
+            ],
+            "userRoles": {},
+            "groupRoles": {},
+            "roles": {},
+            "resources": {},
+            "tenantRoles": {},
+            "trustEnvironmentRoles": false,
+            "trustedEnvRoles": [],
+            "ciReadOnlyActions": [
+                "D",
+                "H",
+                "R"
+            ]
+        },
+        "auditLedger": {
+            "enabled": false,
+            "backend": "file",
+            "memoryCap": 5000,
+            "file": {
+                "path": "audit-ledger.jsonl",
+                "maxSizeMB": 100,
+                "maxFiles": 100,
+                "immutable": true
+            },
+            "ledger": {
+                "checkpointInterval": 1000
+            },
+            "signing": {
+                "enabled": true,
+                "requireKey": true,
+                "algorithm": "RSA-SHA256",
+                "keyPath": "",
+                "keyPassword": "",
+                "certPath": ""
+            },
+            "verification": {
+                "enabled": true,
+                "schedule": "0 2 * * *",
+                "onStartup": true,
+                "alertOnFailure": true
+            },
+            "retention": {
+                "defaultDays": 2555,
+                "perCategory": {},
+                "legalHold": []
+            }
+        },
+        "auditLogPath": "build-audit.log",
+        "auditLogMaxSizeMB": 10,
+        "redactPatterns": [
+            {
+                "name": "OpenRouter Key",
+                "pattern": "sk-or-v1-[A-Za-z0-9]{20,}",
+                "replacement": "sk-or-v1-***REDACTED***"
+            },
+            {
+                "name": "OpenAI Key",
+                "pattern": "sk-[A-Za-z0-9]{20,}",
+                "replacement": "sk-***REDACTED***"
+            },
+            {
+                "name": "Bearer Token",
+                "pattern": "Bearer\\s+[A-Za-z0-9\\-._~+/]+=*",
+                "replacement": "Bearer ***REDACTED***"
+            },
+            {
+                "name": "Secret Assignment",
+                "pattern": "(?i)(password|passwd|token|secret|api_?key|access_?key|client_?secret)\\s*[=:]\\s*\\S+",
+                "replacement": "$1=***REDACTED***"
+            }
+        ]
+    },
+    "releases": {
+        "repo": "https://github.com/${env:GBUILD_GITHUB_REPO}",
+        "builder": {
+            "id": "https://github.com/${env:GBUILD_GITHUB_REPO}/_Build",
+            "type": "https://github.com/${env:GBUILD_GITHUB_REPO}/.github/workflows/build.yml"
+        }
+    },
+    "profiles": {
+        "default": {
+            "configuration": "Release",
+            "enableParallelBuild": true,
+            "incremental": true,
+            "logLevel": "Info"
+        },
+        "Debug": {
+            "extends": "default",
+            "configuration": "Debug",
+            "enableParallelBuild": false,
+            "incremental": true,
+            "logLevel": "Debug"
+        },
+        "Release": {
+            "extends": "default",
+            "configuration": "Release",
+            "enableParallelBuild": true,
+            "incremental": true,
+            "logLevel": "Info"
+        },
+        "CI": {
+            "extends": "default",
+            "configuration": "Release",
+            "enableParallelBuild": true,
+            "incremental": false,
+            "logLevel": "Warn",
+            "nonInteractive": true,
+            "enableBuildCache": false,
+            "enableJsonLog": true,
+            "blockOnCriticalVulns": true
+        },
+        "Android": {
+            "extends": "default",
+            "configuration": "Release",
+            "targetFramework": "net10.0-android",
+            "packageFormat": "apk",
+            "enableParallelBuild": true,
+            "logLevel": "Info"
+        }
+    },
+    "projects": {
+        "exclude": [
+            "**/bin/**",
+            "**/obj/**",
+            "**/node_modules/**",
+            "**/.git/**",
+            "**/publish-output/**",
+            "**/_Build/**"
+        ],
+        "autoSelectStrategy": "smart",
+        "preferRootProject": true,
+        "testProjectPatterns": [
+            "\\.(Tests|Specs|UnitTests|IntegrationTests)$"
+        ],
+        "systemDirPattern": "[\\\\/]_[^/\\\\]*[\\\\/]"
+    },
+    "deploy": {
+        "webReadinessAttempts": 30,
+        "webAppLaunchDelayMs": 250,
+        "webAppLaunchDelayMinMs": 100,
+        "webPortProbe": true,
+        "webAppLaunchMaxAttempts": 3,
+        "health": {
+            "enabled": false,
+            "url": "",
+            "retries": 3
+        },
+        "promotion": {
+            "from": "staging",
+            "to": "production"
+        }
+    },
+    "android": {
+        "defaultApplicationId": "com.companyname.app",
+        "adbUninstallDelayMs": 800,
+        "adbAutoConnectEndpoints": [
+            "127.0.0.1:5555",
+            "127.0.0.1:5556",
+            "127.0.0.1:5557",
+            "127.0.0.1:7555",
+            "127.0.0.1:21503",
+            "127.0.0.1:62001",
+            "localhost:5555"
+        ],
+        "adbConnectTimeoutMs": 2000,
+        "keystore": {
+            "alias": "androiddebugkey",
+            "distinguishedName": "CN=GBuild Debug, O=Development, C=VN",
+            "keySize": 2048,
+            "validityDays": 10000
+        }
+    },
+    "dotnet": {
+        "verbosity": "minimal",
+        "defaultTfm": "net8.0"
+    },
+    "paths": {
+        "publishOutput": "publish-output",
+        "localeDir": "../Locales",
+        "vendoredTools": ".tools/Modules"
+    },
+    "sdk": {
+        "androidCmdLineToolsRelPath": "cmdline-tools/latest/bin",
+        "cacheExpiryDays": 90,
+        "exeTimeoutMs": 5000,
+        "defaultSearchDepth": 4,
+        "projectScanDepth": 3,
+        "parentScanDepth": 2,
+        "winSearchDepthDelta": 3,
+        "quickMode": false,
+        "skipWindowsDriveScan": false,
+        "customPaths": [],
+        "autoProvision": {
+            "enabled": false,
+            "installDir": "~/.dotnet",
+            "channel": "LTS",
+            "version": "",
+            "installerSha256": ""
+        },
+        "releaseMetadataBaseUrl": "https://builds.dotnet.microsoft.com/dotnet/release-metadata",
+        "maxKnownSdkVersion": "",
+        "releaseCacheHours": 24,
+        "releaseCacheFileName": "dotnet-release.json",
+        "searchPaths": {
+            "primary": [
+                "${env:HOME}/.dotnet",
+                "${env:APPDATA}/dotnet"
+            ],
+            "fallback": [
+                "/usr/share/dotnet",
+                "/usr/local/share/dotnet",
+                "/opt/homebrew/share/dotnet"
+            ]
+        },
+        "gbuildDotSdkAndroidSdk": ".sdk/android-sdk",
+        "gbuildDotSdk": ".sdk",
+        "gbuildParentDotSdkAndroidSdk": "../.sdk/android-sdk",
+        "androidStudioPath": "${env:ANDROID_STUDIO_PATH}",
+        "protectedPathPatterns": [
+            "Program Files",
+            "Windows",
+            "/usr/*",
+            "/opt/*"
+        ],
+        "blacklistWindows": [
+            "node_modules",
+            "bin",
+            "obj",
+            ".git",
+            ".vs",
+            "AppData",
+            "Program Files (x86)",
+            "Windows"
+        ],
+        "blacklistMac": [
+            "node_modules",
+            "bin",
+            "obj",
+            ".git",
+            ".DS_Store"
+        ],
+        "blacklistBase": [
+            "node_modules",
+            "bin",
+            "obj",
+            ".git"
+        ],
+        "dotnetMac": "/usr/local/share/dotnet",
+        "dotnetLinux": "/usr/share/dotnet",
+        "jvmMac": "/Library/Java/JavaVirtualMachines",
+        "jvmUnix": [
+            "/usr/lib/jvm",
+            "/usr/local/lib/jvm"
+        ],
+        "androidLinux": "/opt/android-sdk",
+        "androidMac": "/usr/local/share/android-sdk",
+        "androidDebian": "/usr/lib/android-sdk",
+        "jdkJavacRelativeWin": "bin/javac.exe",
+        "jdkJavacRelativeUnix": "bin/javac",
+        "androidAdbRelativeWin": "platform-tools/adb.exe",
+        "androidAdbRelativeUnix": "platform-tools/adb",
+        "cacheUserRelativePath": ".gbuild/sdkcache.json"
+    },
+    "tenancy": {
+        "tenantId": "${env:GBUILD_TENANT_ID}",
+        "defaultTenant": "default",
+        "isolation": "directory",
+        "overrides": {}
+    },
+    "hooks": {
+        "before-build": [],
+        "after-build": [],
+        "afterBuild": {
+            "apply": false
+        }
+    },
+    "alerting": {
+        "enabled": false,
+        "minSeverity": "Critical",
+        "webhookUrl": "${env:GBUILD_ALERT_WEBHOOK}",
+        "provider": "generic",
+        "headers": {},
+        "rotateTokens": false,
+        "rotationIntervalHours": 24,
+        "tokenByteLength": 24
+    },
+    "distributed": {
+        "enabled": true,
+        "strategy": "round-robin",
+        "sshPort": 22,
+        "repoRoot": "${env:GBUILD_DISTRIBUTED_REPO_ROOT}",
+        "hosts": [
+            {
+                "name": "build-worker-1",
+                "hostname": "${env:GBUILD_WORKER_1_HOST}",
+                "port": 22,
+                "user": "${env:GBUILD_WORKER_1_USER}",
+                "identityFile": "${env:GBUILD_WORKER_1_KEY}",
+                "maxConcurrent": 4,
+                "tags": [
+                    "linux",
+                    "dotnet"
+                ]
+            },
+            {
+                "name": "build-worker-2",
+                "hostname": "${env:GBUILD_WORKER_2_HOST}",
+                "port": 22,
+                "user": "${env:GBUILD_WORKER_2_USER}",
+                "identityFile": "${env:GBUILD_WORKER_2_KEY}",
+                "maxConcurrent": 4,
+                "tags": [
+                    "windows",
+                    "dotnet"
+                ]
+            }
+        ],
+        "timeout": {
+            "connect": 30,
+            "execution": 600
+        },
+        "strictHostKeyChecking": "accept-new",
+        "reportPath": "distributed-report",
+        "minConcurrent": 1,
+        "maxTotalConcurrency": 64,
+        "probeBatchSize": 8,
+        "taskMaxRetries": 2
+    },
+    "telemetry": {
+        "enabled": true,
+        "anonymousOnly": true,
+        "collectBuildTimes": true,
+        "collectErrorStats": true,
+        "prometheus": {
+            "enabled": false,
+            "port": 9100,
+            "bindAddress": "0.0.0.0",
+            "altPorts": [
+                9101,
+                9102,
+                9200,
+                9300
+            ],
+            "metricsPath": "/metrics/"
+        },
+        "otel": {
+            "enabled": true,
+            "endpoint": "${env:OTEL_EXPORTER_OTLP_ENDPOINT}",
+            "metricsPath": "/v1/metrics",
+            "tracesPath": "/v1/traces",
+            "jsonDepth": 10
+        }
+    },
+    "verification": {
+        "enabled": true,
+        "ssh": true,
+        "remoteCache": true,
+        "otel": true,
+        "webhook": true,
+        "webhookSendTest": true,
+        "sdk": true,
+        "connectTimeout": 10,
+        "requestTimeout": 5,
+        "outputDir": "build-reports"
+    },
+    "errorHandling": {
+        "maxRetries": 3,
+        "baseDelayMs": 500,
+        "maxDelayMs": 10000,
+        "retryTimeoutSec": 0,
+        "circuitBreaker": {
+            "enabled": true,
+            "failureThreshold": 5,
+            "resetTimeoutMs": 60000,
+            "persistState": true,
+            "statePath": ""
+        }
+    },
+    "license": {
+        "allowed": [],
+        "deny": [],
+        "blockOnViolation": false
+    },
+    "rootCause": {
+        "enabled": true,
+        "historyPath": "build-reports/root-cause.jsonl",
+        "maxHistoryEntries": 500
+    },
+    "autoTune": {
+        "enabled": true,
+        "autoApply": false,
+        "historyPath": "build-reports/autotune-history.jsonl",
+        "maxHistoryEntries": 200,
+        "minSamplesBeforeTune": 5,
+        "defaultParallelMax": 8,
+        "parallelCeiling": 16,
+        "cacheMaxEntriesDefault": 256,
+        "cacheMaxSizeMbDefault": 512,
+        "defaultTimeoutMinutes": 30,
+        "failRateThresholdLow": 0.1,
+        "failRateThresholdHigh": 0.3,
+        "avgDurationThreshold": 300,
+        "timeoutMultiplier": 1.5,
+        "timeoutRatio": 0.8,
+        "incrementalRatio": 0.7,
+        "verifyEnabled": true,
+        "rollbackEnabled": true,
+        "ewmaAlpha": 0.3,
+        "cacheHitRateLow": 0.5,
+        "cacheHitRateHigh": 0.9
+    },
+    "slo": {
+        "enabled": true,
+        "preflightPassRateTarget": 0.95,
+        "preflightPassRateWindowDays": 30,
+        "secretScanFalsePositiveRateTarget": 0.01,
+        "secretScanFalsePositiveRateWindowDays": 30,
+        "buildSuccessRateTarget": 0.9,
+        "buildSuccessRateWindowDays": 30,
+        "mttrSecondsTargetMedian": 300,
+        "maxBurnRatePerSprint": 0.2,
+        "doraWindowHours": 24
+    },
+    "stepTimeoutSeconds": 0,
+    "baseline": {
+        "driftEnabled": true,
+        "driftThresholdPct": 10,
+        "driftMinDeltaSeconds": 0.5,
+        "alertOnImprovement": false,
+        "historySize": 5,
+        "excludedSteps": []
+    },
+    "chaos": {
+        "enabled": false,
+        "scenarios": [],
+        "seed": 42
+    },
+    "anomaly": {
+        "enabled": true,
+        "zScoreThreshold": 3.0,
+        "ewmaAlpha": 0.3,
+        "minSamples": 10,
+        "historyPath": "build-reports/anomaly-history.jsonl",
+        "alertOnAnomaly": true,
+        "defaultWindowSize": 20,
+        "failureRateThreshold": 0.3,
+        "failureRateZScoreHigh": 2.5,
+        "failureRateZScoreCrit": 4.0,
+        "trendSlopeThreshold": 0.5,
+        "trendR2Threshold": 0.4,
+        "trendHighSlope": 2.0,
+        "criticalZScore": 5.0,
+        "highZScore": 4.0,
+        "ewmaMultiplier": 2.0,
+        "failureRateHighZScore2": 3.0
+    },
+    "supplyChain": {
+        "toolName": "gbuild"
+    }
+}

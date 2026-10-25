@@ -1,0 +1,23 @@
+{
+    "$schema":  "../../gbuild.plugin.schema.json",
+    "name":  "Elixir",
+    "version":  "1.0.0",
+    "apiVersion":  "1.0.0",
+    "minGbuildVersion":  "2.0.0",
+    "maxGbuildVersion":  "",
+    "author":  "gbuild",
+    "description":  "Elixir build, test and lint plugin (mix compile/test/format).",
+    "supportedLanguages":  [
+                               "Elixir"
+                           ],
+    "priority":  5,
+    "dependencies":  [
+                     ],
+    "capabilities":  [
+                         "build",
+                         "test",
+                         "lint",
+                         "preflight"
+                     ],
+    "entryPoint":  "Elixir.psm1"
+}

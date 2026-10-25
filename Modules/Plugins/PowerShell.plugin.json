@@ -1,0 +1,23 @@
+{
+    "$schema":  "../../gbuild.plugin.schema.json",
+    "name":  "PowerShell",
+    "version":  "1.0.0",
+    "apiVersion":  "1.0.0",
+    "minGbuildVersion":  "2.0.0",
+    "maxGbuildVersion":  "",
+    "author":  "gbuild",
+    "description":  "PowerShell parser, Pester, and PSScriptAnalyzer plugin.",
+    "supportedLanguages":  [
+                               "PowerShell"
+                           ],
+    "priority":  1,
+    "dependencies":  [
+                     ],
+    "capabilities":  [
+                         "build",
+                         "test",
+                         "lint",
+                         "preflight"
+                     ],
+    "entryPoint":  "PowerShell.psm1"
+}

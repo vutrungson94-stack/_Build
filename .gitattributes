@@ -1,0 +1,35 @@
+# Default: normalize in the repository, check out with the platform convention.
+* text=auto
+
+# --- PowerShell sources: CRLF is the Windows PowerShell 5.1 convention ---
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.psd1  text eol=crlf
+*.ps1xml text eol=crlf
+
+# --- POSIX launcher: MUST stay LF or the shebang breaks on Git Bash / WSL ---
+gbuild      text eol=lf
+gbuild.bat  text eol=crlf
+
+# --- Config / data: LF keeps the working tree stable across platforms ---
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.md    text eol=lf
+Dockerfile  text eol=lf
+.dockerignore text eol=lf
+.gitignore   text eol=lf
+.copyright   text eol=lf
+
+# --- Locales ship a UTF-8 BOM on purpose (asserted by Tests\Locale.Tests.ps1) ---
+Locales/*.json text eol=crlf
+
+# --- Binary / never-translated ---
+*.dll   binary
+*.p7s   binary
+*.gbuildstate binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.zip   binary
+*.nupkg binary

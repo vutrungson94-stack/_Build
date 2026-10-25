@@ -1,0 +1,24 @@
+{
+    "$schema":  "../../gbuild.plugin.schema.json",
+    "name":  "Cpp",
+    "version":  "1.0.0",
+    "apiVersion":  "1.0.0",
+    "minGbuildVersion":  "2.0.0",
+    "maxGbuildVersion":  "",
+    "author":  "gbuild",
+    "description":  "C/C++ build, test and lint plugin (cmake/ctest/cppcheck).",
+    "supportedLanguages":  [
+                               "C/C++",
+                               "C"
+                           ],
+    "priority":  2,
+    "dependencies":  [
+                     ],
+    "capabilities":  [
+                         "build",
+                         "test",
+                         "lint",
+                         "preflight"
+                     ],
+    "entryPoint":  "Cpp.psm1"
+}

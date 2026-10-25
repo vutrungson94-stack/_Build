@@ -1,0 +1,24 @@
+{
+    "$schema":  "../../gbuild.plugin.schema.json",
+    "name":  "Node",
+    "version":  "1.0.0",
+    "apiVersion":  "1.0.0",
+    "minGbuildVersion":  "2.0.0",
+    "maxGbuildVersion":  "",
+    "author":  "gbuild",
+    "description":  "Node.js / TypeScript build, test and lint plugin (npm, eslint, tsc).",
+    "supportedLanguages":  [
+                               "Node.js",
+                               "TypeScript"
+                           ],
+    "priority":  2,
+    "dependencies":  [
+                     ],
+    "capabilities":  [
+                         "build",
+                         "test",
+                         "lint",
+                         "preflight"
+                     ],
+    "entryPoint":  "Node.psm1"
+}

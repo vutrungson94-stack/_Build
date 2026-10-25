@@ -1,0 +1,54 @@
+# ============================================================================
+# gbuild pipeline definition (YAML).
+#
+# Pipeline-as-code. When this file exists next to the project, Resolve-PipelineSteps
+# prefers it over build.pipeline.steps in gbuild.config.json.
+#
+# Supported subset (Modules/YamlPipeline.psm1): block mappings, block sequences,
+# plain/'single'/"double" scalars, comments, and flow sequences of scalars.
+# Anchors, aliases, merge keys, tags and block scalars (| / >) are REJECTED with
+# a parse error rather than silently misread. Multi-line PowerShell belongs in
+# gbuild.config.json's build.pipeline.steps, which takes real script bodies.
+#
+# Step keys:
+#   step:    display/registry name (required, unique)
+#   task:    PowerShell command invoked as & <task> $ctx (required)
+#   when:    PowerShell expression evaluated against $ctx; false skips the step
+#   timeout: per-step SLA in seconds (fails the step when exceeded)
+#   retry:   attempts beyond the first for this step
+# ============================================================================
+
+name: gbuild-pipeline
+version: "1.0"
+trigger: manual
+
+env:
+  GBUILD_PIPELINE_SOURCE: yaml
+
+steps:
+  - step: RegisterPlugins
+    task: Register-Plugins
+    timeout: 60
+
+  - step: ScanProject
+    task: Find-Project
+    timeout: 60
+
+  - step: Preflight
+    task: Invoke-PreflightValidation
+    timeout: 120
+
+  - step: Build
+    task: Start-BuildAndShow
+    timeout: 900
+    retry: 1
+
+  - step: SecurityScan
+    task: Invoke-SecurityScan
+    timeout: 300
+    when: "($ctx.buildAttempted)"
+
+  - step: SupplyChain
+    task: Invoke-SupplyChainChecks
+    timeout: 300
+    when: "($ctx.buildOk)"
