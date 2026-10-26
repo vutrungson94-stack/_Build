@@ -38,7 +38,7 @@ Describe 'Android' {
 
     It 'rejects an invalid application id before invoking adb' {
         $state = [PSCustomObject]@{ OS = 'Windows'; Colors = @{ Gray = 'Gray'; Warn = 'Yellow'; Err = 'Red' } }
-        Get-LauncherActivity -State $state -AdbPath (Get-Command powershell.exe).Source -AppId 'com.example.app; rm -rf /' | Should -Be '.MainActivity'
+        Get-LauncherActivity -State $state -AdbPath 'adb' -AppId 'com.example.app; rm -rf /' | Should -Be '.MainActivity'
     }
 
     It 'does not accept passwords from signing.properties' {
