@@ -64,13 +64,13 @@ Describe 'CircuitBreaker' {
     It 'HalfOpen on timeout then success closes breaker' {
         $state = [PSCustomObject]@{
             ScriptRoot   = (Split-Path $PSScriptRoot)
-            BuildConfig  = [PSCustomObject]@{ errorHandling = [PSCustomObject]@{ circuitBreaker = [PSCustomObject]@{ enabled=$true; failureThreshold=1; resetTimeoutMs=100 } } }
+            BuildConfig  = [PSCustomObject]@{ errorHandling = [PSCustomObject]@{ circuitBreaker = [PSCustomObject]@{ enabled=$true; failureThreshold=1; resetTimeoutMs=1000 } } }
             CorrelationId = [guid]::NewGuid().ToString('N')
         }
         { Invoke-WithCircuitBreaker -Action { throw 'x' } -State $state } | Should -Throw
         (Get-CircuitBreakerState).State | Should -Be 'Open'
 
-        Start-Sleep -Milliseconds 150
+        Start-Sleep -Milliseconds 1100
         (Get-CircuitBreakerState).State | Should -Be 'HalfOpen'
 
         $result = Invoke-WithCircuitBreaker -Action { 'ok' } -State $state
@@ -83,11 +83,11 @@ Describe 'CircuitBreaker' {
     It 'HalfOpen on timeout then failure re-opens breaker' {
         $state = [PSCustomObject]@{
             ScriptRoot   = (Split-Path $PSScriptRoot)
-            BuildConfig  = [PSCustomObject]@{ errorHandling = [PSCustomObject]@{ circuitBreaker = [PSCustomObject]@{ enabled=$true; failureThreshold=1; resetTimeoutMs=100 } } }
+            BuildConfig  = [PSCustomObject]@{ errorHandling = [PSCustomObject]@{ circuitBreaker = [PSCustomObject]@{ enabled=$true; failureThreshold=1; resetTimeoutMs=1000 } } }
             CorrelationId = [guid]::NewGuid().ToString('N')
         }
         { Invoke-WithCircuitBreaker -Action { throw 'x' } -State $state } | Should -Throw
-        Start-Sleep -Milliseconds 150
+        Start-Sleep -Milliseconds 1100
         (Get-CircuitBreakerState).State | Should -Be 'HalfOpen'
 
         { Invoke-WithCircuitBreaker -Action { throw 'x' } -State $state } | Should -Throw

@@ -74,7 +74,7 @@ function Test-RunnerSelfHeal {
 function Restore-RunnerSelf {
     if (-not (Test-RunnerSelfHeal)) { return }
     try {
-        [System.IO.File]::WriteAllBytes($script:GBuildRunnerSelf, $script:GBuildRunnerBytes)
+        [System.IO.File]::WriteAllBytes($script:GBuildRunnerSelf, $script:GBuildRunnerSelfBytes)
         Write-SuiteMessage "[RUNNER] Restored $([System.IO.Path]::GetFileName($script:GBuildRunnerSelf)) - it was removed mid-suite (endpoint protection?)." 'Warn'
     } catch { Write-SuiteMessage "[RUNNER] Could not restore the test runner: $($_.Exception.Message)" 'Err' }
 }
