@@ -73,8 +73,8 @@ Describe "Environment" {
     }
 
     # ── Test-PortListening ───────────────────────────────────────────────
-    It "Test-PortListening returns a bool for port 1" {
-        $r = Test-PortListening -Port 1
+    It "Test-PortListening returns a bool for a closed port" {
+        $r = Test-PortListening -Port 65530
         $r | Should -BeOfType [bool]
     }
 
@@ -84,12 +84,12 @@ Describe "Environment" {
     }
 
     It "Wait-PortRelease returns true immediately for a closed port" {
-        $r = Wait-PortRelease -Port 1 -Attempts 2 -DelayMs 1 -Mode 'Listening'
+        $r = Wait-PortRelease -Port 65530 -Attempts 2 -DelayMs 1 -Mode 'Listening'
         $r | Should -Be $true
     }
 
     It "Wait-PortRelease Bindable mode returns true for a closed port" {
-        $r = Wait-PortRelease -Port 1 -Attempts 2 -DelayMs 1 -Mode 'Bindable'
+        $r = Wait-PortRelease -Port 65530 -Attempts 2 -DelayMs 1 -Mode 'Bindable'
         $r | Should -Be $true
     }
 
