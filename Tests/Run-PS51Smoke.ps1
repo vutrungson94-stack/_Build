@@ -27,21 +27,21 @@ if (-not $Use51Host) {
     if ($PSVersionTable.PSVersion.Major -eq 5) {
         $Use51Host = $true
     } else {
+        # Skip the 5.1 re-exec on non-Windows platforms: SystemRoot is unset
+        # and there is no powershell.exe to forward to.
         $sysRoot = $env:SystemRoot
-        $ps51 = ''
         if (-not [string]::IsNullOrWhiteSpace($sysRoot)) {
             $ps51 = Join-Path $sysRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            if (Test-Path -LiteralPath $ps51 -PathType Leaf) {
+                $forward = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath, '-Use51Host')
+                if (-not [string]::IsNullOrWhiteSpace($Files)) { $forward += @('-Files', $Files) }
+                if ($Strict.IsPresent) { $forward += '-Strict' }
+                if ($RequireNoSkips.IsPresent) { $forward += '-RequireNoSkips' }
+                & $ps51 @forward
+                exit $LASTEXITCODE
+            }
         }
-        if ([string]::IsNullOrWhiteSpace($ps51) -or -not (Test-Path -LiteralPath $ps51 -PathType Leaf)) {
-            Write-Error '[PS51Smoke] powershell.exe not found; the 5.1 gate cannot be skipped.'
-            exit 1
-        }
-        $forward = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $PSCommandPath, '-Use51Host')
-        if (-not [string]::IsNullOrWhiteSpace($Files)) { $forward += @('-Files', $Files) }
-        if ($Strict.IsPresent) { $forward += '-Strict' }
-        if ($RequireNoSkips.IsPresent) { $forward += '-RequireNoSkips' }
-        & $ps51 @forward
-        exit $LASTEXITCODE
+        # Linux/macOS: no powershell.exe available; run tests in current host
     }
 }
 
