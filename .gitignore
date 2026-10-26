@@ -72,6 +72,7 @@ logs/
 publish-output/
 
 # --- added by gsync security gate ---
+<<<<<<< Updated upstream
 # === SECURITY ===
 ssh_id
 *.pfx
@@ -84,6 +85,11 @@ node_modules/
 *.aab
 
 # --- added by gsync security gate ---
+=======
+.env
+*.pfx
+ssh_id
+>>>>>>> Stashed changes
 *.p12
 *.key
 .DS_Store
@@ -97,6 +103,16 @@ Thumbs.db
 *.orig
 *.rej
 .cache/
+<<<<<<< Updated upstream
+=======
+# === SECURITY ===
+bin/
+obj/
+node_modules/
+.vs/
+*.apk
+*.aab
+>>>>>>> Stashed changes
 *.env
 secrets.*
 *.secret
