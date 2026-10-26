@@ -154,17 +154,17 @@ function Test-IsWindowsHost {
     # and triggers module auto-discovery on EVERY call. The OS cannot change
     # while the process runs, so one answer per session is sufficient.
     if ($null -ne $script:IsWindowsHostCached) { return [bool]$script:IsWindowsHostCached }
-    $isWindows = $false
+    $hostIsWindows = $false
     try {
         if (Get-Command Get-OSPlatform -ErrorAction SilentlyContinue) {
-            $isWindows = ([string](Get-OSPlatform) -eq 'Windows')
-            $script:IsWindowsHostCached = $isWindows
-            return $isWindows
+            $hostIsWindows = ([string](Get-OSPlatform) -eq 'Windows')
+            $script:IsWindowsHostCached = $hostIsWindows
+            return $hostIsWindows
         }
     } catch { }
-    try { $isWindows = ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) } catch { $isWindows = $false }
-    $script:IsWindowsHostCached = $isWindows
-    return $isWindows
+    try { $hostIsWindows = ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) } catch { $hostIsWindows = $false }
+    $script:IsWindowsHostCached = $hostIsWindows
+    return $hostIsWindows
 }
 
 <#
