@@ -1,0 +1,73 @@
+{
+  "_readme": "gsync config",
+  "git": {
+    "remoteName": "origin",
+    "defaultBranchFallback": "main",
+    "pullConflictPolicy": "ask",
+    "stashWhenWorkingTreeDirty": true,
+    "retryCount": 3
+  },
+  "gitignore": {
+    "enabled": true,
+    "rulesToAdd": [
+      "# === SECURITY ===",
+      "ssh_id",
+      "*.pfx",
+      ".env",
+      "bin/",
+      "obj/",
+      "node_modules/",
+      ".vs/",
+      "*.apk",
+      "*.aab",
+      "publish-output/"
+    ]
+  },
+  "sensitive": {
+    "enabled": true,
+    "allowedPatterns": [
+      "\\.env\\.example$"
+    ],
+    "blockedPatterns": [
+      "\\.keystore$",
+      "\\.env$",
+      "secrets\\.json$"
+    ]
+  },
+  "junkCleanup": {
+    "enabled": true,
+    "patterns": [
+      "*.tmp",
+      "Thumbs.db"
+    ],
+    "restrictToDirs": [
+      "."
+    ],
+    "confirmBeforeDelete": false
+  },
+  "largeFiles": {
+    "enabled": true,
+    "excludeDirs": [
+      ".git",
+      "node_modules"
+    ]
+  },
+  "artifactUnstage": {
+    "enabled": true,
+    "patterns": [
+      "\\.(apk|aab|ipa|msix)$"
+    ],
+    "extraPatterns": [
+      "publish-output/"
+    ]
+  },
+  "ui": {
+    "largeFileThresholdMB": 90
+  },
+  "webhook": {
+    "enabled": false,
+    "url": "",
+    "onSuccess": true,
+    "onFailure": true
+  }
+}
