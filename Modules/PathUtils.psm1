@@ -311,7 +311,7 @@ function Resolve-BuildProjectRoot {
         try { $start = (Get-Location).ProviderPath } catch { $start = $null }
     }
     if ([string]::IsNullOrWhiteSpace($start)) { return $result }
-    try { $start = [System.IO.Path]::GetFullPath($start) } catch { return $result }
+    try { $start = [System.IO.Path]::GetFullPath($start); if ([string]::IsNullOrWhiteSpace($start) -and $StartDir -eq '/') { $start = '/' } } catch { return $result }
 
     if ($MaxDepth -le 0) {
         $MaxDepth = if (Get-Command Get-BuildConstant -ErrorAction SilentlyContinue) {
@@ -444,6 +444,7 @@ function Test-BuildVolumeRoot {
     [OutputType([bool])]
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Path)
     if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
+    if ($Path -eq '/' -or $Path -eq '\') { return $true }
     try {
         $full = [System.IO.Path]::GetFullPath($Path)
         $root = [System.IO.Path]::GetPathRoot($full)
