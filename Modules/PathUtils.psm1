@@ -445,16 +445,16 @@ function Test-BuildVolumeRoot {
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Path)
     if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
     try {
-        $full = [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/')
+        $full = [System.IO.Path]::GetFullPath($Path)
         $root = [System.IO.Path]::GetPathRoot($full)
         if ([string]::IsNullOrEmpty($root)) { return $false }
         $rootTrim = $root.TrimEnd('\', '/')
-        # POSIX root is '/' itself; only a path that IS the root counts as a
-        # volume root. Trimming '/' from '/' yields '' for EVERY POSIX path's
-        # root, so test the full path against the root, not against the trimmed
-        # root (which is '' for all '/'-rooted paths).
-        if ([string]::IsNullOrEmpty($rootTrim)) { return ($full -eq '/' -or $full -eq $root) }
-        return ($full -eq $rootTrim)
+        $fullTrim = $full.TrimEnd('\', '/')
+        # POSIX root is '/' itself; trimming '/' from '/' yields '' for EVERY
+        # POSIX path's root, so compare the trimmed full path against the trimmed
+        # root, treating an empty trimmed full path as the root itself.
+        if ([string]::IsNullOrEmpty($rootTrim)) { return ($fullTrim -eq '' -or $full -eq $root) }
+        return ($fullTrim -eq $rootTrim)
     } catch { return $false }
 }
 

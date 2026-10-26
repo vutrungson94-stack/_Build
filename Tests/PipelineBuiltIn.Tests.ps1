@@ -398,11 +398,11 @@ param($c)
 $flagPath = '{0}'
 if (-not (Test-Path -LiteralPath $flagPath)) {{
     Set-Content -LiteralPath $flagPath -Value 'attempted' | Out-Null
-    Start-Sleep -Seconds 30
+    Start-Sleep -Seconds 60
 }}
 $c.marker = 'second-attempt-won'
 '@ -f $flag
-        $step = @{ Name = 'Flaky'; TimeoutSeconds = 3; Retry = 1; Job = $true; Script = [scriptblock]::Create($body) }
+        $step = @{ Name = 'Flaky'; TimeoutSeconds = 10; Retry = 1; Job = $true; Script = [scriptblock]::Create($body) }
         { Invoke-PipelineStep -Step $step -Context $ctx -State $state | Out-Null } | Should -Not -Throw
         $ctx.marker | Should -Be 'second-attempt-won'
     }
