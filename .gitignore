@@ -1,4 +1,4 @@
-# _Build local runtime artifacts - never commit these.
+﻿# _Build local runtime artifacts - never commit these.
 #
 # Every pattern below is listed exactly ONCE. The file previously carried four
 # of them twice (logs/, build-reports/, .gbuildcache/, test-results*.xml), split
@@ -70,3 +70,15 @@ nul*
 .gbuildcache/
 logs/
 publish-output/
+
+# --- added by gsync security gate ---
+# === SECURITY ===
+ssh_id
+*.pfx
+.env
+bin/
+obj/
+node_modules/
+.vs/
+*.apk
+*.aab
