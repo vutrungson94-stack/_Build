@@ -19,16 +19,11 @@ permissions:
 jobs:
   syntax:
     name: Parse + PSScriptAnalyzer
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell-Action@v1
-        with:
-          version: '7.x'
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -72,17 +67,12 @@ jobs:
 
   test:
     name: Core test suite (fail-closed)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: syntax
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell-Action@v1
-        with:
-          version: '7.x'
 
       - name: Install Pester
         shell: pwsh
@@ -101,17 +91,12 @@ jobs:
 
   gbuild-flow:
     name: gbuild end-to-end flow
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: syntax
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell-Action@v1
-        with:
-          version: '7.x'
 
       - name: Install Pester
         shell: pwsh
@@ -131,7 +116,7 @@ jobs:
     runs-on: windows-latest
     needs: syntax
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -147,17 +132,12 @@ jobs:
 
   portability:
     name: POSIX launcher + full suite
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: syntax
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell-Action@v1
-        with:
-          version: '7.x'
 
       - name: Install Pester
         shell: pwsh
@@ -183,10 +163,10 @@ jobs:
 
   container:
     name: Multi-architecture container build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: syntax
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -211,14 +191,9 @@ jobs:
     runs-on: ubuntu-24.04-arm
     needs: syntax
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell-Action@v1
-        with:
-          version: '7.x'
 
       - name: Self-test gates on arm64
         shell: pwsh
@@ -229,17 +204,12 @@ jobs:
 
   coverage:
     name: Code coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
-      - name: Setup PowerShell
-        uses: PowerShell/PowerShell-Action@v1
-        with:
-          version: '7.x'
 
       - name: Install Pester
         shell: pwsh

@@ -82,3 +82,24 @@ node_modules/
 .vs/
 *.apk
 *.aab
+
+# --- added by gsync security gate ---
+*.p12
+*.key
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+*.swp
+*~
+.vscode/
+.idea/
+*.orig
+*.rej
+.cache/
+*.env
+secrets.*
+*.secret
+*.pem
+.gsync.state
+sync-outputs/
