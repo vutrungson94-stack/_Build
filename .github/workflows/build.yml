@@ -221,13 +221,13 @@ jobs:
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          Import-Module Pester -Force
           $config = [PesterConfiguration]::Default
           $config.Run.Path = (Join-Path $root 'Tests')
           $config.Run.Exit = $true
           $config.CodeCoverage.Enabled = $true
           $config.CodeCoverage.OutputPath = Join-Path $root 'coverage.xml'
           $config.CodeCoverage.CoveragePercentTarget = 85
-          $config.CodeCoverage.InputFiles = @(
-            @{ Path = (Join-Path $root 'Modules'); Recurse = $true }
-          )
+          $config.CodeCoverage.Path = @((Join-Path $root 'Modules'))
+          $config.CodeCoverage.RecursePaths = $true
           Invoke-Pester -Configuration $config

@@ -16,6 +16,32 @@ Import-GBuildModuleIfMissing -Name 'PathUtils' -SentinelCommand 'Test-PathUnderR
 $script:RootCauseHistoryPath = $null
 $script:RootCauseEnabled = $true
 
+function Get-DiagnosticRoot {
+    param([PSCustomObject]$State)
+
+Set-StrictMode -Version 1.0
+    foreach ($name in @('ProjectRoot', 'WorkingDir', 'ScriptRoot')) {
+        $value = if ($State) { [string](Get-SectionValue -Section $State -Key $name -Default '') } else { '' }
+        if ($value) {
+            try { if ($name -eq 'ScriptRoot' -and (Split-Path -Leaf $value) -ieq 'Modules') { return (Split-Path -Parent $value) } } catch { }
+            return $value
+        }
+    }
+    if (Get-Command Get-BuildRootDirectory -ErrorAction SilentlyContinue) {
+        return [string](Get-BuildRootDirectory -State $State)
+    }
+    throw (Get-LocaleMessage -Key 'log.diagnostic.noRoot')
+}
+
+function Resolve-DiagnosticPath {
+    param([PSCustomObject]$State, [string]$Path)
+    $root = Get-DiagnosticRoot $State
+    $candidate = if ([System.IO.Path]::IsPathRooted($Path)) { [System.IO.Path]::GetFullPath($Path) } else { [System.IO.Path]::GetFullPath((Join-Path $root $Path)) }
+    if (-not (Get-Command Test-PathUnderRoots -ErrorAction SilentlyContinue)) { return '' }
+    if (-not (Test-PathUnderRoots -Path $candidate -AllowedRoots @($root))) { return '' }
+    return $candidate
+}
+
 function Resolve-RootCausePath {
     param([PSCustomObject]$State, [string]$Path)
     return (Resolve-DiagnosticPath -State $State -Path $Path)

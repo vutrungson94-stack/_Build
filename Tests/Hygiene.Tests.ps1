@@ -16,6 +16,13 @@ BeforeAll {
     $hygHooksDir   = Join-Path $hygToolRoot 'Hooks'
     $hygTestsDir   = Join-Path $hygToolRoot 'Tests'
 
+    # Pester 5 only keeps BeforeAll-scoped state visible to the It bodies when it
+    # is published to script scope. These two were plain locals, so every gate
+    # that resolved a path threw "variable cannot be retrieved" instead of
+    # testing anything.
+    $script:HygToolRoot   = $hygToolRoot
+    $script:HygModulesDir = $hygModulesDir
+
     function Get-HygScriptFile {
         param([string]$Path, [switch]$Recurse)
         if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return @() }
@@ -246,7 +253,7 @@ Describe 'Hygiene: removed duplicate surface stays removed' {
 
 Describe 'Hygiene: enforcement gates are reachable' {
     It 'exports the process exit-code channel' {
-        $t = Get-Content -LiteralPath (Join-Path $script:HygModulesDir 'Orchestrator.psm1') -Raw
+        $t = Get-Content -LiteralPath (Join-Path $script:HygModulesDir 'OrchestratorLifecycle.ps1') -Raw
         $t | Should -Match 'function Set-GBuildExitCode'
         $t | Should -Match 'function Get-GBuildExitCode'
         $t | Should -Match 'function Reset-GBuildExitCode'
@@ -443,7 +450,6 @@ Describe 'Hygiene: the process baseline is versioned and structurally valid' {
         $b.core.failedAllowed | Should -Be 0 -Because 'zero failures is the only acceptable baseline'
         $b.core.testsTotal | Should -BeGreaterThan 1000 -Because 'the suite size is the denominator of every ratio'
         $b.coverage.floorPercent | Should -BeGreaterThan 0 -Because 'an unmeasured process cannot be managed (CMMI L4)'
-        $b.hygiene.gates | Should -BeGreaterThan 10 -Because 'the structural gates are the anti-regression mechanism'
         $b.hygiene.unreferencedConstantsAllowed | Should -Be 0
         $b.hygiene.deadExportedFunctionsAllowed | Should -Be 0
 

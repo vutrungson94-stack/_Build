@@ -844,6 +844,19 @@ function New-StandaloneBundleScript {
 # names previously in play here (Get-StandaloneSha256 and Get-StandaloneHash) were
 # called interchangeably from five sites in one file, which is exactly the shape
 # where a fix to one copy silently invalidates the manifests the other writes.
+#
+# The function itself had been dropped from this template while the comment
+# stayed, so every emitted bundle died on "Get-StandaloneHash is not recognized"
+# during Restore-StandaloneFiles. Keep the body byte-identical to the live copy.
+
+function Get-StandaloneHash {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][byte[]]$Bytes)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { return ([System.BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-', '') }
+    finally { $sha.Dispose() }
+}
 
 function Assert-StandaloneRelativePath {
     param([string]$Target, [string]$RelPath)
