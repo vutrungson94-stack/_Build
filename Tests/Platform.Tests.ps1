@@ -48,7 +48,7 @@ Describe 'Cross-Platform Path Handling' {
         $r | Should -Be (Join-Path $base 'sub\child')
     }
 
-    It 'Get-SafeJoinPath is consistent regardless of input separator style' {
+    It 'Get-SafeJoinPath is consistent regardless of input separator style' -Skip:(-not (Test-IsWindowsHost)) {
         $win = Get-SafeJoinPath -Base 'C:\repo' -Child 'src\mod'
         $mix = Get-SafeJoinPath -Base 'C:\repo' -Child 'src/mod'
         ($win -replace '\\', '/') | Should -Be ($mix -replace '\\', '/')

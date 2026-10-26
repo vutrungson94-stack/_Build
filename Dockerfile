@@ -3,7 +3,7 @@
 # "amd64"` guard below made `docker buildx build --platform linux/arm64` a hard
 # failure and forced Apple Silicon builders through QEMU emulation. The tag
 # stays multi-arch and the arch is resolved from TARGETARCH at build time.
-FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04
+FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04@sha256:62300a213a9293916333df2b014cd3a8f22fb0b0b65f2bb446aaf436bcf8c868
 
 ARG TARGETARCH=amd64
 ARG GBUILD_USER=gbuild

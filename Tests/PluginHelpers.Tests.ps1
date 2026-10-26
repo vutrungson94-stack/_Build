@@ -105,7 +105,11 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
             $powerShellError = Invoke-PluginCommandResult -ScriptBlock { Write-Error 'bad' } -State $global:phState -ProjectDir $tmp
             $powerShellError.Status | Should -Be 'Failed'
             $powerShellError.Succeeded | Should -BeFalse
-            $nativeStderr = Invoke-PluginCommandResult -ScriptBlock { & cmd.exe /d /c 'echo native-stderr 1>&2 & exit /b 0' } -State $global:phState -ProjectDir $tmp
+              $nativeStderr = if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+                  Invoke-PluginCommandResult -ScriptBlock { & cmd.exe /d /c 'echo native-stderr 1>&2 & exit /b 0' } -State $global:phState -ProjectDir $tmp
+              } else {
+                  Invoke-PluginCommandResult -ScriptBlock { & sh -c 'echo native-stderr >&2; exit 0' } -State $global:phState -ProjectDir $tmp
+              }
             $nativeStderr.Status | Should -Be 'Succeeded'
         } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
     }

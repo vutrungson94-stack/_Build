@@ -34,8 +34,8 @@ Describe 'PathUtils - core path helpers' {
     }
 
     It 'Get-SafeJoinPath joins with the OS separator and normalizes' {
-        $base = 'C:\repo'; $r = Get-SafeJoinPath -Base $base -Child 'src/mod'
-        $r | Should -Be (Join-Path 'C:\repo' 'src\mod')
+        $base = Join-Path $( [System.IO.Path]::GetTempPath() ) 'repo'; $r = Get-SafeJoinPath -Base $base -Child 'src/mod'
+        $r | Should -Be (Join-Path $base 'src/mod')
     }
 }
 
@@ -61,7 +61,7 @@ Describe 'PathUtils - security (path traversal guard)' {
     }
 
     It 'Test-SafePath rejects a rooted escape outside the base' {
-        Test-SafePath -Path 'C:\Windows\System32\calc.exe' -Base $global:ptBase | Should -BeFalse
+        Test-SafePath -Path (Join-Path ( [System.IO.Path]::GetTempPath() ) 'escape-outside.txt') -Base $global:ptBase | Should -BeFalse
     }
 
     It 'Test-SafePath rejects mixed-separator traversal' {

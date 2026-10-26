@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 #Requires -Module Pester
 
 # PS 5.1 compatibility shim for $IsWindows/$IsLinux/$IsMacOS

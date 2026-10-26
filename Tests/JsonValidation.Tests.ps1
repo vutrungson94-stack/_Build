@@ -71,7 +71,7 @@ Describe 'JsonValidation - env placeholder backslash regression' {
         # from $env:SystemDrive exercises the same backslash-escaping hazard with
         # no personal data in it.
         $old = $env:APPDATA
-        $env:APPDATA = Join-Path ([string]$env:SystemDrive) 'Users/gbuild-test/AppData/Roaming'
+        $env:APPDATA = 'C:\Users\gbuild-test\AppData\Roaming'
         try {
             # Test-BuildConfig with Strict=false should return $true (non-throwing)
             $r = Test-BuildConfig -State $state

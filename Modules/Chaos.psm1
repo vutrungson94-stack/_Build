@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # gbuild - PowerShell Build System
 # Copyright (c) 2026 Vu Trung Son (vutrungson94@gmail.com)
 # Licensed under the MIT License. See LICENSE file for details.
