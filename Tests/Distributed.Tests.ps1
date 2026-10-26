@@ -4,14 +4,17 @@
 Set-StrictMode -Version 1.0
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'Modules'
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+$null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'MockHelpers.psm1')) -Force -DisableNameChecking -ErrorAction Stop
+
+# New-FakeSsh (Helpers/MockHelpers.psm1) writes a runnable fake ssh for the
+# current platform: ssh.cmd on Windows, an executable `ssh` sh script on POSIX.
 
 Describe "Distributed Build (Multi-Host)" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Distributed.psm1') -Force -DisableNameChecking -ErrorAction Stop
         # Provide a fake `ssh` on PATH so connectivity + command execution can be exercised.
         $sshDir = Join-Path $TestDrive 'fakebin_ok'
-        New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
-        Set-Content -Path (Join-Path $sshDir 'ssh.cmd') -Value "@echo off`r`nexit /b 0"
+        New-FakeSsh -Directory $sshDir -Mode 'Ok'
         $global:GBuildFakeSshDir = $sshDir
         $global:GBuildOrigPath = $env:PATH
         $env:PATH = "$sshDir$([IO.Path]::PathSeparator)$env:PATH"
@@ -100,8 +103,7 @@ Describe "Distributed Build (Multi-Host)" {
 
     It "Test-RemoteHost returns true when ssh echo ok succeeds" {
         $okDir = Join-Path $TestDrive 'fakebin_ok'
-        New-Item -ItemType Directory -Path $okDir -Force | Out-Null
-        Set-Content -Path (Join-Path $okDir 'ssh.cmd') -Value "@echo off`r`necho ok"
+        New-FakeSsh -Directory $okDir -Mode 'EchoOk'
         $orig = $env:PATH
         $env:PATH = "$okDir$([IO.Path]::PathSeparator)$env:PATH"
         try {
@@ -115,8 +117,7 @@ Describe "Distributed Build (Multi-Host)" {
 
     It "Invoke-RemoteCommand reports failure when ssh exits non-zero" {
         $failDir = Join-Path $TestDrive 'fakebin_fail'
-        New-Item -ItemType Directory -Path $failDir -Force | Out-Null
-        Set-Content -Path (Join-Path $failDir 'ssh.cmd') -Value "@echo off`r`nexit /b 1"
+        New-FakeSsh -Directory $failDir -Mode 'Fail'
         $orig = $env:PATH
         $env:PATH = "$failDir$([IO.Path]::PathSeparator)$env:PATH"
         try {
@@ -169,8 +170,7 @@ Describe "Distributed Build (Multi-Host)" {
 
     It "kills a remote command when execution timeout expires" {
         $slowDir = Join-Path $TestDrive 'fakebin_slow'
-        New-Item -ItemType Directory -Path $slowDir -Force | Out-Null
-        [System.IO.File]::WriteAllText((Join-Path $slowDir 'ssh.cmd'), "@echo off`r`nping -n 8 127.0.0.1 >nul`r`nexit /b 0")
+        New-FakeSsh -Directory $slowDir -Mode 'Slow'
         $oldPath = $env:PATH
         $env:PATH = "$slowDir$([IO.Path]::PathSeparator)$oldPath"
         try {
@@ -246,7 +246,10 @@ Describe 'Distributed - result aggregation dashboard (New-DistributedReport)' {
     It 'contains a traversal report path under the state root' {
         $script:cfg.reportPath = '../outside'
         $report = New-DistributedReport -Results $script:results -State $script:state -Config $script:cfg
-        $report.JsonPath | Should -BeLike '*distributed-report\distributed-report.json'
+        # Separator-agnostic: production builds the path with Join-Path, so on
+        # POSIX it is /.../distributed-report/distributed-report.json.
+        (Split-Path -Leaf (Split-Path -Parent $report.JsonPath)) | Should -Be 'distributed-report'
+        (Split-Path -Leaf $report.JsonPath) | Should -Be 'distributed-report.json'
         $report.JsonPath | Should -Not -Match '(?i)outside'
         Test-Path -LiteralPath (Join-Path $script:state.ScriptRoot '../outside') | Should -BeFalse
     }
@@ -260,10 +263,7 @@ Describe 'Distributed - real-path integration (fake ssh transport, no -Simulatio
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Distributed.psm1') -Force -DisableNameChecking -ErrorAction Stop
         $sshDir = Join-Path $TestDrive 'fakebin_ok'
-        if (-not (Test-Path $sshDir)) {
-            New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
-            Set-Content -Path (Join-Path $sshDir 'ssh.cmd') -Value "@echo off`r`nexit /b 0"
-        }
+        New-FakeSsh -Directory $sshDir -Mode 'Ok'
         $global:GBuildRealPathOrigPath = $env:PATH
         $env:PATH = "$sshDir$([IO.Path]::PathSeparator)$env:PATH"
         if (Get-Command Reset-CircuitBreaker -ErrorAction SilentlyContinue) { Reset-CircuitBreaker }
@@ -330,10 +330,7 @@ Describe 'Distributed - real-path integration (fake ssh transport, no -Simulatio
 
     It 'all-failed aggregation returns null (throw recorded by circuit breaker)' {
         $failDir = Join-Path $TestDrive 'fakebin_fail'
-        if (-not (Test-Path $failDir)) {
-            New-Item -ItemType Directory -Path $failDir -Force | Out-Null
-            Set-Content -Path (Join-Path $failDir 'ssh.cmd') -Value "@echo off`r`nexit /b 1"
-        }
+        New-FakeSsh -Directory $failDir -Mode 'Fail'
         $orig = $env:PATH
         $env:PATH = "$failDir$([IO.Path]::PathSeparator)$env:PATH"
         try {

@@ -552,7 +552,11 @@ function Get-SdkExePath
     if (-not $cfg)
     { return $null
     }
-    return Join-Path (Join-Path $SdkRoot $cfg.Bin) $cfg.Exe
+    # Path.Combine, not Join-Path: on POSIX, Join-Path treats a Windows-style
+    # root ('C:\x') as a PSDrive reference and fails with "Cannot find drive C",
+    # leaving the call site to bind $null. Combine is pure string composition,
+    # so it works with either separator style on either host.
+    return [System.IO.Path]::Combine([string]$SdkRoot, [string]$cfg.Bin, [string]$cfg.Exe)
 }
 
 function Test-IsGhostSdk {

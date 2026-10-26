@@ -32,8 +32,11 @@ Describe "Environment" {
     }
 
     It "Get-SafePath returns the original path for a non-existent path" {
-        $r = Get-SafePath -Path 'C:\does\not\exist 123'
-        $r | Should -Be 'C:\does\not\exist 123'
+        # The path must be syntactically native: POSIX GetFullPath on
+        # 'C:\does\not\exist 123' yields a cwd-relative /.../C:\... string.
+        $missing = if ($env:OS -eq 'Windows_NT') { 'C:\does\not\exist 123' } else { '/does/not/exist 123' }
+        $r = Get-SafePath -Path $missing
+        $r | Should -Be $missing
     }
 
     # ── Save/Read-JsonSafe round-trip ───────────────────────────────────

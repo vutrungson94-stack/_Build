@@ -143,12 +143,28 @@ function Get-PathComparison {
     that only need the boolean and previously inlined the PlatformID
     comparison themselves.
 #>
+$script:IsWindowsHostCached = $null
+
 function Test-IsWindowsHost {
     [CmdletBinding()]
     [OutputType([bool])]
     param()
-    try { if (Get-Command Get-OSPlatform -ErrorAction SilentlyContinue) { return ([string](Get-OSPlatform) -eq 'Windows') } } catch { }
-    try { return ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) } catch { return $false }
+    # Cache the probe: this is called from the argument-quoting hot path, and
+    # when the Environment module is not imported the Get-Command lookup fails
+    # and triggers module auto-discovery on EVERY call. The OS cannot change
+    # while the process runs, so one answer per session is sufficient.
+    if ($null -ne $script:IsWindowsHostCached) { return [bool]$script:IsWindowsHostCached }
+    $isWindows = $false
+    try {
+        if (Get-Command Get-OSPlatform -ErrorAction SilentlyContinue) {
+            $isWindows = ([string](Get-OSPlatform) -eq 'Windows')
+            $script:IsWindowsHostCached = $isWindows
+            return $isWindows
+        }
+    } catch { }
+    try { $isWindows = ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) } catch { $isWindows = $false }
+    $script:IsWindowsHostCached = $isWindows
+    return $isWindows
 }
 
 <#

@@ -4,6 +4,10 @@
 Set-StrictMode -Version 1.0
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'Modules'
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+$null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'MockHelpers.psm1')) -Force -DisableNameChecking -ErrorAction Stop
+
+# New-FakeDotnet (Helpers/MockHelpers.psm1) writes dotnet.cmd on Windows and an
+# executable `dotnet` sh script on POSIX, where .cmd cannot be launched.
 
 Describe "InfraVerification (Level 5)" {
     BeforeAll {
@@ -68,9 +72,8 @@ Describe "InfraVerification (Level 5)" {
 
     It "SDK check passes when dotnet actually answers --list-sdks" {
         $fakeBin = Join-Path $TestDrive 'okbin'
-        New-Item -ItemType Directory -Path $fakeBin -Force | Out-Null
-        Set-Content -Path (Join-Path $fakeBin 'dotnet.cmd') -Value "@echo off`r`necho 8.0.400`r`nexit /b 0"
-        $state = [PSCustomObject]@{ ScriptRoot = $TestDrive; ProjectRoot = $TestDrive; BuildConfig = $null; DotnetCmd = (Join-Path $fakeBin 'dotnet.cmd') }
+        $fakeDotnet = New-FakeDotnet -Directory $fakeBin -Output '8.0.400' -ExitCode 0
+        $state = [PSCustomObject]@{ ScriptRoot = $TestDrive; ProjectRoot = $TestDrive; BuildConfig = $null; DotnetCmd = $fakeDotnet }
         $r = Invoke-InfraVerification -State $state -Force
         $sdk = @($r.Checks | Where-Object { $_.Name -eq 'sdk.dotnet' } | Select-Object -First 1)
         $sdk.Status | Should -Be 'passed'
@@ -78,9 +81,8 @@ Describe "InfraVerification (Level 5)" {
 
     It "SDK check fails when dotnet is a ghost stub (exit 0 but no output)" {
         $fakeBin = Join-Path $TestDrive 'stubbin'
-        New-Item -ItemType Directory -Path $fakeBin -Force | Out-Null
-        Set-Content -Path (Join-Path $fakeBin 'dotnet.cmd') -Value "@echo off`r`nexit /b 0"
-        $state = [PSCustomObject]@{ ScriptRoot = $TestDrive; ProjectRoot = $TestDrive; BuildConfig = $null; DotnetCmd = (Join-Path $fakeBin 'dotnet.cmd') }
+        $fakeDotnet = New-FakeDotnet -Directory $fakeBin -Output '' -ExitCode 0
+        $state = [PSCustomObject]@{ ScriptRoot = $TestDrive; ProjectRoot = $TestDrive; BuildConfig = $null; DotnetCmd = $fakeDotnet }
         $r = Invoke-InfraVerification -State $state -Force
         $sdk = @($r.Checks | Where-Object { $_.Name -eq 'sdk.dotnet' } | Select-Object -First 1)
         $sdk.Status | Should -Be 'failed'

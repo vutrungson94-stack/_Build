@@ -58,4 +58,83 @@ function Test-RealInfraEnabled {
     return ($env:GBUILD_REAL_INFRA -eq '1')
 }
 
-Export-ModuleMember -Function @('New-FullTestState', 'New-IntegrationTempDir', 'Test-RealInfraEnabled')
+<#
+.SYNOPSIS
+    Writes a fake `ssh` executable into a directory for PATH-shim tests.
+.DESCRIPTION
+    Windows resolves ssh.cmd; POSIX resolves an executable file named `ssh`.
+    The script is written in the shape the current platform can actually run.
+    Create the file in a BeforeAll (or an It body) - never at file scope, since
+    Pester's run phase does not see script-scope functions.
+.PARAMETER Mode
+    Ok = exit 0 silently; EchoOk = print "ok"; Fail = exit 1;
+    Slow = sleep ~8s then exit 0 (for execution-timeout tests).
+#>
+function New-FakeSsh {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [ValidateSet('Ok', 'EchoOk', 'Fail', 'Slow')][string]$Mode = 'Ok'
+    )
+    if (-not (Test-Path -LiteralPath $Directory)) {
+        New-Item -ItemType Directory -Path $Directory -Force | Out-Null
+    }
+    if ($env:OS -eq 'Windows_NT') {
+        $body = switch ($Mode) {
+            'Ok'     { "@echo off`r`nexit /b 0" }
+            'EchoOk' { "@echo off`r`necho ok" }
+            'Fail'   { "@echo off`r`nexit /b 1" }
+            'Slow'   { "@echo off`r`nping -n 8 127.0.0.1 >nul`r`nexit /b 0" }
+        }
+        Set-Content -Path (Join-Path $Directory 'ssh.cmd') -Value $body -Encoding ASCII
+    } else {
+        $body = switch ($Mode) {
+            'Ok'     { "#!/bin/sh`nexit 0`n" }
+            'EchoOk' { "#!/bin/sh`necho ok`n" }
+            'Fail'   { "#!/bin/sh`nexit 1`n" }
+            # exec: replace the shell so the timeout teardown kills the sleeper
+            # itself. A forked sleep grandchild can outlive the tree kill and
+            # hold the redirected pipes until the bounded drain times out.
+            'Slow'   { "#!/bin/sh`nexec sleep 8`n" }
+        }
+        $sshPath = Join-Path $Directory 'ssh'
+        [System.IO.File]::WriteAllText($sshPath, $body)
+        & chmod +x $sshPath
+    }
+}
+
+<#
+.SYNOPSIS
+    Writes a fake dotnet executable into a directory.
+.DESCRIPTION
+    Windows gets dotnet.cmd; POSIX gets an executable `dotnet` sh script,
+    because a .cmd file cannot be launched there.
+#>
+function New-FakeDotnet {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$Directory,
+        [string]$Output = '',
+        [int]$ExitCode = 0
+    )
+    if (-not (Test-Path -LiteralPath $Directory)) {
+        New-Item -ItemType Directory -Path $Directory -Force | Out-Null
+    }
+    if ($env:OS -eq 'Windows_NT') {
+        $path = Join-Path $Directory 'dotnet.cmd'
+        $body = "@echo off`r`n"
+        if ($Output) { $body += "echo $Output`r`n" }
+        $body += "exit /b $ExitCode"
+        Set-Content -Path $path -Value $body -Encoding ASCII
+    } else {
+        $path = Join-Path $Directory 'dotnet'
+        $body = "#!/bin/sh`n"
+        if ($Output) { $body += "echo $Output`n" }
+        $body += "exit $ExitCode`n"
+        [System.IO.File]::WriteAllText($path, $body)
+        & chmod +x $path
+    }
+    return $path
+}
+
+Export-ModuleMember -Function @('New-FullTestState', 'New-IntegrationTempDir', 'Test-RealInfraEnabled', 'New-FakeSsh', 'New-FakeDotnet')

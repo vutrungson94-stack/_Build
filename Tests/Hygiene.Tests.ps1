@@ -83,6 +83,7 @@ Describe 'Hygiene: no dead exported functions' {
             # format is Module::Function (no extension).
             'AutoTuner::Approve-AutoTuneProposal',   # pilot operator decision API
             'AutoTuner::New-AutoTuneProposal',       # pilot proposal API
+            'BuildProgress::ConvertTo-ProcessArgument', # documented single-argument quoting API (Docs/API/BuildProgress.md) for external log consumers
             'CacheProvider::Get-LocalCacheDir',      # exported accessor for external cache consumers
             'Container::Set-ServiceFactory',         # documented DI extension point
             'Menu::Show-BuildEnvironmentSummary',    # config-declared custom menu handler (gbuild.config.json)

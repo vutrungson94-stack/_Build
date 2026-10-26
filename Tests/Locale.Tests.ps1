@@ -151,7 +151,7 @@ Describe "Locale" {
         # Every code site that can consume a key.
         $sources = @()
         foreach ($p in @(Get-ChildItem -LiteralPath (Join-Path $global:GBuildModuleRoot '..') -Recurse -File -Include '*.psm1', '*.ps1')) {
-            if ($p.FullName -match '\\(\.tools|logs|TestResults|build-reports|reports|distributed-report)\\' -or $p.Name -eq 'Locale.Tests.ps1') { continue }
+            if ($p.FullName -match '[\\/](\.tools|logs|TestResults|build-reports|reports|distributed-report)[\\/]' -or $p.Name -eq 'Locale.Tests.ps1') { continue }
             $sources += $p.FullName
         }
         $corpus = ''
@@ -187,7 +187,7 @@ Describe "Locale" {
         $negative = @('no.such.key.xyz', 'menu.nonexistent')
         $sources = @()
         foreach ($p in @(Get-ChildItem -LiteralPath (Join-Path $global:GBuildModuleRoot '..') -Recurse -File -Include '*.psm1', '*.ps1')) {
-            if ($p.FullName -match '\\(\.tools|logs|TestResults|build-reports|reports|distributed-report)\\' -or $p.FullName -match '\\Tests\\') { continue }
+            if ($p.FullName -match '[\\/](\.tools|logs|TestResults|build-reports|reports|distributed-report)[\\/]' -or $p.FullName -match '[\\/]Tests[\\/]') { continue }
             $sources += $p.FullName
         }
         $keyPat = [regex]'(Get-LocaleMessage|Resolve-LogMessage|Write-MetricLog|Get-MenuLabel)\s+(?:-Locale\s+[''"][^''"]+[''"]\s+)?-Key\s+[''"]([A-Za-z0-9_.]+)[''"]'

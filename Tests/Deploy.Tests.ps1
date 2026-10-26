@@ -240,14 +240,24 @@ Describe "Deploy - readiness probe (Test-ProcessExited / Test-WebAppReady contra
 
     It "Test-ProcessExited returns true for an already-exited process" {
         $mod = Get-Module Deploy
-        $p = Start-Process -FilePath (Get-Command 'powershell.exe').Source -ArgumentList '-NoProfile -Command exit 0' -PassThru -WindowStyle Hidden
+        # powershell.exe and -WindowStyle are Windows-only. Use the host pwsh
+        # elsewhere and only pass -WindowStyle where the parameter exists.
+        $onWindows = ($env:OS -eq 'Windows_NT')
+        $shell = if ($onWindows) { (Get-Command 'powershell.exe' -ErrorAction Stop).Source } else { (Get-Command 'pwsh' -ErrorAction Stop).Source }
+        $spArgs = @{ FilePath = $shell; ArgumentList = '-NoProfile -Command exit 0'; PassThru = $true }
+        if ($onWindows) { $spArgs['WindowStyle'] = 'Hidden' }
+        $p = Start-Process @spArgs
         $null = $p.WaitForExit(5000)
         $mod.Invoke({ param($Proc, $State) Test-ProcessExited -Proc $Proc -State $State }, @($p, $global:state)) | Should -BeTrue
     }
 
     It "Test-ProcessExited returns false for a still-running process" {
         $mod = Get-Module Deploy
-        $p = Start-Process -FilePath (Get-Command 'powershell.exe').Source -ArgumentList '-NoProfile -Command Start-Sleep 5' -PassThru -WindowStyle Hidden
+        $onWindows = ($env:OS -eq 'Windows_NT')
+        $shell = if ($onWindows) { (Get-Command 'powershell.exe' -ErrorAction Stop).Source } else { (Get-Command 'pwsh' -ErrorAction Stop).Source }
+        $spArgs = @{ FilePath = $shell; ArgumentList = '-NoProfile -Command Start-Sleep 5'; PassThru = $true }
+        if ($onWindows) { $spArgs['WindowStyle'] = 'Hidden' }
+        $p = Start-Process @spArgs
         try {
             $mod.Invoke({ param($Proc, $State) Test-ProcessExited -Proc $Proc -State $State }, @($p, $global:state)) | Should -BeFalse
         } finally {

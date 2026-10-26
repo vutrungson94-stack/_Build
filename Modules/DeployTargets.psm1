@@ -123,9 +123,12 @@ function Get-DeployTarget {
 }
 
 # ── Deploy Lock (serialize concurrent deploys of same target) ───────────────────
-# Named-semaphore based (not Monitor): same-thread re-entry must BLOCK so the
-# DeployOrchestration.Tests concurrent-acquisition contract holds, and the lock
-# also serializes across processes (parallel pwsh hosts deploying same target).
+# Named-semaphore based on Windows (not Monitor): same-thread re-entry must
+# BLOCK so the DeployOrchestration.Tests concurrent-acquisition contract holds,
+# and the lock also serializes across processes (parallel pwsh hosts deploying
+# the same target). POSIX uses SharedUtils.Enter-BuildFileLock because named
+# semaphores are unsupported there; flock gives the same cross-process
+# exclusion.
 $script:DeployLocks = [System.Collections.Hashtable]::Synchronized(@{})
 
 <#
@@ -154,6 +157,26 @@ function Enter-DeployLock {
                 $TimeoutMs = [int](Get-BuildConstant -Key 'DeployTimeoutMs' -Fallback 30000)
             }
         } catch { $TimeoutMs = 30000 }
+    }
+    # Named semaphores are Windows-only: on Linux/macOS the 4-arg Semaphore
+    # constructor throws PlatformNotSupportedException, so every deploy lock
+    # acquisition returned $false and Invoke-DeployTarget failed closed before
+    # ever invoking a target. POSIX hosts get the same cross-process guarantee
+    # from SharedUtils.Enter-BuildFileLock (FileShare.None -> flock), which is
+    # the single file-lock primitive in the tree. Both handles implement
+    # Dispose(); only the semaphore needs an explicit Release().
+    if ([System.IO.Path]::DirectorySeparatorChar -ne '\') {
+        Initialize-BuildSharedUtils -SentinelCommand 'Enter-BuildFileLock'
+        if (-not (Get-Command Enter-BuildFileLock -ErrorAction SilentlyContinue)) { return $false }
+        $safeName = [regex]::Replace($LockName, '[^A-Za-z0-9._-]', '_')
+        if ($safeName.Length -gt 80) { $safeName = $safeName.Substring(0, 80) }
+        $lockDir = Join-Path ([System.IO.Path]::GetTempPath()) 'gbuild-deploy-locks'
+        $lock = Enter-BuildFileLock -Path (Join-Path $lockDir ('deploy-' + $safeName)) -TimeoutMs $TimeoutMs
+        if ($lock) {
+            $script:DeployLocks[$LockName] = $lock
+            return $true
+        }
+        return $false
     }
     $semName = "gbuild_deploy_$LockName"
     try {
@@ -186,11 +209,12 @@ function Exit-DeployLock {
     [CmdletBinding()]
     param([Parameter(Mandatory=$true)] [string]$LockName)
     if ($script:DeployLocks.ContainsKey($LockName)) {
+        $lock = $script:DeployLocks[$LockName]
         try {
-            $script:DeployLocks[$LockName].Release() | Out-Null
-        } catch { # benign — already released
+            if ($lock -is [System.Threading.Semaphore]) { $lock.Release() | Out-Null }
+        } catch { # benign - already released
         }
-        try { $script:DeployLocks[$LockName].Dispose() } catch { }
+        try { $lock.Dispose() } catch { }
         $script:DeployLocks.Remove($LockName) | Out-Null
     }
 }

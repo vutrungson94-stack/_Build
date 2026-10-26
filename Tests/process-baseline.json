@@ -34,6 +34,7 @@
     "deliberatePublicApi": [
       "AutoTuner::Approve-AutoTuneProposal",
       "AutoTuner::New-AutoTuneProposal",
+      "BuildProgress::ConvertTo-ProcessArgument",
       "CacheProvider::Get-LocalCacheDir",
       "Container::Set-ServiceFactory",
       "Menu::Show-BuildEnvironmentSummary",

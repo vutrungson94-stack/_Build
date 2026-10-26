@@ -77,6 +77,7 @@ Describe "CacheProvider Config" {
         if (Test-Path -LiteralPath $global:cpS3Destination) { Remove-Item -LiteralPath $global:cpS3Destination -Force -ErrorAction SilentlyContinue }
         InModuleScope CacheProvider {
             $state = [PSCustomObject]@{ TenantId = 'tenant-a'; ScriptRoot = $global:cpTemp; BuildConfig = [PSCustomObject]@{ build = [PSCustomObject]@{ cacheRemote = [PSCustomObject]@{ Enabled = $true; Type = 'awsS3'; Container = 'mybucket'; Endpoint = 'https://example.invalid'; MaxEntryBytes = 32 } } } }
+            Mock Get-Command { [PSCustomObject]@{ Name = 'stub'; Source = 'stub'; CommandType = 'Function' } } -ParameterFilter { $Name -ne 'aws' }
             Mock Get-Command { $null } -ParameterFilter { $Name -eq 'aws' }
             Mock New-S3SignedUrl { 'https://example.invalid/mybucket/tenant-a/entry' }
             $script:boundedFallbackCalls = 0
