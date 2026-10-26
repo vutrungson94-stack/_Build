@@ -89,6 +89,17 @@ jobs:
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Diagnose Environment (on failure)
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Environment child logs ==="
+          ls -la /tmp/gbuild-scope-Environment-*.log 2>/dev/null || echo "no files"
+          for f in /tmp/gbuild-scope-Environment-*.log; do echo "----- $f -----"; cat "$f" 2>/dev/null; done
+          echo "=== re-run Environment ==="
+          root="$GITHUB_WORKSPACE"
+          pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$root/Tests/Run-CoreTests.ps1" -Scope Environment -StrictSkips
+
   gbuild-flow:
     name: gbuild end-to-end flow
     runs-on: ubuntu-24.04
@@ -160,6 +171,17 @@ jobs:
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Diagnose Environment (on failure)
+        if: failure()
+        shell: bash
+        run: |
+          echo "=== Environment child logs ==="
+          ls -la /tmp/gbuild-scope-Environment-*.log 2>/dev/null || echo "no files"
+          for f in /tmp/gbuild-scope-Environment-*.log; do echo "----- $f -----"; cat "$f" 2>/dev/null; done
+          echo "=== re-run Environment ==="
+          root="$GITHUB_WORKSPACE"
+          pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$root/Tests/Run-CoreTests.ps1" -Scope Environment -StrictSkips
 
   container:
     name: Multi-architecture container build
