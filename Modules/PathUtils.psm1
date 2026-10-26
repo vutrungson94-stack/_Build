@@ -311,7 +311,17 @@ function Resolve-BuildProjectRoot {
         try { $start = (Get-Location).ProviderPath } catch { $start = $null }
     }
     if ([string]::IsNullOrWhiteSpace($start)) { return $result }
-    try { $start = [System.IO.Path]::GetFullPath($start); if ([string]::IsNullOrWhiteSpace($start) -and $StartDir -eq '/') { $start = '/' } } catch { return $result }
+    # Normalize to a full path. On POSIX, GetFullPath('/') can return an empty
+    # string on some runtimes, and a bare '/' must survive normalization so the
+    # volume-root detection below keeps working.
+    try {
+        if ($StartDir -eq '/' -or $StartDir -eq '\') {
+            $start = $StartDir
+        } else {
+            $start = [System.IO.Path]::GetFullPath($start)
+            if ([string]::IsNullOrWhiteSpace($start) -and ($StartDir -eq '/' -or $StartDir -eq '\')) { $start = $StartDir }
+        }
+    } catch { return $result }
 
     if ($MaxDepth -le 0) {
         $MaxDepth = if (Get-Command Get-BuildConstant -ErrorAction SilentlyContinue) {
@@ -319,6 +329,19 @@ function Resolve-BuildProjectRoot {
         } else { 10 }
     }
     if ($MaxDepth -le 0) { $MaxDepth = 10 }
+
+    # 2a. A filesystem volume root can never be a project. Detect it up front so
+    #     the walk does not escape into ancestors and so the launcher can refuse
+    #     it (this is how F:\\ got .gbuildcache). Root is kept equal to the
+    #     start path so callers compare equal to the value they passed in.
+    if (Test-BuildVolumeRoot -Path $start) {
+        $result.Root = $start
+        $result.IsVolumeRoot = $true
+        $result.HasMarker = (Test-BuildProjectMarker -Path $start)
+        $result.IsToolRoot = (Test-BuildPathEqual -PathA $start -PathB $toolRoot)
+        $result.Candidates = @()
+        return $result
+    }
 
     # 2. Walk up looking for a build file. StartDir itself wins (a repo root that
     #    is also a package root is the common case), then each ancestor.

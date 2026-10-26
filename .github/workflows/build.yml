@@ -183,8 +183,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           tags: gbuild:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   arm64:
     name: Native arm64 build
