@@ -5,7 +5,8 @@
     "defaultBranchFallback": "main",
     "pullConflictPolicy": "ask",
     "stashWhenWorkingTreeDirty": true,
-    "retryCount": 3
+    "retryCount": 3,
+    "minVersion": "2.20.0"
   },
   "gitignore": {
     "enabled": true,
@@ -69,5 +70,57 @@
     "url": "",
     "onSuccess": true,
     "onFailure": true
+  },
+  "version": "2.1.0",
+  "logging": {
+    "level": "Info",
+    "enableFile": true,
+    "enableConsoleColor": true,
+    "enableJsonLog": true,
+    "maxLogFiles": 10,
+    "maxLogSizeMB": 50
+  },
+  "security": {
+    "enabled": true,
+    "blockOnMatch": true,
+    "secretPatterns": [
+      "(?i)(sk-or-v1-[a-z0-9]{32,})",
+      "(?i)(ghp_[a-z0-9]{36})",
+      "(?i)(gho_[a-z0-9]{36})",
+      "(?i)(ghu_[a-z0-9]{36})",
+      "(?i)(ghs_[a-z0-9]{36})",
+      "(?i)(ghr_[a-z0-9]{36})",
+      "(?i)(npm_[a-z0-9]{36})",
+      "(?i)(token\\s*[=:]\\s*[a-zA-Z0-9]{20,})",
+      "(?i)(password\\s*[=:]\\s*\\S+)"
+    ],
+    "redactPatterns": [
+      {
+        "name": "generic_token",
+        "pattern": "sk-or-v1-[a-z0-9]{32,}",
+        "replacement": "***REDACTED***"
+      },
+      {
+        "name": "github_token",
+        "pattern": "ghp_[a-z0-9]{36}",
+        "replacement": "***REDACTED***"
+      },
+      {
+        "name": "npm_token",
+        "pattern": "npm_[a-z0-9]{36}",
+        "replacement": "***REDACTED***"
+      },
+      {
+        "name": "password_kv",
+        "pattern": "password\\s*[=:]\\s*\\S+",
+        "replacement": "password=***REDACTED***"
+      },
+      {
+        "name": "token_kv",
+        "pattern": "token\\s*[=:]\\s*\\S+",
+        "replacement": "token=***REDACTED***"
+      }
+    ],
+    "encryptStateFiles": false
   }
 }
