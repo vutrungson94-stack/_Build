@@ -188,7 +188,13 @@ function Invoke-DotnetLint {
         if ($Detailed) { return $result }
         return $false
     }
-    $target = if ($ProjectFile -and (Test-Path -LiteralPath $ProjectFile -PathType Leaf)) { $ProjectFile } else { $ProjectDir }
+    $project = Resolve-DotnetProjectFile -ProjectFile $ProjectFile -ProjectDir $ProjectDir
+    if (-not $project) {
+        $result = New-PluginActionResult -Status Skipped -Operation 'dotnet.lint' -ReasonCode 'ManifestMissing' -Message 'No .csproj manifest found' -Details $ProjectDir
+        if ($Detailed) { return $result }
+        return $false
+    }
+    $target = if ($ProjectFile -and (Test-Path -LiteralPath $ProjectFile -PathType Leaf)) { $ProjectFile } else { $project.FullName }
     $help = Invoke-PluginCommandResult -ScriptBlock { param($dotnetPath) & $dotnetPath format --help } -State $State -ProjectDir $ProjectDir -ArgumentList @($dotnet) -Label "Checking dotnet format for $PluginLabel"
     if (-not $help.Succeeded) {
         $result = New-PluginActionResult -Status Skipped -Operation 'dotnet.lint' -ReasonCode 'FormatUnavailable' -Message 'dotnet format is not available' -Details $help

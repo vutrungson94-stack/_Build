@@ -32,9 +32,15 @@ Describe "BuildProgress (live output streaming)" {
     }
 
     It "ConvertTo-ProcessArgument quotes args containing spaces and preserves plain args" {
-        ConvertTo-ProcessArgument -Value 'plain' | Should -Be 'plain'
-        ConvertTo-ProcessArgument -Value 'G:\TRUNG SON\x.psm1' | Should -Be '"G:\TRUNG SON\x.psm1"'
-        ConvertTo-ProcessArgument -Value '-p:K="v"' | Should -Be '"-p:K=\"v\""'
+        if (Test-IsWindowsHost) {
+            ConvertTo-ProcessArgument -Value 'plain' | Should -Be 'plain'
+            ConvertTo-ProcessArgument -Value 'G:\TRUNG SON\x.psm1' | Should -Be '"G:\TRUNG SON\x.psm1"'
+            ConvertTo-ProcessArgument -Value '-p:K="v"' | Should -Be '"-p:K=\"v\""'
+        } else {
+            ConvertTo-ProcessArgument -Value 'plain' | Should -Be '''plain'''
+            ConvertTo-ProcessArgument -Value 'G:\TRUNG SON\x.psm1' | Should -Be '''G:\TRUNG SON\x.psm1'''
+            ConvertTo-ProcessArgument -Value '-p:K="v"' | Should -Be '''-p:K="v"'''
+        }
         ConvertTo-ProcessArgument -Value '' | Should -Be '""'
     }
 
@@ -56,7 +62,7 @@ Describe "BuildProgress (live output streaming)" {
     }
 
     It "ScriptBlock mode propagates the native exit code" {
-        $sb = { cmd /c "exit 7" }
+        $sb = { & $script:TestShell -NoProfile -Command 'exit 7' }
         $res = Invoke-WithLiveOutput -ScriptBlock $sb -State $null -Label 'test'
         $res.ExitCode | Should -Be 7
     }

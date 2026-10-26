@@ -328,7 +328,13 @@ function Invoke-WithLiveOutput {
         }
     }
 
-    $quoted = foreach ($a in $ArgList) { ConvertTo-ProcessArgument -Value ([string]$a) }
+    $quoted = foreach ($a in $ArgList) {
+        $v = [string]$a
+        # ProcessStartInfo does NOT use a shell: never shell-quote (single quotes
+        # on POSIX would become literal argument text). Wrap only args that
+        # contain spaces in double quotes, which .NET respects on both OSes.
+        if ($v -match '[ \t]') { '"' + $v + '"' } else { $v }
+    }
     $psi = New-BuildProcessStartInfo -FilePath $FilePath -Arguments ($quoted -join ' ') -WorkingDirectory $WorkingDir
     if ($null -eq $psi) { return }
 
