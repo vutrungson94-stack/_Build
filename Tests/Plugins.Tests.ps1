@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -58,7 +58,7 @@ Describe 'Plugin metadata' {
 # -- Describe: Plugin build fallback ------------------------------------
 Describe 'Plugin action result contract' {
     It 'returns explicit skipped or failed results for missing test and lint prerequisites' {
-        $dir = Join-Path $env:TEMP ('gbuild_action_contract_' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_action_contract_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         try {
             foreach ($p in $global:GBuildPluginFiles) {
@@ -79,7 +79,7 @@ Describe 'Plugin action result contract' {
 
 Describe 'Plugin build fallback' {
     BeforeAll {
-        $global:GBuildTestTemp = Join-Path $env:TEMP "gbuild_plugtest_$(New-Guid)"
+        $global:GBuildTestTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild_plugtest_$(New-Guid)"
         New-Item -ItemType Directory -Path $global:GBuildTestTemp -Force -EA 0 | Out-Null
     }
     AfterAll { Remove-Item $global:GBuildTestTemp -Recurse -Force -EA 0 }
@@ -140,7 +140,7 @@ Describe 'Plugin lint fallback' {
         # (Get-Command -CommandType Application), so a PowerShell function shim could
         # neither satisfy the gate nor be reached - missing tools degrade to a clean
         # bool return (skip), which is exactly what this test asserts.
-        $global:GBuildTestTemp = Join-Path $env:TEMP "gbuild_linttest_$(New-Guid)"
+        $global:GBuildTestTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild_linttest_$(New-Guid)"
         New-Item -ItemType Directory -Path $global:GBuildTestTemp -Force -EA 0 | Out-Null
     }
     AfterAll {

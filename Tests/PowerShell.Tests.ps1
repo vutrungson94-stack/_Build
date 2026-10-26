@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -13,7 +13,7 @@ $null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 
 
 Describe 'PowerShell plugin' {
     BeforeAll {
-        $global:GBuildPsTemp = Join-Path $env:TEMP "gbuild_pstest_$(New-Guid)"
+        $global:GBuildPsTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild_pstest_$(New-Guid)"
         New-Item -ItemType Directory -Path $global:GBuildPsTemp -Force -EA 0 | Out-Null
     }
     AfterAll {

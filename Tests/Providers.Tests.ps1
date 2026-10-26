@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -19,7 +19,7 @@ Describe "Build" {
 
     It "Stop-ProcessByPort does not throw with minimal params" {
         $s = [PSCustomObject]@{ LogLevel = 0; OS = 'Windows'; Colors = @{ Gray = 'Gray' } }
-        { Stop-ProcessByPort -State $s -ProjectDir $env:TEMP } | Should -Not -Throw
+        { Stop-ProcessByPort -State $s -ProjectDir $( [System.IO.Path]::GetTempPath() ) } | Should -Not -Throw
     }
 }
 

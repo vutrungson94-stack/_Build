@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $PSCommandPath
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent $here) 'Modules'
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
@@ -138,7 +138,7 @@ Describe 'CredentialVault — audit log wiring' {
     }
 
     It 'Write-SecretAuditLog writes a JSON entry to file' {
-        $tmpLog = Join-Path $env:TEMP "audit-test-$(Get-Random).log"
+        $tmpLog = Join-Path $( [System.IO.Path]::GetTempPath() ) "audit-test-$(Get-Random).log"
         $mockState = [PSCustomObject]@{ TenantId = 'test'; CorrelationId = 'abc123' }
         Write-SecretAuditLog -SecretName 'test.secret' -Action 'read' -Module 'test' -LogPath $tmpLog -State $mockState
         $content = Get-Content $tmpLog -Raw
@@ -164,7 +164,7 @@ Describe 'CredentialVault — audit log wiring' {
     }
 
     It 'Write-BuildAuditLog rotates to audit-<timestamp>.log when MaxSizeMB is exceeded' {
-        $testDir = Join-Path $env:TEMP ('audit-rot-test-' + (Get-Random))
+        $testDir = Join-Path $( [System.IO.Path]::GetTempPath() ) ('audit-rot-test-' + (Get-Random))
         $null = New-Item -ItemType Directory -Path $testDir -Force -ErrorAction SilentlyContinue
         $tmpLog = Join-Path $testDir 'audit.log'
         try {
@@ -256,14 +256,17 @@ Describe 'CredentialVault - default key filename is unguessable (no fixed TEMP n
         # would fall through to the real TEMP) so the assertions are deterministic.
         $script:VaultOrigTmp = $env:TMP
         $script:VaultOrigTemp = $env:TEMP
+        $script:VaultOrigTmpDir = $env:TMPDIR
         $script:VaultIsoTemp = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-vault-test-' + [guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $script:VaultIsoTemp -Force
         $env:TMP = $script:VaultIsoTemp
         $env:TEMP = $script:VaultIsoTemp
+        $env:TMPDIR = $script:VaultIsoTemp
     }
     AfterAll {
         $env:TMP = $script:VaultOrigTmp
         $env:TEMP = $script:VaultOrigTemp
+        $env:TMPDIR = $script:VaultOrigTmpDir
         if ($script:VaultIsoTemp -and (Test-Path $script:VaultIsoTemp)) { Remove-Item $script:VaultIsoTemp -Recurse -Force -ErrorAction SilentlyContinue }
     }
 

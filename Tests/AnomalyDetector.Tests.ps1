@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -10,7 +10,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'AnomalyDetector.psm1'
 
 Describe "AnomalyDetector (statistical anomaly detection)" {
     BeforeAll {
-        $script:tempDir = Join-Path $env:TEMP "gbuild-anomaly-test-$(Get-Random)"
+        $script:tempDir = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild-anomaly-test-$(Get-Random)"
         New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     }
     AfterAll {

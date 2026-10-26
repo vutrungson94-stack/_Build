@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 <#
@@ -79,7 +79,7 @@ Describe 'ProviderContracts - AndroidSdkProvider' {
     }
 
     It 'Find-AdbPath returns null-or-existing path without throwing (fail-closed)' {
-        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $env:TEMP; OS = 'Windows'; Colors = @{ Warn = 'Yellow' }; BuildConfig = $null }
+        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $( [System.IO.Path]::GetTempPath() ); OS = 'Windows'; Colors = @{ Warn = 'Yellow' }; BuildConfig = $null }
         $p = Find-AdbPath -State $st
         if ($p) {
             (Test-Path -LiteralPath $p) | Should -Be $true
@@ -89,18 +89,18 @@ Describe 'ProviderContracts - AndroidSdkProvider' {
     }
 
     It 'Get-AdbDevices returns array without throwing when adb absent' {
-        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $env:TEMP; OS = 'Windows'; Colors = @{ Warn = 'Yellow' }; BuildConfig = $null }
+        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $( [System.IO.Path]::GetTempPath() ); OS = 'Windows'; Colors = @{ Warn = 'Yellow' }; BuildConfig = $null }
         $d = @(Get-AdbDevices -State $st -AdbPath 'Z:\nonexistent-adb.exe' -TryConnect $false)
         $d.Count | Should -Be 0
     }
 
     It 'Get-AndroidSdkHome returns null or string without throwing (no SDK required)' {
-        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $env:TEMP; BuildConfig = $null }
+        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $( [System.IO.Path]::GetTempPath() ); BuildConfig = $null }
         { Get-AndroidSdkHome -State $st } | Should -Not -Throw
     }
 
     It 'Get-AndroidSdkManagerPath + Get-AndroidPlatformToolsDir degrade gracefully without SDK' {
-        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $env:TEMP; BuildConfig = $null }
+        $st = [PSCustomObject]@{ AndroidSdk = $null; ScriptRoot = $( [System.IO.Path]::GetTempPath() ); BuildConfig = $null }
         { Get-AndroidSdkManagerPath -State $st } | Should -Not -Throw
         { Get-AndroidPlatformToolsDir -State $st } | Should -Not -Throw
     }

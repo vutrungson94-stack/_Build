@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 1.0
+Set-StrictMode -Version 1.0
 
 $modulePath = Join-Path $PSScriptRoot '../Modules/CacheProvider.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
@@ -108,7 +108,7 @@ Describe 'Cache HA/DR' {
 
     It 'Receive-CacheEntryFromReplica is a no-op when HA is disabled' {
         $st = [PSCustomObject]@{ BuildConfig = [PSCustomObject]@{ build = [PSCustomObject]@{ cacheRemote = [PSCustomObject]@{ enabled = $false } } } }
-        Receive-CacheEntryFromReplica -State $st -Key 'k' -DestinationPath (Join-Path $env:TEMP 'nope.bin') | Should -BeFalse
+        Receive-CacheEntryFromReplica -State $st -Key 'k' -DestinationPath (Join-Path $( [System.IO.Path]::GetTempPath() ) 'nope.bin') | Should -BeFalse
     }
 
     It 'Receive-CacheEntryFromReplica returns false when no replica is reachable' {
@@ -122,9 +122,9 @@ Describe 'Cache HA/DR' {
                 regions = @([PSCustomObject]@{ name = 'secondary'; type = 'azureBlob'; endpoint = 'https://s.invalid'; container = 'c2'; priority = 10 })
             }
         }
-        $st = [PSCustomObject]@{ ProjectRoot = $env:TEMP; ScriptRoot = $env:TEMP
+        $st = [PSCustomObject]@{ ProjectRoot = $( [System.IO.Path]::GetTempPath() ); ScriptRoot = $( [System.IO.Path]::GetTempPath() )
                                 BuildConfig = [PSCustomObject]@{ build = [PSCustomObject]@{ cacheRemote = $remote } } }
-        Receive-CacheEntryFromReplica -State $st -Key 'missing' -DestinationPath (Join-Path $env:TEMP 'ha-miss.bin') | Should -BeFalse
+        Receive-CacheEntryFromReplica -State $st -Key 'missing' -DestinationPath (Join-Path $( [System.IO.Path]::GetTempPath() ) 'ha-miss.bin') | Should -BeFalse
     }
 
     It 'Test-CacheHAFailoverPosture is wired and reports without throwing' {

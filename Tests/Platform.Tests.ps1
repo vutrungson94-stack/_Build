@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -43,7 +43,7 @@ Describe 'Cross-Platform Path Handling' {
     }
 
     It 'Format-Path anchors a relative path under Base' {
-        $base = Join-Path $env:TEMP 'gplat_base'
+        $base = Join-Path $( [System.IO.Path]::GetTempPath() ) 'gplat_base'
         $r = Format-Path -Path 'sub\child' -Base $base
         $r | Should -Be (Join-Path $base 'sub\child')
     }

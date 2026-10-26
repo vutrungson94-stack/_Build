@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -367,10 +367,10 @@ Describe "Locale device persistence (bounded per-device cache)" {
     It "Save-DeviceLocaleCache writes nothing for a relative ScriptRoot" {
         $origLoc = $PWD.Path
         try {
-            Set-Location -LiteralPath $env:TEMP
-            $before = Test-Path -LiteralPath (Join-Path $env:TEMP '.gbuild')
+            Set-Location -LiteralPath $( [System.IO.Path]::GetTempPath() )
+            $before = Test-Path -LiteralPath (Join-Path $( [System.IO.Path]::GetTempPath() ) '.gbuild')
             Save-DeviceLocaleCache -State ([PSCustomObject]@{ ScriptRoot = '..' }) -Locale 'vi' | Should -BeFalse
-            Test-Path -LiteralPath (Join-Path $env:TEMP '.gbuild') | Should -Be $before
+            Test-Path -LiteralPath (Join-Path $( [System.IO.Path]::GetTempPath() ) '.gbuild') | Should -Be $before
         } finally { Set-Location -LiteralPath $origLoc }
     }
 

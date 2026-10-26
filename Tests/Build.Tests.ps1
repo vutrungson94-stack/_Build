@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 # PS 5.1 compatibility shim for $IsWindows/$IsLinux/$IsMacOS
@@ -87,8 +87,8 @@ Describe 'Build dispatch and target contracts' {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Build.psm1') -Force -DisableNameChecking -ErrorAction Stop
         $global:targetState = [PSCustomObject]@{
-            ProjectRoot = $env:TEMP
-            ScriptRoot = $env:TEMP
+            ProjectRoot = $( [System.IO.Path]::GetTempPath() )
+            ScriptRoot = $( [System.IO.Path]::GetTempPath() )
             OS = 'Windows'
             LogLevel = 0
             BuildConfig = [PSCustomObject]@{}
@@ -96,7 +96,7 @@ Describe 'Build dispatch and target contracts' {
         }
     }
     It 'detects a non-.NET project before applying the dotnet gate' {
-        $dir = Join-Path $env:TEMP ('gbuild_node_gate_' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_node_gate_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         $file = Join-Path $dir 'package.json'
         Set-Content -LiteralPath $file -Value '{"name":"gate"}'

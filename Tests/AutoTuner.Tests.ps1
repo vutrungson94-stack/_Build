@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -9,7 +9,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'AutoTuner.psm1') -For
 
 Describe "AutoTuner (self-optimizing build performance)" {
     BeforeAll {
-        $script:tempDir = Join-Path $env:TEMP "gbuild-autotune-test-$(Get-Random)"
+        $script:tempDir = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild-autotune-test-$(Get-Random)"
         New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     }
     AfterAll {

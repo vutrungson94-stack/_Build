@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -28,7 +28,7 @@ Describe 'PathUtils - core path helpers' {
     }
 
     It 'Format-Path anchors a relative path under Base' {
-        $base = Join-Path $env:TEMP 'gbutil_base'
+        $base = Join-Path $( [System.IO.Path]::GetTempPath() ) 'gbutil_base'
         $r = Format-Path -Path 'sub\child' -Base $base
         $r | Should -Be (Join-Path $base 'sub\child')
     }
@@ -41,7 +41,7 @@ Describe 'PathUtils - core path helpers' {
 
 Describe 'PathUtils - security (path traversal guard)' {
     BeforeAll {
-        $global:ptBase = Join-Path $env:TEMP ('gbutil_safe_' + [guid]::NewGuid().ToString('N'))
+        $global:ptBase = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbutil_safe_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $global:ptBase -Force | Out-Null
     }
     AfterAll {

@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -11,7 +11,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Loader.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'ConfigProvider.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
-$global:swState = [PSCustomObject]@{ ProjectRoot = $env:TEMP }
+$global:swState = [PSCustomObject]@{ ProjectRoot = $( [System.IO.Path]::GetTempPath() ) }
 
 Describe 'Swift plugin' {
     BeforeAll {
@@ -29,7 +29,7 @@ Describe 'Swift plugin' {
     }
 
     It 'Invoke-PluginBuild returns false when swift is unavailable (graceful)' {
-        $tmp = Join-Path $env:TEMP ('gbuild_swift_b_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_swift_b_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             Invoke-PluginBuild -State $global:swState -ProjectDir $tmp | Should -BeFalse
@@ -39,7 +39,7 @@ Describe 'Swift plugin' {
     }
 
     It 'Invoke-PluginTest returns false without Package.swift' {
-        $tmp = Join-Path $env:TEMP ('gbuild_swift_t_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_swift_t_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             Invoke-PluginTest -State $global:swState -ProjectDir $tmp | Should -BeFalse
@@ -49,7 +49,7 @@ Describe 'Swift plugin' {
     }
 
     It 'Invoke-PluginLint returns true (SoftFail) without Package.swift' {
-        $tmp = Join-Path $env:TEMP ('gbuild_swift_l_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_swift_l_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-PluginLint -State $global:swState -ProjectDir $tmp -Detailed
@@ -62,7 +62,7 @@ Describe 'Swift plugin' {
     }
 
     It 'Invoke-PluginPreflight returns a result hashtable' {
-        $tmp = Join-Path $env:TEMP ('gbuild_swift_p_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_swift_p_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-PluginPreflight -State $global:swState -ProjectDir $tmp

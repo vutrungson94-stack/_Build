@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -11,7 +11,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Loader.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'ConfigProvider.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
-$global:elState = [PSCustomObject]@{ ProjectRoot = $env:TEMP }
+$global:elState = [PSCustomObject]@{ ProjectRoot = $( [System.IO.Path]::GetTempPath() ) }
 
 Describe 'Elixir plugin' {
     BeforeAll {
@@ -30,7 +30,7 @@ Describe 'Elixir plugin' {
     }
 
     It 'Invoke-PluginBuild returns false when mix is unavailable (graceful)' {
-        $tmp = Join-Path $env:TEMP ('gbuild_elixir_b_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_elixir_b_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             Invoke-PluginBuild -State $global:elState -ProjectDir $tmp | Should -BeFalse
@@ -40,7 +40,7 @@ Describe 'Elixir plugin' {
     }
 
     It 'Invoke-PluginTest returns false without mix.exs' {
-        $tmp = Join-Path $env:TEMP ('gbuild_elixir_t_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_elixir_t_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             Invoke-PluginTest -State $global:elState -ProjectDir $tmp | Should -BeFalse
@@ -50,7 +50,7 @@ Describe 'Elixir plugin' {
     }
 
     It 'Invoke-PluginLint returns true (SoftFail) without mix.exs' {
-        $tmp = Join-Path $env:TEMP ('gbuild_elixir_l_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_elixir_l_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-PluginLint -State $global:elState -ProjectDir $tmp -Detailed
@@ -63,7 +63,7 @@ Describe 'Elixir plugin' {
     }
 
     It 'Invoke-PluginPreflight returns a result hashtable' {
-        $tmp = Join-Path $env:TEMP ('gbuild_elixir_p_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_elixir_p_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-PluginPreflight -State $global:elState -ProjectDir $tmp

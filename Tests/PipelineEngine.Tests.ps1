@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -12,7 +12,7 @@ $null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 
 
 Describe 'Pipeline engine' {
     BeforeAll {
-        $global:GBuildPipelineTestTemp = Join-Path $env:TEMP "gbuild_pipeline_$(New-Guid)"
+        $global:GBuildPipelineTestTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild_pipeline_$(New-Guid)"
         New-Item -ItemType Directory -Path $global:GBuildPipelineTestTemp -Force -EA 0 | Out-Null
     }
     AfterAll { Remove-Item $global:GBuildPipelineTestTemp -Recurse -Force -EA 0 }

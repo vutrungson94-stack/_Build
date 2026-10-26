@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -208,7 +208,7 @@ Describe "Distributed Build (Multi-Host)" {
 Describe 'Distributed - result aggregation dashboard (New-DistributedReport)' {
 
     BeforeEach {
-        $dir = Join-Path $env:TEMP ('gbuild_rpt_' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_rpt_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         $script:state = [PSCustomObject]@{ ScriptRoot = $dir }
         $script:cfg = [PSCustomObject]@{ reportPath = 'distributed-report' }

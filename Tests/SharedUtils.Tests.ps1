@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 Set-StrictMode -Version 1.0
 
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'Modules'
@@ -208,7 +208,7 @@ Describe 'Read-DotEnvFile' {
     # Read-DotEnvFile. The read-only contract is now pinned here, including the
     # property that actually matters: reading a .env must not touch the session.
     It 'Read-DotEnvFile loads KEY=value pairs and returns a hashtable' {
-        $td = Join-Path $env:TEMP ("gbuild_dotenv_" + [guid]::NewGuid().ToString('N'))
+        $td = Join-Path $( [System.IO.Path]::GetTempPath() ) ("gbuild_dotenv_" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $td -Force | Out-Null
         $envFile = Join-Path $td '.env'
         Set-Content -Path $envFile -Value 'GB_DOT_KEY=dotvalue123'
@@ -222,7 +222,7 @@ Describe 'Read-DotEnvFile' {
     }
 
     It 'Read-DotEnvFile leaves the process environment untouched' {
-        $td = Join-Path $env:TEMP ("gbuild_dotenv_" + [guid]::NewGuid().ToString('N'))
+        $td = Join-Path $( [System.IO.Path]::GetTempPath() ) ("gbuild_dotenv_" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $td -Force | Out-Null
         $envFile = Join-Path $td '.env'
         Set-Content -Path $envFile -Value 'GB_DOT_TEST2=value2'
@@ -326,7 +326,7 @@ Describe 'Get-InvokeCommandHint (OS-correct launcher)' {
     It 'uses the bare entry form when standing inside the tool dir' {
         $w = Get-Variable -Name IsWindows -ValueOnly -ErrorAction SilentlyContinue
         $isWin = if ($null -ne $w) { [bool]$w } else { ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) }
-        $tool = Join-Path $env:TEMP 'gbuild_hint_tool'
+        $tool = Join-Path $( [System.IO.Path]::GetTempPath() ) 'gbuild_hint_tool'
         $h = Get-InvokeCommandHint -ScriptRoot $tool -FromDirectory $tool -Arguments '-Help'
         if ($isWin) { $h | Should -Be '.\gbuild.ps1 -Help' } else { $h | Should -Be './gbuild -Help' }
     }
@@ -334,7 +334,7 @@ Describe 'Get-InvokeCommandHint (OS-correct launcher)' {
     It 'uses the actual folder name from the tool parent' {
         $w = Get-Variable -Name IsWindows -ValueOnly -ErrorAction SilentlyContinue
         $isWin = if ($null -ne $w) { [bool]$w } else { ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) }
-        $tool = Join-Path $env:TEMP 'MyCustomBuild'
+        $tool = Join-Path $( [System.IO.Path]::GetTempPath() ) 'MyCustomBuild'
         $parent = Split-Path $tool -Parent
         $h = Get-InvokeCommandHint -ScriptRoot $tool -FromDirectory $parent -Arguments '-Locale vi'
         if ($isWin) { $h | Should -Be '.\MyCustomBuild\gbuild.ps1 -Locale vi' } else { $h | Should -Be './MyCustomBuild/gbuild -Locale vi' }

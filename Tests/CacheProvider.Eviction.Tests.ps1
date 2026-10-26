@@ -1,4 +1,4 @@
-﻿# ============================================================================
+# ============================================================================
 # CacheProvider.Eviction.Tests.ps1 (Sprint 3-Q6: LRU/age eviction + compression)
 # ============================================================================
 
@@ -11,7 +11,7 @@ Import-Module $cacheModule -Force -DisableNameChecking
 Describe 'CacheProvider - LRU / age eviction (Invoke-CacheEviction)' {
 
     BeforeEach {
-        $dir = Join-Path $env:TEMP ('gbuild_ev_' + [guid]::NewGuid().ToString('N'))
+        $dir = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ev_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         for ($i = 0; $i -lt 5; $i++) {
             $f = Join-Path $dir ("entry_$i.bin")
@@ -19,7 +19,7 @@ Describe 'CacheProvider - LRU / age eviction (Invoke-CacheEviction)' {
             (Get-Item $f).LastWriteTime = (Get-Date).AddDays(-($i * 10))
         }
         $script:state = [PSCustomObject]@{
-            ScriptRoot = $env:TEMP
+            ScriptRoot = $( [System.IO.Path]::GetTempPath() )
             TenantId   = 'default'
             BuildConfig = [PSCustomObject]@{
                 build = [PSCustomObject]@{
@@ -52,7 +52,7 @@ Describe 'CacheProvider - LRU / age eviction (Invoke-CacheEviction)' {
 Describe 'CacheProvider - GZip compression round-trip' {
 
     It 'compresses then decompresses a file to identical bytes' {
-        $tmp = Join-Path $env:TEMP ('gbuild_cmp_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_cmp_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $src = Join-Path $tmp 'plain.bin'

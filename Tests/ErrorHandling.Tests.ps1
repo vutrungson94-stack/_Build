@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 # PS 5.1 compatibility shim for $IsWindows/$IsLinux/$IsMacOS
@@ -19,9 +19,9 @@ Describe "ErrorHandling" {
         Reset-ErrorLog
         Clear-RollbackStack
         $global:state = [PSCustomObject]@{
-            ScriptRoot  = $env:TEMP
-            ProjectRoot = $env:TEMP
-            WorkingDir  = $env:TEMP
+            ScriptRoot  = $( [System.IO.Path]::GetTempPath() )
+            ProjectRoot = $( [System.IO.Path]::GetTempPath() )
+            WorkingDir  = $( [System.IO.Path]::GetTempPath() )
             CorrelationId = 'test-correlation-000'
             BuildConfig = [PSCustomObject]@{ }
             Colors = [PSCustomObject]@{ Info='Cyan'; Succ='Green'; Gray='DarkGray'; Err='Red'; Warn='Yellow'; Header='Magenta' }

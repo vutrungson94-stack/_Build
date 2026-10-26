@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 <#
@@ -65,7 +65,7 @@ Describe "Distributed Build E2E (mock SSH)" {
     }
 
     It "New-DistributedReport produces JSON and Markdown rollup" {
-        $dir = Join-Path $env:TEMP ('gbuild_rpt_e2e_' + [guid]::NewGuid().ToString('N').Substring(0,8))
+        $dir = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_rpt_e2e_' + [guid]::NewGuid().ToString('N').Substring(0,8))
         $null = New-Item -ItemType Directory -Path $dir -Force
         $state = [PSCustomObject]@{ ScriptRoot = $dir }
         $cfg = [PSCustomObject]@{ reportPath = 'distributed-report' }

@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -16,7 +16,7 @@ AfterAll {
 Describe 'Edge Cases - path traversal & permission/error safety' {
 
     BeforeAll {
-        $global:ecBase = Join-Path $env:TEMP ('gbedge_' + [guid]::NewGuid().ToString('N'))
+        $global:ecBase = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbedge_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $global:ecBase -Force | Out-Null
     }
     AfterAll {
@@ -24,7 +24,7 @@ Describe 'Edge Cases - path traversal & permission/error safety' {
     }
 
     It 'Test-SafePath rejects a rooted absolute escape outside the base (permission boundary)' {
-        Test-SafePath -Path 'C:\Windows\System32\calc.exe' -Base $global:ecBase | Should -BeFalse
+        Test-SafePath -Path (Join-Path ( [System.IO.Path]::GetTempPath() ) 'gbedge-escape.txt') -Base $global:ecBase | Should -BeFalse
     }
 
     It 'Test-SafePath resolves a relative path against the base and contains it (no bypass switch)' {

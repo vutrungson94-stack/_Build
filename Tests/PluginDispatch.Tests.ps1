@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -12,7 +12,7 @@ $null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 
 
 Describe 'Plugin dispatch' {
     BeforeAll {
-        $global:GBuildDispatchTemp = Join-Path $env:TEMP "gbuild_dispatch_$(New-Guid)"
+        $global:GBuildDispatchTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild_dispatch_$(New-Guid)"
         New-Item -ItemType Directory -Path $global:GBuildDispatchTemp -Force -EA 0 | Out-Null
         $global:GBuildNodeDir = Join-Path $global:GBuildDispatchTemp 'node-project'
         New-Item -ItemType Directory -Path $global:GBuildNodeDir -Force -EA 0 | Out-Null
@@ -174,7 +174,7 @@ Describe 'Plugin dispatch context contract' {
             Export-ModuleMember -Function Invoke-PluginTest,Invoke-PluginLint
         }
         Import-Module $global:DispatchContextModule -Force -Global -DisableNameChecking
-        $global:DispatchContextTemp = Join-Path $env:TEMP ('gbuild_dispatch_context_' + [guid]::NewGuid().ToString('N'))
+        $global:DispatchContextTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dispatch_context_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $global:DispatchContextTemp -Force | Out-Null
         $global:DispatchContextState = New-TestState
     }
@@ -233,7 +233,7 @@ Describe 'Plugin action dispatch parity (Invoke-PluginActionFor)' {
             Export-ModuleMember -Function Invoke-PluginTest,Invoke-PluginLint,Invoke-PluginClean,Invoke-PluginRun
         }
         Mock Resolve-PluginForLanguage -ModuleName Loader -MockWith { return @{ Module = $global:ParityModule } }
-        $global:ParityTemp = Join-Path $env:TEMP ('gbuild_parity_' + [guid]::NewGuid().ToString('N'))
+        $global:ParityTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_parity_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $global:ParityTemp -Force | Out-Null
         $global:ParityState = New-TestState
         $global:ParityState | Add-Member -MemberType NoteProperty -Name ProjectRoot -Value $global:ParityTemp -Force

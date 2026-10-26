@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -10,7 +10,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 
 # Minimal non-null state object (functions only use it for logging).
-$global:phState = [PSCustomObject]@{ ProjectRoot = $env:TEMP }
+$global:phState = [PSCustomObject]@{ ProjectRoot = $( [System.IO.Path]::GetTempPath() ) }
 
 Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     BeforeAll {
@@ -21,7 +21,7 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'Resolve-PluginManifest returns explicit ProjectFile when present' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         $mf = Join-Path $tmp 'mix.exs'; New-Item -ItemType File -Path $mf -Force | Out-Null
         try {
@@ -30,7 +30,7 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'Resolve-PluginManifest falls back to manifest found in ProjectDir' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph2_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph2_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         $mf = Join-Path $tmp 'go.mod'; New-Item -ItemType File -Path $mf -Force | Out-Null
         try {
@@ -39,7 +39,7 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'Resolve-PluginManifest returns null when nothing found' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph3_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph3_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             Resolve-PluginManifest -ProjectDir $tmp -ManifestFiles @('nope.x') | Should -BeNullOrEmpty
@@ -47,7 +47,7 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'Resolve-PluginManifest resolves manifest given a Unix-style (forward-slash) ProjectDir' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph4_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph4_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         $mf = Join-Path $tmp 'go.mod'; New-Item -ItemType File -Path $mf -Force | Out-Null
         $unixDir = $tmp -replace '\\', '/'
@@ -57,26 +57,26 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'Get-SimplePluginPreflight reports missing tool as warning (universal success, not error)' {
-        $r = Get-SimplePluginPreflight -ToolName 'zzz_no_such_tool_xyz' -ManifestFiles @('mix.exs') -ManifestLabel 'mix.exs' -State $global:phState -ProjectDir $env:TEMP
+        $r = Get-SimplePluginPreflight -ToolName 'zzz_no_such_tool_xyz' -ManifestFiles @('mix.exs') -ManifestLabel 'mix.exs' -State $global:phState -ProjectDir $( [System.IO.Path]::GetTempPath() )
         $r.Passed | Should -BeTrue
         ($r.Warnings -join ',') | Should -Match 'Missing tool'
         $r.Errors.Count | Should -Be 0
     }
 
     It 'Resolve-PluginBuild returns null when tool missing' {
-        Resolve-PluginBuild -ToolName 'zzz_no_such_tool_xyz' -ToolNotFoundMsg 'x' -ManifestFiles @('mix.exs') -State $global:phState -ProjectDir $env:TEMP | Should -BeNullOrEmpty
+        Resolve-PluginBuild -ToolName 'zzz_no_such_tool_xyz' -ToolNotFoundMsg 'x' -ManifestFiles @('mix.exs') -State $global:phState -ProjectDir $( [System.IO.Path]::GetTempPath() ) | Should -BeNullOrEmpty
     }
 
     It 'Invoke-SimplePluginTest returns false when tool missing' {
-        Invoke-SimplePluginTest -ToolName 'zzz_no_such_tool_xyz' -ToolNotFoundMsg 'x' -ManifestFiles @('mix.exs') -TestCommand 'mix test' -State $global:phState -ProjectDir $env:TEMP | Should -BeFalse
+        Invoke-SimplePluginTest -ToolName 'zzz_no_such_tool_xyz' -ToolNotFoundMsg 'x' -ManifestFiles @('mix.exs') -TestCommand 'mix test' -State $global:phState -ProjectDir $( [System.IO.Path]::GetTempPath() ) | Should -BeFalse
     }
 
     It 'Invoke-SimplePluginLint returns true with SoftFail when tool missing' {
-        Invoke-SimplePluginLint -ToolName 'zzz_no_such_tool_xyz' -ToolNotFoundMsg 'x' -ManifestFiles @('mix.exs') -LintCommand 'mix format' -State $global:phState -ProjectDir $env:TEMP -SoftFail | Should -BeTrue
+        Invoke-SimplePluginLint -ToolName 'zzz_no_such_tool_xyz' -ToolNotFoundMsg 'x' -ManifestFiles @('mix.exs') -LintCommand 'mix format' -State $global:phState -ProjectDir $( [System.IO.Path]::GetTempPath() ) -SoftFail | Should -BeTrue
     }
 
     It 'rejects an explicit ProjectFile outside the manifest contract' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph_reject_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph_reject_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         $valid = Join-Path $tmp 'package.json'; $invalid = Join-Path $tmp 'notes.txt'
         New-Item -ItemType File -Path $valid -Force | Out-Null
@@ -88,7 +88,7 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'uses child exit status instead of stdout as command success' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph_command_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph_command_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-PluginCommandResult -ScriptBlock { $global:LASTEXITCODE = 9; 'stdout is not success' } -State $global:phState -ProjectDir $tmp
@@ -99,7 +99,7 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'treats PowerShell errors as failures without promoting native stderr alone' {
-        $tmp = Join-Path $env:TEMP ('gbuild_ph_error_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_ph_error_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $powerShellError = Invoke-PluginCommandResult -ScriptBlock { Write-Error 'bad' } -State $global:phState -ProjectDir $tmp
@@ -111,8 +111,8 @@ Describe 'PluginHelpers (shared single-tool plugin skeleton)' {
     }
 
     It 'cache key includes canonical path, configuration, plugin, toolchain, and input hash' {
-        $a = Join-Path $env:TEMP ('gbuild_key_a_' + [guid]::NewGuid().ToString('N'))
-        $b = Join-Path $env:TEMP ('gbuild_key_b_' + [guid]::NewGuid().ToString('N'))
+        $a = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_key_a_' + [guid]::NewGuid().ToString('N'))
+        $b = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_key_b_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $a,$b -Force | Out-Null
         $plugin = @{ Info = @{ Name = 'Node'; Version = '1.0.0'; ToolName = 'npm' }; Path = (Join-Path $global:GBuildModuleRoot 'Plugins/Node.psm1') }
         $k1 = Get-PluginCacheKey -Plugin $plugin -ProjectDir $a -ProjectFile (Join-Path $a 'package.json') -Configuration Release -InputHash one

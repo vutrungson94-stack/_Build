@@ -17,7 +17,7 @@
 #     exist - the kind of claim that sends an operator to the wrong function.
 
 
-. (Join-Path $PSScriptRoot 'ModuleBootstrap.ps1') -Dependencies @()
+. (Join-Path $PSScriptRoot 'ModuleBootstrap.ps1') -Dependencies @('SharedUtils')
 
 
 # OS detection uses Get-OSPlatform from Environment.psm1 (Tier-1 import).

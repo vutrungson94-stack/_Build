@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -31,7 +31,7 @@ Describe 'Full Build Pipeline Integration (safe, no live SDK)' {
     }
 
     It 'Invoke-PreflightValidation composes and returns a structured result' {
-        $tmp = Join-Path $env:TEMP ('gbint_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbint_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-PreflightValidation -State $global:intState -ProjectDir $tmp
@@ -42,7 +42,7 @@ Describe 'Full Build Pipeline Integration (safe, no live SDK)' {
     }
 
     It 'Pipeline degrades gracefully with no required SDK/tools' {
-        $tmp = Join-Path $env:TEMP ('gbint2_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbint2_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             { Invoke-PreflightValidation -State $global:intState -ProjectDir $tmp } | Should -Not -Throw

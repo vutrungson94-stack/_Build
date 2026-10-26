@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -12,7 +12,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -F
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Loader.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 
 # Minimal non-null state object (functions only use it for logging).
-$global:dhState = [PSCustomObject]@{ ProjectRoot = $env:TEMP }
+$global:dhState = [PSCustomObject]@{ ProjectRoot = $( [System.IO.Path]::GetTempPath() ) }
 
 Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     BeforeAll {
@@ -23,7 +23,7 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Get-DotnetPreflightResult returns a result hashtable' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Get-DotnetPreflightResult -State $global:dhState -ProjectDir $tmp
@@ -33,7 +33,7 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Resolve-DotnetProjectFile prefers an explicit project file over directory scan' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh4_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh4_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             New-Item -ItemType File -Path (Join-Path $tmp 'App.csproj') -Force | Out-Null
@@ -45,7 +45,7 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Resolve-DotnetProjectFile scans all supported project types when no explicit file is given' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh5_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh5_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             New-Item -ItemType File -Path (Join-Path $tmp 'App.vbproj') -Force | Out-Null
@@ -55,7 +55,7 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Resolve-DotnetProjectFile returns null when no project file exists' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh6_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh6_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Resolve-DotnetProjectFile -ProjectDir $tmp
@@ -64,7 +64,7 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Invoke-NpmBuildIfPresent is a no-op without package.json (does not throw)' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh2_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh2_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             { Invoke-NpmBuildIfPresent -State $global:dhState -ProjectDir $tmp } | Should -Not -Throw
@@ -72,7 +72,7 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Invoke-DotnetTest returns true (skip) when no test projects exist' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh3_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh3_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
             $r = Invoke-DotnetTest -State $global:dhState -ProjectDir $tmp -Detailed
@@ -126,10 +126,10 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
     }
 
     It 'Get-DotnetPreflightResult does not throw on a polluted array DotnetCmd' {
-        $tmp = Join-Path $env:TEMP ('gbuild_dh7_' + [guid]::NewGuid().ToString('N'))
+        $tmp = Join-Path $( [System.IO.Path]::GetTempPath() ) ('gbuild_dh7_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $tmp -Force | Out-Null
         try {
-            $polluted = [PSCustomObject]@{ ProjectRoot = $env:TEMP; DotnetCmd = @($true, 'zzz_no_such_tool_xyz') }
+            $polluted = [PSCustomObject]@{ ProjectRoot = $( [System.IO.Path]::GetTempPath() ); DotnetCmd = @($true, 'zzz_no_such_tool_xyz') }
             { Get-DotnetPreflightResult -State $polluted -ProjectDir $tmp } | Should -Not -Throw
         } finally { Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue }
     }

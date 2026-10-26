@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -8,7 +8,7 @@ $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -F
 Describe "Circuit Breaker State Persistence" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'ErrorHandling.psm1') -Force -DisableNameChecking -ErrorAction Stop
-        $global:tempStateFile = Join-Path $env:TEMP ("gbuild_cb_test_{0}.gbuildstate" -f [guid]::NewGuid().ToString('N'))
+        $global:tempStateFile = Join-Path $( [System.IO.Path]::GetTempPath() ) ("gbuild_cb_test_{0}.gbuildstate" -f [guid]::NewGuid().ToString('N'))
     }
     AfterEach {
         Reset-CircuitBreaker
