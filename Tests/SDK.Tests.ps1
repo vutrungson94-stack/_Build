@@ -259,7 +259,7 @@ Describe 'SDK project pin (global.json)' {
         '{"sdk":{"version":"99.0.100"}}' | Set-Content -LiteralPath (Join-Path $tempDir 'global.json') -Encoding UTF8
         $sdk = [PSCustomObject]@{ releaseMetadataBaseUrl = ''; maxKnownSdkVersion = ''; autoProvision = [PSCustomObject]@{ enabled = $false } }
         $st = [PSCustomObject]@{ ProjectRoot = $tempDir; WorkingDir = $tempDir; BuildConfig = [PSCustomObject]@{ sdk = $sdk } }
-        $cand = 'C:\definitely\not\here\dotnet.exe'
+        $cand = if ($IsWindows) { 'C:\definitely\not\here\dotnet.exe' } else { '/definitely/not/here/dotnet' }
         Resolve-PinnedDotnetSdk -State $st -CandidateExe $cand | Should -Be $cand
         Resolve-PinnedDotnetSdk -State ([PSCustomObject]@{ BuildConfig = $null }) -CandidateExe $cand | Should -Be $cand
     }
@@ -268,7 +268,7 @@ Describe 'SDK project pin (global.json)' {
         '{"sdk":{"version":"98.0.100"}}' | Set-Content -LiteralPath (Join-Path $tempDir 'global.json') -Encoding UTF8
         $sdk = [PSCustomObject]@{ releaseMetadataBaseUrl = ''; maxKnownSdkVersion = ''; autoProvision = [PSCustomObject]@{ enabled = $false } }
         $st = [PSCustomObject]@{ ProjectRoot = $tempDir; WorkingDir = $tempDir; BuildConfig = [PSCustomObject]@{ sdk = $sdk } }
-        $cand = 'C:\definitely\not\here\dotnet.exe'
+        $cand = if ($IsWindows) { 'C:\definitely\not\here\dotnet.exe' } else { '/definitely/not/here/dotnet' }
         # Strict-safe read of module session state (direct $script: reads throw
         # under Set-StrictMode when the variable does not exist yet).
         $pinCount = {

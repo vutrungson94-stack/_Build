@@ -93,12 +93,13 @@ Describe 'DotnetHelpers (shared dotnet/avalonia helpers)' {
         # be loaded - which differs between a bare Pester run and the canonical
         # isolated scope runner. Both outcomes are correct; what must never happen
         # is the stringified array, so that is asserted directly.
+        $fakePath = if ($IsWindows) { 'C:\fake\dotnet.exe' } else { '/fake/dotnet' }
         $mod = Get-Module DotnetHelpers
-        $r = & $mod { param($s) Resolve-DotnetCommand -State $s } ([PSCustomObject]@{ DotnetCmd = @($true, 'C:\fake\dotnet.exe') })
+        $r = & $mod { param($s) Resolve-DotnetCommand -State $s } ([PSCustomObject]@{ DotnetCmd = @($true, $fakePath) })
         $r | Should -BeOfType [string]
         $r | Should -Not -BeNullOrEmpty
         $r | Should -Not -Match 'True'          # never the stringified array
-        if ($r -ne 'C:\fake\dotnet.exe') {
+        if ($r -ne $fakePath) {
             # The SDK-capable branch won; it must genuinely be SDK-capable.
             $out = & $r '--list-sdks' 2>&1
             $LASTEXITCODE | Should -Be 0

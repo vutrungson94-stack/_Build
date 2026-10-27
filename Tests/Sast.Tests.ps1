@@ -280,12 +280,13 @@ Describe 'SAST - dotnet scanner resolution (SDK-capable muxer only)' {
     }
 
     It 'does not fall back to a PATH muxer when State points at a broken one' {
+        $brokenPath = if ($IsWindows) { 'C:\definitely\not\here\dotnet.exe' } else { '/definitely/not/here/dotnet' }
         $state = [PSCustomObject]@{
             BuildConfig = $null
-            DotnetCmd   = 'C:\definitely\not\here\dotnet.exe'
+            DotnetCmd   = $brokenPath
         }
         $path = Resolve-SastToolPath -Tool 'dotnet' -State $state
-        $path | Should -Not -Be 'C:\definitely\not\here\dotnet.exe'
+        $path | Should -Not -Be $brokenPath
         if ($path) {
             $out = & $path '--list-sdks' 2>&1
             $LASTEXITCODE | Should -Be 0
