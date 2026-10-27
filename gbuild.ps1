@@ -49,7 +49,7 @@ $targetDir = if ($Project) { $Project } else { (Get-Location).Path }
 $toolFolderNames = @('_Build', '_Sync', '_Tests')
 $holdsPlatformFolders = @($toolFolderNames | Where-Object { Test-Path -LiteralPath (Join-Path $targetDir $_) -PathType Container }).Count -gt 0
 $isPlatformFolder = @((($targetDir -replace '\\', '/') -split '/') | Where-Object { $_ -in $toolFolderNames }).Count -gt 0
-if ($holdsPlatformFolders -and -not $isPlatformFolder) {
+if (-not ($Help -or $SelfTest -or $SyntaxCheck) -and $holdsPlatformFolders -and -not $isPlatformFolder) {
     $msg = if (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue) { Get-LocaleMessage -Key 'log.launcher.workspaceRoot' } else { "This folder only holds the platform tools (_Build, _Sync, _Tests). Point gbuild at a project directory instead." }
     Write-Host $msg -ForegroundColor Red
     exit 1
