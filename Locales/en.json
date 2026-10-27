@@ -1,4 +1,4 @@
-﻿{
+{
   "log.artifact.archiveCreated": "[ARTIFACT] Archive created: {0}",
   "log.artifact.createFailed": "[ARTIFACT] Artifact creation failed: {0}",
   "log.artifact.dirCopied": "[ARTIFACT] Directory copied: {0}",
@@ -1034,6 +1034,7 @@
   "log.standalone.noEmbeddableFiles": "No embeddable files found",
   "log.standalone.bundleVersionEmpty": "Standalone bundle version is empty",
   "log.launcher.noProjectMarker": "No project found at or above: {0}",
+  "log.launcher.workspaceRoot": "This folder only holds the platform tools (_Build, _Sync, _Tests). Point gbuild at a project directory instead.",
   "log.launcher.noProjectMarkerFix": "Fix: pass -Project <path>, or run gbuild from inside the project.",
   "log.launcher.noProjectMarkerFound": "Projects found below it - build one with:",
   "log.launcher.noProjectMarkerHint": "That directory has no project manifest (*.sln, *.csproj, package.json, go.mod, Cargo.toml, pyproject.toml, pom.xml, CMakeLists.txt, ...).",

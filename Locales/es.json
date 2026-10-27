@@ -1,4 +1,4 @@
-﻿{
+{
   "log.artifact.archiveCreated": "[ARTIFACT] Archivo creado: {0}",
   "log.artifact.createFailed": "[ARTIFACT] Error al crear el artefacto: {0}",
   "log.artifact.dirCopied": "[ARTIFACT] Directorio copiado: {0}",
@@ -1027,6 +1027,7 @@
   "log.standalone.noEmbeddableFiles": "Sin archivos incrustables",
   "log.standalone.bundleVersionEmpty": "Versión del bundle standalone vacía",
   "log.launcher.noProjectMarker": "No se encontró ningún proyecto en ni por encima de: {0}",
+  "log.launcher.workspaceRoot": "Esta carpeta solo contiene las herramientas de la plataforma (_Build, _Sync, _Tests). Apunte gbuild a un directorio de proyecto.",
   "log.launcher.noProjectMarkerFix": "Solución: pasa -Project <ruta>, o ejecuta gbuild desde dentro del proyecto.",
   "log.launcher.noProjectMarkerFound": "Proyectos encontrados debajo - compila uno con:",
   "log.launcher.noProjectMarkerHint": "Ese directorio no tiene manifiesto de proyecto (*.sln, *.csproj, package.json, go.mod, Cargo.toml, pyproject.toml, pom.xml, CMakeLists.txt, ...).",

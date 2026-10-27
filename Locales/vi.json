@@ -1,4 +1,4 @@
-﻿{
+{
   "log.artifact.archiveCreated": "[ARTIFACT] Đã tạo archive: {0}",
   "log.artifact.createFailed": "[ARTIFACT] Tạo artifact thất bại: {0}",
   "log.artifact.dirCopied": "[ARTIFACT] Đã sao chép thư mục: {0}",
@@ -1034,6 +1034,7 @@
   "log.standalone.noEmbeddableFiles": "Không tìm thấy file embeddable",
   "log.standalone.bundleVersionEmpty": "Standalone bundle version rỗng",
   "log.launcher.noProjectMarker": "Không tìm thấy project nào tại hoặc phía trên: {0}",
+  "log.launcher.workspaceRoot": "Thư mục này chỉ chứa các công cụ nền tảng (_Build, _Sync, _Tests). Hãy chỉ gbuild vào thư mục project.",
   "log.launcher.noProjectMarkerFix": "Cách sửa: truyền -Project <đường-dẫn>, hoặc chạy gbuild từ bên trong thư mục project.",
   "log.launcher.noProjectMarkerFound": "Tìm thấy các project bên dưới - hãy build một project bằng:",
   "log.launcher.noProjectMarkerHint": "Thư mục đó không có project manifest (*.sln, *.csproj, package.json, go.mod, Cargo.toml, pyproject.toml, pom.xml, CMakeLists.txt, ...).",

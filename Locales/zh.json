@@ -1,4 +1,4 @@
-﻿{
+{
   "log.artifact.archiveCreated": "[ARTIFACT] 已创建归档：{0}",
   "log.artifact.createFailed": "[ARTIFACT] 创建构件失败：{0}",
   "log.artifact.dirCopied": "[ARTIFACT] 已复制目录：{0}",
@@ -1027,6 +1027,7 @@
   "log.standalone.noEmbeddableFiles": "未找到可嵌入文件",
   "log.standalone.bundleVersionEmpty": "Standalone 包版本为空",
   "log.launcher.noProjectMarker": "在此处或其上级目录中未找到项目：{0}",
+  "log.launcher.workspaceRoot": "此文件夹仅包含平台工具（_Build、_Sync、_Tests）。请将 gbuild 指向项目目录。",
   "log.launcher.noProjectMarkerFix": "解决方法：传入 -Project <路径>，或在项目目录内运行 gbuild。",
   "log.launcher.noProjectMarkerFound": "在下方找到的项目 - 用以下方式构建其中一个：",
   "log.launcher.noProjectMarkerHint": "该目录没有项目清单（*.sln、*.csproj、package.json、go.mod、Cargo.toml、pyproject.toml、pom.xml、CMakeLists.txt 等）。",

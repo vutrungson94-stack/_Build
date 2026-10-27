@@ -38,6 +38,23 @@ param(
 
 Set-StrictMode -Version 1.0
 
+# Locale is needed for the workspace-root guard below; load it before any
+# user-facing message is emitted.
+$null = Import-Module (Join-Path $PSScriptRoot 'Modules/Locale.psm1') -Global -DisableNameChecking -ErrorAction SilentlyContinue
+
+# Refuse to run against a folder that merely holds the platform tools: that is
+# not a project, and running here is what created stray logs/build-reports
+# (and worse, git state) outside any project.
+$targetDir = if ($Project) { $Project } else { (Get-Location).Path }
+$toolFolderNames = @('_Build', '_Sync', '_Tests')
+$holdsPlatformFolders = @($toolFolderNames | Where-Object { Test-Path -LiteralPath (Join-Path $targetDir $_) -PathType Container }).Count -gt 0
+$isPlatformFolder = @((($targetDir -replace '\\', '/') -split '/') | Where-Object { $_ -in $toolFolderNames }).Count -gt 0
+if ($holdsPlatformFolders -and -not $isPlatformFolder) {
+    $msg = if (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue) { Get-LocaleMessage -Key 'log.launcher.workspaceRoot' } else { "This folder only holds the platform tools (_Build, _Sync, _Tests). Point gbuild at a project directory instead." }
+    Write-Host $msg -ForegroundColor Red
+    exit 1
+}
+
 $gbuildModulesRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Modules'))
 $gbuildModulePrefix = $gbuildModulesRoot + [System.IO.Path]::DirectorySeparatorChar
 # Anti-shadow purge: drop any gbuild module loaded from THIS tree before we go
