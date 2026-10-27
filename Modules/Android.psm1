@@ -161,7 +161,7 @@ function New-DebugKeystore {
     Write-Log (Get-LocaleMessage -Key 'log.android.initKeystore') $State.Colors.Gray $State
     $javaSdk = [string]$State.JavaSdk
     if ([string]::IsNullOrWhiteSpace($javaSdk)) { return $null }
-    try { $keytoolExe = [System.IO.Path]::GetFullPath((Join-Path $javaSdk ("bin" + [System.IO.Path]::DirectorySeparatorChar + 'keytool' + (Get-ExecutableExtension -State $State)))) } catch { return $null }
+    try { $keytoolExe = [System.IO.Path]::GetFullPath(([System.IO.Path]::Combine($javaSdk, ("bin" + [System.IO.Path]::DirectorySeparatorChar + 'keytool' + (Get-ExecutableExtension -State $State))))) } catch { return $null }
     if (-not (Test-Path -LiteralPath $keytoolExe -PathType Leaf)) {
         Write-Log (Get-LocaleMessage -Key 'log.android.keytoolNotFound' -MessageArgs $keytoolExe) $State.Colors.Err $State
         return $null

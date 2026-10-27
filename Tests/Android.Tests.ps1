@@ -17,7 +17,7 @@ Describe 'Android' {
     It 'New-DebugKeystore returns null when JavaSdk not configured' {
         $state = [PSCustomObject]@{
             OS = 'Windows'
-            JavaSdk = 'C:\nonexistent\java'
+            JavaSdk = if ($IsWindows) { 'C:\nonexistent\java' } else { '/nonexistent/java' }
             Colors = @{ Gray = 'Gray'; Err = 'Red' }
         }
         $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) 'testkeystore'
