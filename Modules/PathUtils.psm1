@@ -520,9 +520,13 @@ function Test-SafePath {
         [Parameter(Mandatory)][string]$Path,
         [Parameter(Mandatory)][string]$Base
     )
+    # Normalize separators so that '..' traversal works consistently on
+    # all OSes. On Linux, backslash is not a separator so we must convert
+    # it to the OS directory separator before combining/resolving.
+    $normalizedPath = $Path.Replace('\', [System.IO.Path]::DirectorySeparatorChar)
     try {
         $baseFull = [System.IO.Path]::GetFullPath($Base.TrimEnd('\', '/'))
-        $target = if ([System.IO.Path]::IsPathRooted($Path)) { $Path } else { [System.IO.Path]::Combine($baseFull, $Path) }
+        $target = if ([System.IO.Path]::IsPathRooted($normalizedPath)) { $normalizedPath } else { [System.IO.Path]::Combine($baseFull, $normalizedPath) }
         $targetFull = [System.IO.Path]::GetFullPath($target)
         $sep = [System.IO.Path]::DirectorySeparatorChar
         # SAME comparison rule as Test-PathUnderRoots (:581): ordinal on
