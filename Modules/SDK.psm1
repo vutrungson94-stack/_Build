@@ -1071,7 +1071,7 @@ function Find-SdkInProjectTree
             -DirectoryPatterns $cfg.DirectoryPatterns -Exe $cfg.ExeRelativePath `
             -Label "Scanning parent: $walker" -ValidateScript $validateBlock -State $State
         if ($null -ne $sdkRoot -and (Test-Path -Path $sdkRoot)) {
-            $exePath = Join-Path $sdkRoot $cfg.Exe
+            $exePath = [System.IO.Path]::Combine($sdkRoot, $cfg.Exe)
             $result = Register-SdkCandidate -ExePath $exePath -ToolType $ToolType -State $State -LogLabel 'in parent directory'
             if ($result) { return $result }
         }
@@ -1112,7 +1112,7 @@ function Find-SdkOnWindowsDrives
             -DirectoryPatterns $cfg.DirectoryPatterns -Exe $cfg.ExeRelativePath `
             -Label "$labelPrefix (Depth $searchDepth)" -ValidateScript $validateBlock -State $State
         if ($null -ne $sdkRoot -and (Test-Path -Path $sdkRoot)) {
-            $exePath = Join-Path $sdkRoot $cfg.Exe
+            $exePath = [System.IO.Path]::Combine($sdkRoot, $cfg.Exe)
             $result = Register-SdkCandidate -ExePath $exePath -ToolType $ToolType -State $State -LogLabel "on drive $drive"
             if ($result) { return $result }
         }
@@ -1148,8 +1148,8 @@ function Find-SdkFromCustomPaths
         # <base>\cmdline-tools\latest\bin\sdkmanager.bat. The recursive scan
         # below uses shallow depths and misses nested tool layouts.
         $directCandidates = @(
-            (Join-Path $resolved $cfg.ExeRelativePath),
-            (Join-Path (Join-Path $resolved $cfg.Bin) $cfg.Exe)
+            ([System.IO.Path]::Combine($resolved, $cfg.ExeRelativePath)),
+            ([System.IO.Path]::Combine([System.IO.Path]::Combine($resolved, $cfg.Bin), $cfg.Exe))
         )
         foreach ($cand in $directCandidates) {
             if ((Test-Path -Path $cand) -and (& $validateBlock $cand)) {
@@ -1162,7 +1162,7 @@ function Find-SdkFromCustomPaths
             -DirectoryPatterns $cfg.DirectoryPatterns -Exe $cfg.ExeRelativePath `
             -Label "Scanning custom path: $resolved" -ValidateScript $validateBlock -State $State
         if ($null -ne $sdkRoot -and (Test-Path -Path $sdkRoot)) {
-            $exePath = Join-Path $sdkRoot $cfg.Exe
+            $exePath = [System.IO.Path]::Combine($sdkRoot, $cfg.Exe)
             $result = Register-SdkCandidate -ExePath $exePath -ToolType $ToolType -State $State -LogLabel 'from custom path'
             if ($result) { return $result }
         }

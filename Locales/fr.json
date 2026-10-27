@@ -1,4 +1,4 @@
-{
+﻿{
   "log.artifact.archiveCreated": "[ARTIFACT] Archive créée : {0}",
   "log.artifact.createFailed": "[ARTIFACT] Échec de la création de l'artefact : {0}",
   "log.artifact.dirCopied": "[ARTIFACT] Répertoire copié : {0}",

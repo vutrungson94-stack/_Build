@@ -1,4 +1,4 @@
-{
+﻿{
   "log.artifact.archiveCreated": "[ARTIFACT] Đã tạo archive: {0}",
   "log.artifact.createFailed": "[ARTIFACT] Tạo artifact thất bại: {0}",
   "log.artifact.dirCopied": "[ARTIFACT] Đã sao chép thư mục: {0}",

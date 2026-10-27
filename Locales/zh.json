@@ -1,4 +1,4 @@
-{
+﻿{
   "log.artifact.archiveCreated": "[ARTIFACT] 已创建归档：{0}",
   "log.artifact.createFailed": "[ARTIFACT] 创建构件失败：{0}",
   "log.artifact.dirCopied": "[ARTIFACT] 已复制目录：{0}",

@@ -49,7 +49,7 @@ function Format-Path {
     $sep = [System.IO.Path]::DirectorySeparatorChar
     $p = $Path.Replace('\', $sep).Replace('/', $sep)
     if ($Base -and -not [System.IO.Path]::IsPathRooted($p)) {
-        $p = Join-Path $Base $p
+        $p = [System.IO.Path]::Combine($Base, $p)
     }
     return $p
 }
@@ -75,7 +75,7 @@ function Get-SafeJoinPath {
         throw [System.InvalidOperationException]::new((Resolve-LogMessage -Key 'log.pathutils.line74' -Fallback 'Get-SafeJoinPath requires a rooted Base path.'))
     }
     $sep = [System.IO.Path]::DirectorySeparatorChar
-    $joined = Join-Path $Base $Child
+    $joined = [System.IO.Path]::Combine($Base, $Child)
     try { $joined = [System.IO.Path]::GetFullPath($joined) } catch { }
     return $joined.Replace('\', $sep).Replace('/', $sep)
 }
@@ -522,7 +522,7 @@ function Test-SafePath {
     )
     try {
         $baseFull = [System.IO.Path]::GetFullPath($Base.TrimEnd('\', '/'))
-        $target = if ([System.IO.Path]::IsPathRooted($Path)) { $Path } else { Join-Path $baseFull $Path }
+        $target = if ([System.IO.Path]::IsPathRooted($Path)) { $Path } else { [System.IO.Path]::Combine($baseFull, $Path) }
         $targetFull = [System.IO.Path]::GetFullPath($target)
         $sep = [System.IO.Path]::DirectorySeparatorChar
         # SAME comparison rule as Test-PathUnderRoots (:581): ordinal on
@@ -915,7 +915,7 @@ function Resolve-BuildContainedPath {
     if (-not (Get-Command Test-NoReparsePointInPath -ErrorAction SilentlyContinue)) { return '' }
     try {
         $rootFull = [System.IO.Path]::GetFullPath($root).TrimEnd('\', '/')
-        $candidate = if ([System.IO.Path]::IsPathRooted($Path)) { $Path } else { Join-Path $rootFull $Path }
+        $candidate = if ([System.IO.Path]::IsPathRooted($Path)) { $Path } else { [System.IO.Path]::Combine($rootFull, $Path) }
         $full = [System.IO.Path]::GetFullPath($candidate)
         if (-not (Test-PathUnderRoots -Path $full -AllowedRoots @($rootFull))) { return '' }
         if (-not (Test-NoReparsePointInPath -Path $full)) { return '' }

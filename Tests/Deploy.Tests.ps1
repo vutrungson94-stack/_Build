@@ -243,7 +243,7 @@ Describe "Deploy - readiness probe (Test-ProcessExited / Test-WebAppReady contra
         # powershell.exe and -WindowStyle are Windows-only. Use the host pwsh
         # elsewhere and only pass -WindowStyle where the parameter exists.
         $onWindows = ($env:OS -eq 'Windows_NT')
-        $shell = if ($onWindows) { ('powershell.exe').Source } else { ('pwsh').Source }
+        $shell = if ($onWindows) { 'powershell.exe' } else { 'pwsh' }
         $spArgs = @{ FilePath = $shell; ArgumentList = '-NoProfile -Command exit 0'; PassThru = $true }
         if ($onWindows) { $spArgs['WindowStyle'] = 'Hidden' }
         $p = Start-Process @spArgs
@@ -254,7 +254,7 @@ Describe "Deploy - readiness probe (Test-ProcessExited / Test-WebAppReady contra
     It "Test-ProcessExited returns false for a still-running process" {
         $mod = Get-Module Deploy
         $onWindows = ($env:OS -eq 'Windows_NT')
-        $shell = if ($onWindows) { ('powershell.exe').Source } else { ('pwsh').Source }
+        $shell = if ($onWindows) { 'powershell.exe' } else { 'pwsh' }
         $spArgs = @{ FilePath = $shell; ArgumentList = '-NoProfile -Command Start-Sleep 5'; PassThru = $true }
         if ($onWindows) { $spArgs['WindowStyle'] = 'Hidden' }
         $p = Start-Process @spArgs
