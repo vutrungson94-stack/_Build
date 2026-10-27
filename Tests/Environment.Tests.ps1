@@ -32,9 +32,7 @@ Describe "Environment" {
     }
 
     It "Get-SafePath returns the original path for a non-existent path" {
-        # The path must be syntactically native: POSIX GetFullPath on
-        # 'C:\does\not\exist 123' yields a cwd-relative /.../C:\... string.
-        $missing = if ($env:OS -eq 'Windows_NT') { 'C:\does\not\exist 123' } else { '/does/not/exist 123' }
+        $missing = if ($IsWindows) { 'C:\does\not\exist 123' } else { '/does/not/exist 123' }
         $r = Get-SafePath -Path $missing
         $r | Should -Be $missing
     }
@@ -84,12 +82,20 @@ Describe "Environment" {
     }
 
     It "Wait-PortRelease returns true immediately for a closed port" {
-        $r = Wait-PortRelease -Port 65530 -Attempts 2 -DelayMs 1 -Mode 'Listening'
+        $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+        $probe.Start()
+        $freePort = ($probe.LocalEndpoint -as [System.Net.IPEndPoint]).Port
+        $probe.Stop()
+        $r = Wait-PortRelease -Port $freePort -Attempts 2 -DelayMs 1 -Mode 'Listening'
         $r | Should -Be $true
     }
 
     It "Wait-PortRelease Bindable mode returns true for a closed port" {
-        $r = Wait-PortRelease -Port 65530 -Attempts 2 -DelayMs 1 -Mode 'Bindable'
+        $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+        $probe.Start()
+        $freePort = ($probe.LocalEndpoint -as [System.Net.IPEndPoint]).Port
+        $probe.Stop()
+        $r = Wait-PortRelease -Port $freePort -Attempts 2 -DelayMs 1 -Mode 'Bindable'
         $r | Should -Be $true
     }
 

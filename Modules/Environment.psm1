@@ -99,7 +99,7 @@ if (-not $hasGState) {
 }
 $envState = $global:GState
 # SDK cache path: same file as CacheFile for compatibility with gbuild.ps1
-# GState (which exposes the path as State.SDKCache — SDK.Get-SdkCacheFile reads it).
+# GState (which exposes the path as State.SDKCache � SDK.Get-SdkCacheFile reads it).
 # Leaf name is single-sourced in BuildConstants.SdkCacheUserRelativePath.
 $sdkCacheRel = if (Get-Command Get-BuildDefault -ErrorAction SilentlyContinue) { [string](Get-BuildDefault -Key 'SdkCacheUserRelativePath' -Fallback '.gbuild/sdkcache.json') } else { '.gbuild/sdkcache.json' }
 $sdkCacheDefault = Join-Path ([Environment]::GetFolderPath('UserProfile')) $sdkCacheRel
@@ -119,7 +119,7 @@ if (Get-Command Set-BuildStateProperty -ErrorAction SilentlyContinue) {
     if (-not ((Get-BuildState -State $envState).PSObject.Properties.Name -contains 'ScriptRoot') -or [string]::IsNullOrEmpty($envState.ScriptRoot)) {
         Set-BuildStateProperty -State $envState -Name 'ScriptRoot' -Value $scriptRoot -Force
     }
-    # SDK cache path mirror (CacheFile alias) — SDK.Get-SdkCacheFile reads State.SDKCache.
+    # SDK cache path mirror (CacheFile alias) � SDK.Get-SdkCacheFile reads State.SDKCache.
     if (-not ((Get-BuildState -State $envState).PSObject.Properties.Name -contains 'CacheFile') -or [string]::IsNullOrEmpty($envState.CacheFile)) {
         Set-BuildStateProperty -State $envState -Name 'CacheFile' -Value $sdkCacheDefault -Force
     }
@@ -534,7 +534,8 @@ function Open-Target {
 
 function Get-AvailableDrives {
     if ($script:OS -eq 'Windows') {
-        return Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object -ExpandProperty DeviceID
+        $drives = @(Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | Select-Object -ExpandProperty DeviceID)
+        return ,$drives
     }
     if ($script:OS -eq 'Linux') {
         # Mount roots are canonical in BuildConstants.OsRemovableMountRoots. The
@@ -552,7 +553,7 @@ function Get-AvailableDrives {
                 if ($drive -and ($found -notcontains $drive)) { $found.Add($drive) | Out-Null }
             }
         }
-        return @($found.ToArray())
+        return ,$found.ToArray()
     }
     if ($script:OS -eq 'MacOS') {
         $volumeRoot = '/Volumes'
@@ -563,9 +564,9 @@ function Get-AvailableDrives {
         foreach ($drive in @(Get-ChildItem -LiteralPath $volumeRoot -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)) {
             if ($drive -and ($found -notcontains $drive)) { $found += $drive }
         }
-        return $found
+        return ,$found
     }
-    return @('/')
+    return ,@('/')
 }
 
 function Get-RuntimeIdentifier {
@@ -614,7 +615,7 @@ function Test-PortListening {
 # for a new socket bind). This catches TIME_WAIT state which Test-PortListening misses.
 # Level 5 single-source: primary is BuildConstants.LoopbackAddress
 # (config-overridable). The '127.0.0.1' literal below is emergency standalone
-# fallback only (BuildConstants module absent) — never extend, fix constants instead.
+# fallback only (BuildConstants module absent) � never extend, fix constants instead.
 function Test-PortBindable {
     param([int]$Port, [string]$IP = '')
     if ([string]::IsNullOrWhiteSpace($IP)) {
@@ -703,7 +704,7 @@ function Get-PortOwnerProcess {
 # Get-ProcessCommandLine (below), HotReload.psm1 (watch-tree kill) and any
 # future Unix process consumer. Previously duplicated between this module
 # (inline /proc + ps blocks inside Get-ProcessCommandLine) and HotReload.psm1
-# (private copies invisible to other modules) — now exactly one implementation.
+# (private copies invisible to other modules) � now exactly one implementation.
 # Resolution order per helper: /proc/<pid>/cmdline (Linux, no external binary)
 # -> `ps` (PATH discovery, then BuildConstants.PsBinaryFallbackPaths) ->
 # process-name last resort. Never throws.
@@ -819,7 +820,7 @@ function Get-ProcessCommandLine {
             return $null
         } elseif ($script:OS -eq 'Linux' -or $script:OS -eq 'MacOS') {
             # Single source: Get-UnixProcessCommandLine (/proc first, ps fallback,
-            # process-name last resort) — no inline duplicate of that logic here.
+            # process-name last resort) � no inline duplicate of that logic here.
             return Get-UnixProcessCommandLine -ProcessId $ProcessId
         }
     } catch {
@@ -990,7 +991,7 @@ function Test-HttpEndpoint {
 # NOTE: do not export the IsWindows/IsMacOS/IsLinux variables to outer scope.
 # Export -Variable pollutes the global session, overrides/redefines PS7 automatic variables,
 # and Remove-Module would delete pre-existing global variables (breaking PlatformShim in tests).
-# Only export the Get-OSPlatform function — modules compute their own $script:IsWindows via it.
+# Only export the Get-OSPlatform function � modules compute their own $script:IsWindows via it.
 Export-ModuleMember -Function @('Invoke-CompatibleChildItem', 'Get-SafePath', 'Save-JsonSafe', 'Read-JsonSafe',
     'Get-OSPlatform', 'Open-Target', 'Get-AvailableDrives', 'Get-RuntimeIdentifier', 'Test-PortListening',
     'Test-PortBindable', 'Wait-PortRelease', 'Get-PortOwnerProcess', 'Get-ProcessCommandLine', 'Register-TempFile', 'Get-EnvironmentModel',
