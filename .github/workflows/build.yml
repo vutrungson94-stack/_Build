@@ -103,7 +103,9 @@ jobs:
         continue-on-error: true
         with:
           name: gbuild-testresults
-          path: TestResults/**
+          path: |
+            Tests/TestResults/**
+            Tests/suite-progress-*.log
           retention-days: 3
           compression-level: 9
           if-no-files-found: ignore

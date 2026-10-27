@@ -412,6 +412,14 @@ function Invoke-ScopeInProcess {
     } else {
         New-ScopeResult -Scope $ScopeName -Passed $passed -Failed $failed -Skipped $skipped -Total $total -Status 'PASSED'
     }
+    # Persist failed test names so CI can upload them as an artifact even when
+    # the console log is truncated.
+    if ($res -and $res.Failed) {
+        $failedDir = Join-Path $testRoot 'TestResults'
+        if (-not (Test-Path -LiteralPath $failedDir)) { New-Item -ItemType Directory -Path $failedDir -Force | Out-Null }
+        $failedFile = Join-Path $failedDir "failed-$ScopeName.txt"
+        @($res.Failed | ForEach-Object { "$($_.ExpandedPath) :: $($_.Name)" }) | Set-Content -LiteralPath $failedFile -Encoding UTF8
+    }
     Write-ProgressLine "[$ScopeName] $($result.Status) ($passed passed, $failed failed, $skipped skipped, $total total)"
     return $result
 }
