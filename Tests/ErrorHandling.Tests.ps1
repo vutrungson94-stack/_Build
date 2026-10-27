@@ -250,7 +250,8 @@ Describe "ErrorHandling" {
     }
 
     It "Restore-BuildState returns null for nonexistent path" {
-        Restore-BuildState -Path 'C:\nonexistent\fake.gbuildstate' | Should -BeNullOrEmpty
+        $missing = if ($IsWindows) { 'C:\nonexistent\fake.gbuildstate' } else { '/nonexistent/fake.gbuildstate' }
+        Restore-BuildState -Path $missing | Should -BeNullOrEmpty
     }
 
     # --- Regression: CWD-anchored state persistence leaked .gbuild artifacts

@@ -23,7 +23,8 @@ Describe 'Preflight' {
     }
 
     It 'Test-ProjectManifest returns Failed for missing file' {
-        $result = Test-ProjectManifest -Path 'C:\nonexistent\file.csproj' -State $null
+        $missing = if ($IsWindows) { 'C:\nonexistent\file.csproj' } else { '/nonexistent/file.csproj' }
+        $result = Test-ProjectManifest -Path $missing -State $null
         $result.Passed | Should -Be $false
         $result.Errors.Count | Should -BeGreaterThan 0
     }

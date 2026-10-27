@@ -191,7 +191,7 @@ Describe 'Policy - P0 fail-closed regressions' {
         $root = Join-Path $TestDrive 'policy-shipped-patterns'
         New-Item -ItemType Directory -Path $root -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $root 'clean.ps1') -Value ('Get-Item "function:\$fn"', 'Remove-Item Env:\$key -ErrorAction SilentlyContinue', '$TimeoutMilliseconds = 5000' -join "`n") -Encoding UTF8
-        Set-Content -LiteralPath (Join-Path $root 'dirty.ps1') -Value ('$p = "C:\Temp\x"', '$url = "http://localhost:8080/api"', '$Port = 8080' -join "`n") -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $root 'dirty.ps1') -Value ('$p = "' + ([System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'x')) + '"', '$url = "http://localhost:8080/api"', '$Port = 8080' -join "`n") -Encoding UTF8
         $state = [PSCustomObject]@{ BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ policy = [PSCustomObject]@{ enabled = $true } } } }
         $input = [PSCustomObject]@{ project = [PSCustomObject]@{ path = $root; name = 'demo' } }
         $pathsRule = [PSCustomObject]@{ rule = 'DenyHardcodedPaths'; match = 'FileContent'; path = '**/*.ps1'; value = $pathsValue; action = 'deny' }

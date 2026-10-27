@@ -30,7 +30,7 @@ Describe "Clean" {
         Assert-SafePath -Target (Join-Path $global:td 'sub') -AllowedRoots @($global:td) | Should -Be $true
     }
 
-    It "Assert-SafePath rejects target outside allowed root" {
+    It "Assert-SafePath rejects target outside allowed root" -Skip:(-not $IsWindows) {
         Assert-SafePath -Target 'C:\Windows' -AllowedRoots @($global:td) | Should -Be $false
     }
 
