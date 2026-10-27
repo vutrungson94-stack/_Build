@@ -89,6 +89,17 @@ jobs:
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: gbuild-testresults
+          path: TestResults/**
+          retention-days: 3
+          compression-level: 9
+          if-no-files-found: ignore
+
       - name: Diagnose Environment (on failure)
         if: failure()
         shell: bash
