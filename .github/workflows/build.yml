@@ -99,7 +99,10 @@ jobs:
 
       - name: Upload test results
         if: failure()
-        uses: actions/upload-artifact@v4
+        # v7 runs on Node 24. v4/v5 declare node20, so the runner forces them
+        # onto Node 24 and annotates the run: "Node.js 20 is deprecated ...".
+        # v6+ is the first line that actually ships node24.
+        uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
           name: gbuild-testresults

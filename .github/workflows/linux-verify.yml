@@ -129,7 +129,10 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        # v7 runs on Node 24. v4/v5 declare node20 and are now forced onto
+        # Node 24 by the runner, which annotates every run with the Node 20
+        # deprecation warning. v6 was the first release that ships node24.
+        uses: actions/upload-artifact@v7
         with:
           name: linux-verify-${{ inputs.scope }}
           path: |
