@@ -1,0 +1,139 @@
+name: Linux verification (no admin)
+
+# Real Linux, triggered by hand, for a workstation where WSL2 and Docker Desktop
+# cannot be installed (both need an administrator to enable Windows optional
+# features / install a service). GitHub-hosted ubuntu-24.04 is the only Linux
+# that needs no local privilege, and this job is the FAST lane: it runs the five
+# files that failed in the 2026-10-27 run first, so a regression is visible in
+# ~2 minutes instead of after the full ~22-minute suite.
+#
+# The full suite still runs automatically on every push in build.yml (jobs
+# `test` and `portability`). This workflow never runs on push - it exists so a
+# fix can be validated on Linux without waiting for the whole pipeline.
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: 'targeted = the 5 files that failed on 2026-10-27; full = every *.Tests.ps1'
+        required: true
+        default: targeted
+        type: choice
+        options:
+          - targeted
+          - full
+      verbosity:
+        description: 'Pester output verbosity (Detailed shows each It + error text)'
+        required: true
+        default: Detailed
+        type: choice
+        options:
+          - Normal
+          - Detailed
+          - Diagnostic
+  # Self-test on publication only: pushing THIS file runs it once, so the first
+  # Linux verdict for the five files arrives immediately instead of waiting for
+  # someone to click Run workflow. Test changes do NOT re-trigger it - the full
+  # pipeline in build.yml still runs on every push.
+  push:
+    paths:
+      - '.github/workflows/linux-verify.yml'
+
+permissions:
+  contents: read
+
+# A second dispatch cancels the previous one: this job exists for quick
+# iteration, so a stale run is noise, not information.
+concurrency:
+  group: linux-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-verify:
+    name: Linux ${{ inputs.scope || 'targeted' }} (${{ inputs.verbosity || 'Normal' }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Show host facts
+        shell: pwsh
+        run: |
+          "pwsh      : $($PSVersionTable.PSVersion)"
+          "os        : $($PSVersionTable.OS)"
+          "workspace : $env:GITHUB_WORKSPACE"
+          Get-ChildItem (Join-Path $env:GITHUB_WORKSPACE 'Tests') -Filter '*.Tests.ps1' |
+            Measure-Object | ForEach-Object { "test files: $($_.Count)" }
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          # Same version gate as build.yml: a 5.x already on the image is kept,
+          # otherwise 5.7.1 is installed, so this job cannot silently change
+          # major version relative to the main pipeline.
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object { $_.Version -ge [version]'5.0.0' -and $_.Version -lt [version]'6.0.0' })) {
+              Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+          (Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1).Version |
+            ForEach-Object { "pester    : $_" }
+
+      - name: Run the requested scope
+        shell: pwsh
+        env:
+          VERIFY_SCOPE: ${{ inputs.scope || 'targeted' }}
+          VERIFY_VERBOSITY: ${{ inputs.verbosity || 'Normal' }}
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          Import-Module Pester -Force
+
+          $config = [PesterConfiguration]::Default
+          $config.Run.Exit = $true
+
+          if ($env:VERIFY_SCOPE -eq 'full') {
+              $config.Run.Path = (Join-Path $root 'Tests')
+          } else {
+              # The exact five files that failed in the 2026-10-27 CI run:
+              #   Distributed.E2E.Tests.ps1    (mock-SSH shim was Windows-only)
+              #   Enterprise.E2E.Tests.ps1     (same shim, second copy)
+              #   PowerShell.Tests.ps1         (plugin unloaded by Plugins.Tests)
+              #   RBAC.Tests.ps1               (Policy module leaked between files)
+              #   Security.Tests.ps1           (SDK resolver bypassed the dotnet stub)
+              $config.Run.Path = @(
+                  'Distributed.E2E.Tests.ps1'
+                  'Enterprise.E2E.Tests.ps1'
+                  'PowerShell.Tests.ps1'
+                  'RBAC.Tests.ps1'
+                  'Security.Tests.ps1'
+              ) | ForEach-Object { Join-Path (Join-Path $root 'Tests') $_ }
+          }
+
+          switch ([string]$env:VERIFY_VERBOSITY) {
+              'Diagnostic' { $config.Output.Verbosity = 'Diagnostic' }
+              'Detailed'   { $config.Output.Verbosity = 'Detailed' }
+              default      { $config.Output.Verbosity = 'Normal' }
+          }
+
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputFormat = 'NUnitXml'
+          $trDir = Join-Path $root 'TestResults'
+          if (-not (Test-Path -LiteralPath $trDir -PathType Container)) {
+              New-Item -ItemType Directory -Path $trDir -Force | Out-Null
+          }
+          $config.TestResult.OutputPath = Join-Path $trDir 'linux-verify.xml'
+
+          Invoke-Pester -Configuration $config
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-verify-${{ inputs.scope }}
+          path: |
+            TestResults/**
+            Tests/TestResults/**
+          retention-days: 7
+          if-no-files-found: ignore
