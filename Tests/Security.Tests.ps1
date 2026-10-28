@@ -252,6 +252,17 @@ Describe "Security - Vulnerabilities, License, Orchestrator" {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force -DisableNameChecking -ErrorAction Stop
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Security.psm1') -Force -DisableNameChecking -ErrorAction Stop
         function global:dotnet { $global:LASTEXITCODE = 0; 'No vulnerabilities found' }
+        # The scanners below stub `dotnet` as a FUNCTION. Security's capture helper
+        # prefers Resolve-DotnetSdkCommand whenever that command is visible, so a
+        # leftover SDK module (SDK.Tests.ps1 imports it earlier in the shared
+        # Pester session) resolves a real muxer, bypasses the stub and turns the
+        # synthetic .csproj into a fail-closed ScannerError. Pin the resolver to
+        # "no preference" so the stub stays authoritative in any run order.
+        InModuleScope Security {
+            if (Get-Command Resolve-DotnetSdkCommand -ErrorAction SilentlyContinue) {
+                Mock Resolve-DotnetSdkCommand { '' }
+            }
+        }
     }
     AfterAll {
         Remove-Item function:dotnet -ErrorAction SilentlyContinue

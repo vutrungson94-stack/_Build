@@ -4,15 +4,24 @@
 Set-StrictMode -Version 1.0
 
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'Modules'
-$null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force -DisableNameChecking -ErrorAction Stop
-$null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -DisableNameChecking -ErrorAction Stop
-$null = Import-Module (Join-Path $global:GBuildModuleRoot 'ConfigProvider.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
-$null = Import-Module (Join-Path $global:GBuildModuleRoot 'Loader.psm1') -Force -DisableNameChecking -ErrorAction Stop
-$null = Import-Module (Join-Path $global:GBuildModuleRoot 'Plugins/PowerShell.psm1') -Force -DisableNameChecking -ErrorAction Stop
-$null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'TestFixtures.psm1')) -Force -DisableNameChecking -ErrorAction Stop
+$global:GBuildTestsRoot = Split-Path -Parent $PSCommandPath
 
 Describe 'PowerShell plugin' {
     BeforeAll {
+        # Imports belong to the RUN phase, not file scope. Pester executes every
+        # discovered file's top-level code during DISCOVERY, so a sibling file
+        # that unloads plugin modules while it runs (Plugins.Tests.ps1 removes
+        # each plugin, PowerShell included) left this suite with no resolvable
+        # commands and all six tests failed with CommandNotFound. Dependencies
+        # are imported -Global so the plugin's internal Write-Log /
+        # Test-ToolAvailable calls resolve from module scope.
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'ConfigProvider.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Loader.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Plugins/PowerShell.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+        $null = Import-Module (Join-Path $global:GBuildTestsRoot (Join-Path 'Helpers' 'TestFixtures.psm1')) -Force -Global -DisableNameChecking -ErrorAction Stop
+
         $global:GBuildPsTemp = Join-Path $( [System.IO.Path]::GetTempPath() ) "gbuild_pstest_$(New-Guid)"
         New-Item -ItemType Directory -Path $global:GBuildPsTemp -Force -EA 0 | Out-Null
     }

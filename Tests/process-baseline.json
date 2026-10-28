@@ -26,7 +26,7 @@
     "metric": "line coverage of Modules/**/*.psm1 (Pester 5 + JaCoCo LINE counters)",
     "floorPercent": 15,
     "measuredSingleScopeOrchestrator": 12.77,
-    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. The floor is a ratchet: raise only, never lower."
+    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. The floor is a ratchet: raise only, never lower. The CI job itself gates a DIFFERENT metric - Pester COMMAND coverage over Modules - at 55% (measured 57.05% of 44,589 commands in 80 files, run 2026-10-27); the two percentages must never be compared with each other, and each is raised only from its own measurement."
   },
   "hygiene": {
     "gates": 8,

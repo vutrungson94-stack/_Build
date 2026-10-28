@@ -27,9 +27,13 @@ Describe "Enterprise E2E Integration" {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Metrics.psm1') -Force -DisableNameChecking -ErrorAction Stop
 
         # Fake ssh on PATH so the distributed build code path exercises fully.
+        # New-FakeSsh is the cross-platform owner of the shim: ssh.cmd on
+        # Windows, an executable `ssh` sh script on POSIX. A bare ssh.cmd is
+        # invisible to a Linux runner, where the real /usr/bin/ssh would then
+        # be dialled for the mock hosts and the proof would fail on network.
+        $null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'MockHelpers.psm1')) -Force -DisableNameChecking -ErrorAction Stop
         $sshDir = Join-Path $TestDrive 'fakebin_ok'
-        $null = New-Item -ItemType Directory -Path $sshDir -Force
-        Set-Content -Path (Join-Path $sshDir 'ssh.cmd') -Value "@echo off`r`nexit /b 0"
+        New-FakeSsh -Directory $sshDir -Mode 'Ok'
         $global:__e2eOrigPath = $env:PATH
         $env:PATH = "$sshDir$([IO.Path]::PathSeparator)$env:PATH"
     }

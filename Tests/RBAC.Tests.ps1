@@ -90,6 +90,19 @@ Describe 'RBAC roles' {
 }
 
 Describe 'RBAC - P0 namespace and escalation regressions' {
+    BeforeAll {
+        # These regressions assert the "policy engine unavailable" branches of
+        # Test-PolicyAuthorization. Pester executes every discovered file in one
+        # session, so when Policy.Tests.ps1 (alphabetically earlier) has already
+        # loaded Policy.psm1, Invoke-PolicyChecks stays resolvable here and the
+        # guard takes the evaluation path instead - the reason then becomes
+        # 'security.policy.rules is empty' and both assertions fail. Hide the
+        # engine from THIS module for this Describe only; unloading the module
+        # would break the file that imported it.
+        InModuleScope RBAC {
+            Mock Get-Command { $null } -ParameterFilter { $Name -eq 'Invoke-PolicyChecks' }
+        }
+    }
     It 'maps Orchestrator action codes to the permission namespace' {
         $state = [PSCustomObject]@{ TenantId = 'default'; BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ rbac = [PSCustomObject]@{ enabled = $true; userRoles = [PSCustomObject]@{ dev = 'Developer' }; defaultRole = 'Viewer' } } } }
         (Test-BuildPermission -State $state -Action '1' -UserName dev) | Should -BeTrue

@@ -7,10 +7,12 @@
 .DESCRIPTION
     Proves Invoke-DistributedBuild dispatches tasks across hosts and
     aggregates results WITHOUT requiring two real networked machines. A fake
-    ssh.cmd on $env:PATH stands in for real SSH: it always exits 0
-    and echoes the remote command, so the full code path
-    (Get-AvailableHosts -> Resolve-HostAssignment -> Invoke-RemoteCommand
-     -> New-DistributedReport) executes and is asserted. No hardcoded paths.
+    ssh executable on $env:PATH stands in for real SSH: it always exits 0, so
+    the full code path (Get-AvailableHosts -> Resolve-HostAssignment
+     -> Invoke-RemoteCommand -> New-DistributedReport) executes and is
+    asserted. No hardcoded paths and no platform assumption: New-FakeSsh
+    writes ssh.cmd on Windows and an executable `ssh` sh script on POSIX, so
+    the shim actually wins the PATH lookup on both platforms.
 #>
 
 Set-StrictMode -Version 1.0
@@ -21,10 +23,11 @@ Describe "Distributed Build E2E (mock SSH)" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Distributed.psm1') -Force -DisableNameChecking -ErrorAction Stop
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -DisableNameChecking -ErrorAction Stop
+        # Single owner of the cross-platform ssh shim (Tests/Helpers/MockHelpers.psm1).
+        $null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'MockHelpers.psm1')) -Force -DisableNameChecking -ErrorAction Stop
 
         $sshDir = Join-Path $TestDrive 'fakebin_ok'
-        $null = New-Item -ItemType Directory -Path $sshDir -Force
-        Set-Content -Path (Join-Path $sshDir 'ssh.cmd') -Value "@echo off`r`nexit /b 0"
+        New-FakeSsh -Directory $sshDir -Mode 'Ok'
         $global:GBuildFakeSshDir = $sshDir
         $global:GBuildOrigPath = $env:PATH
         $env:PATH = "$sshDir$([IO.Path]::PathSeparator)$env:PATH"
