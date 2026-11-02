@@ -229,7 +229,7 @@ Set-StrictMode -Version 1.0
                 try {
                     $dataFile = Join-Path $ModulesRoot 'Tier1Modules.ps1'
                     if (Test-Path -LiteralPath $dataFile -PathType Leaf) {
-                        $list = & { . "$dataFile"; Get-Tier1ModuleList }
+                        $list = & { . $dataFile; Get-Tier1ModuleList }
                         if ($list -and $list.$Which) { $expanded = @($list.$Which) }
                     }
                 } catch { }
