@@ -17,7 +17,7 @@ $null = if (Test-Path $loggingPath) { Import-Module $loggingPath -Force -Global 
 # out of this file to keep Orchestrator.psm1 maintainable. Dot-sourced so
 # they share this module's scope and $script: state.
 $lifecyclePath = Join-Path $PSScriptRoot 'OrchestratorLifecycle.ps1'
-if (Test-Path -LiteralPath $lifecyclePath) { . $lifecyclePath }
+if (Test-Path -LiteralPath $lifecyclePath) { . "$lifecyclePath" }
 # Core modules needed at startup (Tier 1). Remaining modules are lazy-loaded on
 # demand via Import-ModuleOnDemand (inside Invoke-GuildChoice / Start-GBuild) to reduce
 # startup cost (was: eager import of 20 modules at import time).
