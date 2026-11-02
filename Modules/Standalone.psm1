@@ -849,15 +849,6 @@ function New-StandaloneBundleScript {
 # stayed, so every emitted bundle died on "Get-StandaloneHash is not recognized"
 # during Restore-StandaloneFiles. Keep the body byte-identical to the live copy.
 
-function Get-StandaloneHash {
-    [CmdletBinding()]
-    [OutputType([string])]
-    param([Parameter(Mandatory)][byte[]]$Bytes)
-    $sha = [System.Security.Cryptography.SHA256]::Create()
-    try { return ([System.BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-', '') }
-    finally { $sha.Dispose() }
-}
-
 function Assert-StandaloneRelativePath {
     param([string]$Target, [string]$RelPath)
     if ([string]::IsNullOrWhiteSpace($RelPath) -or $RelPath.IndexOf([char]0) -ge 0) { throw 'Standalone path is empty or invalid' }
