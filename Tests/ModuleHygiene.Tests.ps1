@@ -216,7 +216,7 @@ $script:HygieneModulesRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Modul
         $allowed = @{
             'Loader.psm1::Register-Plugins' = 'plugin files only ($p.FullName from Plugins/pluginDirs); Tier-1 name collisions are skipped at runtime by the anti-shadow guard, portable same-name reloads still proceed'
             'DotnetHelpers.psm1::<top-level>' = 'sibling helper ($pluginHelpersPath = helpers/PluginHelpers.psm1); helper modules are never Tier-1/global so nothing can be orphaned'
-            'Orchestrator.psm1::Invoke-GuildChoice' = 'Start-Job scriptblock (background health monitor) runs in an isolated child process; cannot orphan parent-session modules'
+            'Orchestrator.Targets.ps1::Invoke-GuildChoice' = 'Start-Job scriptblock (background health monitor) runs in an isolated child process; cannot orphan parent-session modules'
         }
         $violations = New-Object System.Collections.Generic.List[string]
         foreach ($f in $script:ModuleFiles) {
@@ -297,6 +297,9 @@ $script:HygieneModulesRoot = Join-Path (Split-Path -Parent $PSScriptRoot) 'Modul
             'SDK.psm1', 'Policy.psm1', 'Preflight.psm1', 'Parallel.psm1',
             'ErrorHandling.psm1', 'SupplyChain.psm1', 'Versioning.psm1',
             'Report.psm1', 'Security.psm1', 'Orchestrator.psm1', 'Environment.psm1',
+            'Orchestrator.Config.ps1', 'Orchestrator.Deploy.ps1', 'Orchestrator.Environment.ps1',
+            'Orchestrator.Modules.ps1', 'Orchestrator.Pipeline.ps1', 'Orchestrator.Sdk.ps1',
+            'Orchestrator.Standalone.ps1', 'Orchestrator.Targets.ps1',
             'PathUtils.psm1', 'publish-artifact.ps1', 'pipeline-diagram.ps1',
             'manage-githooks.ps1', '01-post-build.ps1', '01-env-validation.ps1',
             'sign-gpg.ps1'

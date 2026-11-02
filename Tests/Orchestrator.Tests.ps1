@@ -423,8 +423,8 @@ Describe "Cluster config path (no top-level drift)" {
         # and ClusterOrchestrator init use). A top-level 'cluster' read always
         # returns $null, silently disabling the health job / leader election /
         # operator wiring. Lock the canonical path (house tripwire style).
-        $orchPath = Join-Path $global:GBuildModuleRoot 'Orchestrator.psm1'
-        $text = Get-Content -LiteralPath $orchPath -Raw -Encoding UTF8
+        $orchFiles = @(Get-ChildItem -LiteralPath $global:GBuildModuleRoot -Filter 'Orchestrator*.ps*' -File)
+        $text = ($orchFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
         $text | Should -Match "Get-ConfigSection -State \`$State -Path 'build.cluster'"
         $text | Should -Not -Match "-Path 'cluster'"
     }
@@ -432,9 +432,8 @@ Describe "Cluster config path (no top-level drift)" {
 
 Describe "Quiet operational logging" {
     BeforeAll {
-        $script:orchPath = Join-Path $global:GBuildModuleRoot 'Orchestrator.psm1'
-        $script:lifecyclePath = Join-Path $global:GBuildModuleRoot 'OrchestratorLifecycle.ps1'
-        $script:orchText = (Get-Content -LiteralPath $script:orchPath -Raw -Encoding UTF8) + "`n" + (Get-Content -LiteralPath $script:lifecyclePath -Raw -Encoding UTF8)
+        $script:orchFiles = @(Get-ChildItem -LiteralPath $global:GBuildModuleRoot -Filter 'Orchestrator*.ps*' -File)
+        $script:orchText = ($script:orchFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
     }
 
     It "does not emit a locale hint during normal builds" {
