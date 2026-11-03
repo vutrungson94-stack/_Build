@@ -257,6 +257,12 @@ function Install-Hooks {
             $stagedTemplate = Join-Path $stageDir "$hookName.ps1"
             [System.IO.File]::Copy($template.FullName, $stagedTemplate, $true)
             $content = New-HookContent -TemplatePath $stagedTemplate -HooksDirectory $hooksDir
+            # The shim MUST use LF line endings: a CRLF shebang (#!/bin/sh\r)
+            # makes the kernel look for an interpreter named '/bin/sh\r', which
+            # does not exist, so git fails with "cannot exec ... No such file or
+            # directory" on Unix. The staged templates keep CRLF (PowerShell is
+            # fine with it); only the shim is normalised here.
+            $content = $content -replace "`r`n", "`n" -replace "`r", "`n"
             [System.IO.File]::WriteAllText($hookPath, $content, (New-Object System.Text.UTF8Encoding($false)))
             if ([System.Environment]::OSVersion.Platform -ne [System.PlatformID]::Win32NT) {
                 & chmod +x $hookPath 2>$null
