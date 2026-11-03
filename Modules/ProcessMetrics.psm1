@@ -1415,7 +1415,7 @@ function Test-BuildQpmLedger {
         }
         if ($detected -and $resolved) {
             if ($resolved -lt $detected) { [void]$errors.Add("$where resolvedAtUtc is before detectedAtUtc") }
-            else { [void]$repairSeconds.Add(($resolved - $detected).TotalSeconds) | Out-Null }
+            else { $null = $repairSeconds.Add(($resolved - $detected).TotalSeconds) }
         }
     }
     $meanRepair = if ($repairSeconds.Count -gt 0) { [math]::Round(($repairSeconds | Measure-Object -Average).Average, 1) } else { $null }
