@@ -991,7 +991,7 @@ function Optimize-Cache {
     # disabled CacheProvider must never fail a build.
     try {
         if (Get-Command Invoke-UnifiedCacheEviction -ErrorAction SilentlyContinue) {
-            Invoke-UnifiedCacheEviction -State $State -MaxSizeMB $MaxSizeMB | Out-Null
+            Invoke-UnifiedCacheEviction -State $State | Out-Null
         }
     } catch { }
 }

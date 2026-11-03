@@ -388,32 +388,15 @@ function Invoke-CacheEviction {
 function Invoke-UnifiedCacheEviction {
     <#
     .SYNOPSIS
-        Runs BOTH cache evictors in one place: the blob-level LRU/age/size
-        policy owned by CacheProvider and the index-level LRU owned by
-        BuildCache.Optimize.
-    .DESCRIPTION
-        This was the intended bridge between the two cache layers and it was
-        dead: zero production callers, so build.cacheLocal.maxEntries /
-        maxAgeDays / maxSizeMb were advertised in gbuild.config.json while
-        nothing consumed them, and the live path only ever ran
-        BuildCache.Optimize with a hardcoded size.
-
-        It was also broken: it called `Get-BuildCache -State $State`, but
-        Get-BuildCache declares NO parameters, so every invocation raised a
-        ParameterBindingException that the bare `catch {}` swallowed - the
-        index-level eviction this function exists to perform never ran.
+        Runs the blob-level LRU/age/size cache eviction policy owned by
+        CacheProvider. The index-level LRU is owned by BuildCache.Optimize and
+        is invoked directly by Optimize-Cache on the shared $script:BuildCache
+        instance, so it must NOT be repeated here (a fresh Get-BuildCache
+        instance optimizes nothing visible to the live path).
     #>
-    param([PSCustomObject]$State, [string]$CacheDir = '', [int]$MaxSizeMB = 0)
+    param([PSCustomObject]$State, [string]$CacheDir = '')
     $count = 0
     try { $count += [int](Invoke-CacheEviction -State $State -CacheDir $CacheDir) } catch { }
-    try {
-        # Get-BuildCache takes no arguments - construct it directly.
-        $cache = Get-BuildCache
-        if ($cache) {
-            if ($MaxSizeMB -le 0) { $MaxSizeMB = [int](Get-BuildConstant -Key 'MaxCacheSizeMB' -State $State -Fallback 2048) }
-            $cache.Optimize($MaxSizeMB, $State) | Out-Null
-        }
-    } catch { }
     return $count
 }
 

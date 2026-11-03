@@ -107,11 +107,16 @@ $gbuildModulesRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Mod
 $gbuildModulePrefix = $gbuildModulesRoot + [System.IO.Path]::DirectorySeparatorChar
 # Anti-shadow purge: drop any gbuild module loaded from THIS tree before we go
 # on to load our own, so a previous run's copy cannot satisfy a sentinel check.
-# The case comparison follows the host filesystem. It used to be an inline
-# OSVersion.Platform ternary, which is the exact thing PathUtils.Get-PathComparison
-# exists to own - and this file imports PathUtils a few lines later, so the copy
-# had no defence other than being small.
-$gbuildPathComparison = if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+# The case comparison follows the host filesystem. PathUtils.Get-PathComparison
+# owns the OS-aware StringComparison choice; import PathUtils early so this
+# guard does not re-implement the PlatformID ternary inline.
+$puPath = Join-Path $PSScriptRoot 'Modules/PathUtils.psm1'
+if (-not (Get-Command Get-PathComparison -ErrorAction SilentlyContinue)) {
+    if (Test-Path -LiteralPath $puPath -PathType Leaf) {
+        Import-Module $puPath -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+    }
+}
+$gbuildPathComparison = Get-PathComparison
 foreach ($gbuildLoadedModule in @(Get-Module -ErrorAction SilentlyContinue)) {
     if (-not $gbuildLoadedModule.Path) { continue }
     try { $gbuildLoadedPath = [System.IO.Path]::GetFullPath($gbuildLoadedModule.Path) } catch { continue }
