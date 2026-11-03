@@ -211,7 +211,6 @@ if ($SyntaxCheck.IsPresent) {
 
 # ============================================================================
 # -SelfTest: verify this _Build copy is internally consistent, then exit.
-# (aicommit verification marker)
 # This switch was previously declared but never forwarded to Start-GBuild and
 # Start-GBuild has no such parameter, so `gbuild -SelfTest` silently ran a FULL
 # BUILD and ignored the request. It now runs a real, fast integrity check:
