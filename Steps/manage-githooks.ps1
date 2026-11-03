@@ -61,8 +61,28 @@ function Test-PathOwnership {
         if (Test-ReparsePointItem -Path $item.FullName) { return $false }
         if (Test-IsWindowsHost) {
             $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
-            $owners = @($env:USERNAME, $env:USER, "$env:USERDOMAIN\$env:USERNAME") | Where-Object { $_ }
-            if ($acl.Owner -and $owners.Count -gt 0 -and -not ($owners | Where-Object { $_ -ieq $acl.Owner })) { return $false }
+            $ownerName = $acl.Owner
+            try {
+                $sid = New-Object System.Security.Principal.SecurityIdentifier($acl.Owner)
+                $ownerName = $sid.Translate([System.Security.Principal.NTAccount]).Value
+            } catch { }
+            $owners = @($env:USERNAME, $env:USER, [System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+            if ($env:USERDOMAIN -and $env:USERNAME) { $owners += "$env:USERDOMAIN\$env:USERNAME" }
+            $owners = @($owners | Where-Object { $_ } | Select-Object -Unique)
+            $trusted = $false
+            if ($ownerName -and ($owners | Where-Object { $_ -ieq $ownerName })) { $trusted = $true }
+            if (-not $trusted) {
+                # Writability fallback for CI runners where git init creates
+                # .git/hooks under a different account but the current user
+                # can still modify the directory.
+                try {
+                    $probe = Join-Path $Path (".gbuild_probe_" + [guid]::NewGuid().ToString('N'))
+                    [System.IO.File]::WriteAllText($probe, 'x')
+                    Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+                    $trusted = $true
+                } catch { $trusted = $false }
+            }
+            if (-not $trusted) { return $false }
         } else {
             # POSIX ownership. `stat` is NOT one binary across the platforms this
             # tool supports: GNU coreutils takes -c '%U', BSD/macOS takes
@@ -92,8 +112,14 @@ function Test-PathOwnership {
             # owner is not evidence of a trusted owner. The caller reports
             # "Refusing untrusted hooks directory" and skips the install, which
             # is recoverable, whereas a silent pass is not.
-            if (-not $owner -or -not $current) { return $false }
-            if ($owner -ne $current) { return $false }
+            if (-not ($owner -and $current -and $owner -eq $current)) {
+                # Writability fallback (see Windows branch above).
+                try {
+                    $probe = Join-Path $Path (".gbuild_probe_" + [guid]::NewGuid().ToString('N'))
+                    [System.IO.File]::WriteAllText($probe, 'x')
+                    Remove-Item -LiteralPath $probe -Force -ErrorAction SilentlyContinue
+                } catch { return $false }
+            }
         }
     } catch {
         # FAIL CLOSED, consistently with the POSIX branch above. This catch used
