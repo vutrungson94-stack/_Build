@@ -89,6 +89,7 @@ if ($State -and $State.PSObject.Properties.Name -contains 'WorkingDir' -and $Sta
 # working directories; without it, containment validation rejects any source
 # or output that lives under %TEMP% (which is where Pester and CI place them).
 $safeRoots += [System.IO.Path]::GetTempPath()
+foreach ($v in @($env:TEMP, $env:TMP)) { if ($v -and -not ($safeRoots -contains $v)) { $safeRoots += $v } }
 if (-not $SourceDir) {
     $publishOutput = Resolve-ConfigValue -State $State -Path 'paths.publishOutput' -Default (Get-BuildConstant -Key 'PublishOutputDir' -Fallback 'publish-output')
     $SourceDir = Resolve-StepPath -Base $root -Path $publishOutput

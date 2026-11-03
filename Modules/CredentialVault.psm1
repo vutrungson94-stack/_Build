@@ -96,7 +96,9 @@ function Resolve-SafeVaultPath {
     $root = Get-VaultRootDirectory -State $State
     $candidate = if ([System.IO.Path]::IsPathRooted($value)) { $value } else { Join-Path $root $value }
     $full = [System.IO.Path]::GetFullPath($candidate)
-    $allowedRoots = @($root, [System.IO.Path]::GetTempPath())
+    $tmpRoots = @([System.IO.Path]::GetTempPath())
+    foreach ($v in @($env:TEMP, $env:TMP, $env:TMPDIR)) { if ($v -and -not $tmpRoots.Contains($v)) { $tmpRoots += $v } }
+    $allowedRoots = @($root) + $tmpRoots
     # Containment itself is owned by PathUtils.Test-PathUnderRoots. The null /
     # placeholder checks above remain here because they produce different
     # vault-specific errors than a failed containment check.
