@@ -44,5 +44,15 @@ if ([string]::IsNullOrWhiteSpace($repoRoot)) { exit 0 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'gbuild.ps1') -PathType Leaf)) { exit 0 }
 
+# Locale is needed by Resolve-LogMessage below. gbuild purges modules in child
+# processes it spawns, but this hook's own session may not have loaded Locale
+# yet (the bootstrap above only imports it when StepBootstrap is reachable from
+# the staged hook, which it is not). Import it now; no-op if already present.
+$__localePath = Join-Path $repoRoot 'Modules/Locale.psm1'
+if (Test-Path -LiteralPath $__localePath -PathType Leaf) {
+    Import-Module $__localePath -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+}
+Remove-Variable -Name __localePath -ErrorAction SilentlyContinue
+
 Write-Host (Resolve-LogMessage -Key 'log.hook.committed' -Fallback '[gbuild hook] committed. Verify locally with: gbuild . -SyntaxCheck   (full run: gbuild .)')
 exit 0

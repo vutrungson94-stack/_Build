@@ -57,6 +57,13 @@ if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
     exit 0
 }
 
+# Locale is needed by Resolve-LogMessage below; import it before the first use.
+$__localePath = Join-Path $repoRoot 'Modules/Locale.psm1'
+if (Test-Path -LiteralPath $__localePath -PathType Leaf) {
+    Import-Module $__localePath -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+}
+Remove-Variable -Name __localePath -ErrorAction SilentlyContinue
+
 Write-Host (Resolve-LogMessage -Key 'log.hook.prePushRunning' -Fallback '[gbuild hook] pre-push: running gbuild -SyntaxCheck')
 try {
     # Named splat via a VARIABLE. `& $launcher @{...}` does NOT splat - a literal
