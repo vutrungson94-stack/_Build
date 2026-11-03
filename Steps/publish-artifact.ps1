@@ -85,6 +85,10 @@ $root = if ($State -and $State.ScriptRoot) { [string]$State.ScriptRoot } else { 
 $safeRoots = @($root)
 if ($State -and $State.PSObject.Properties.Name -contains 'ProjectRoot' -and $State.ProjectRoot) { $safeRoots += [string]$State.ProjectRoot }
 if ($State -and $State.PSObject.Properties.Name -contains 'WorkingDir' -and $State.WorkingDir) { $safeRoots += [string]$State.WorkingDir }
+# System temp is always a legitimate location for test fixtures and ephemeral
+# working directories; without it, containment validation rejects any source
+# or output that lives under %TEMP% (which is where Pester and CI place them).
+$safeRoots += [System.IO.Path]::GetTempPath()
 if (-not $SourceDir) {
     $publishOutput = Resolve-ConfigValue -State $State -Path 'paths.publishOutput' -Default (Get-BuildConstant -Key 'PublishOutputDir' -Fallback 'publish-output')
     $SourceDir = Resolve-StepPath -Base $root -Path $publishOutput

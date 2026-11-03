@@ -484,7 +484,7 @@ function Protect-CredentialAes {
             $purposeBytes = [System.Text.Encoding]::UTF8.GetBytes($(if (Get-Command Get-BuildConstant -ErrorAction SilentlyContinue) { [string](Get-BuildConstant -Key 'VaultAesPurposeUtf8' -Fallback 'gbuild-vault-aead') } else { 'gbuild-vault-aead' }))
             $protected  = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $purposeBytes, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
             return ($script:AesPrefix + 'dpapi:v1:' + [System.Convert]::ToBase64String($protected))
-        } catch { throw (Get-LocaleMessage -Key 'log.vault.encryptionFailed' -Fallback 'Vault encryption failed.') }
+        } catch { throw (Get-LocaleMessage -Key 'log.vault.encryptionFailed' -Fallback 'Vault encryption failed.') + ' [' + [string]$_.Exception.Message + ']' }
     }
     $gcm = $null
     $rng = $null
@@ -504,7 +504,7 @@ function Protect-CredentialAes {
         [Array]::Copy($cipher, 0, $payload, $nonce.Length + $tag.Length, $cipher.Length)
         return ($script:AesPrefix + 'v2:' + [System.Convert]::ToBase64String($payload))
     } catch {
-        throw (Get-LocaleMessage -Key 'log.vault.encryptionFailed' -Fallback 'Vault encryption failed.')
+        throw (Get-LocaleMessage -Key 'log.vault.encryptionFailed' -Fallback 'Vault encryption failed.') + ' [' + [string]$_.Exception.Message + ']'
     } finally {
         if ($gcm -and ($gcm -is [System.IDisposable])) { $gcm.Dispose() }
         if ($rng) { $rng.Dispose() }
