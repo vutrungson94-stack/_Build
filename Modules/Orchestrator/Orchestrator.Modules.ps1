@@ -9,11 +9,15 @@ function Import-ModuleOnDemand {
 
 Set-StrictMode -Version 1.0
     foreach ($name in $ModuleNames) {
-        $path = Join-Path $PSScriptRoot "$name.psm1"
-        # Providers live in Modules/Providers/ — resolve there as fallback so
+        # PSScriptRoot is Modules/Orchestrator since the split; sibling modules
+        # live one level up. If this file is ever dot-sourced straight from
+        # Modules/ root again, Orchestrator.psm1 sits next to it.
+        $modulesDir = if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator.psm1') -PathType Leaf) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
+        $path = Join-Path $modulesDir "$name.psm1"
+        # Providers live in Modules/Providers/ - resolve there as fallback so
         # on-demand loads of provider modules never silently no-op.
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-            $provPath = Join-Path (Join-Path $PSScriptRoot 'Providers') "$name.psm1"
+            $provPath = Join-Path (Join-Path $modulesDir 'Providers') "$name.psm1"
             if (Test-Path -LiteralPath $provPath -PathType Leaf) { $path = $provPath }
         }
         if (-not (Test-Path $path)) { continue }
@@ -156,8 +160,10 @@ function Test-BuildMenuModuleMap {
     if ($State.PSObject.Properties['ScriptRoot'] -and $State.ScriptRoot) {
         $modulesRoot = Join-Path $State.ScriptRoot 'Modules'
     } elseif ($PSScriptRoot) {
-        # PSScriptRoot is Modules/ when this module is loaded normally, and the
-        # test suite dot-sources this file, so both shapes are covered.
+        # PSScriptRoot is Modules/Orchestrator since the split (this file was
+        # extracted from Orchestrator.psm1); the Modules root is its parent.
+        # If the file is dot-sourced straight from Modules/ root (tests), the
+        # sibling Orchestrator.psm1 sits next to it, so use $PSScriptRoot then.
         $modulesRoot = if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator.psm1') -PathType Leaf) {
             $PSScriptRoot
         } else {

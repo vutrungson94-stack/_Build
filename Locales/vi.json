@@ -1211,5 +1211,18 @@
   "log.gbuild.selftestEventContractFailed": "[SELFTEST] hợp đồng sự kiện: THẤT BẠI ({0} vi phạm)",
   "log.gbuild.syntaxError": "[CÚ PHÁP] {0}: {1}",
   "log.gbuild.syntaxError2": "[CÚ PHÁP] {0}: {1}",
-  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] process-metrics: THẤT BẠI ({0} lớp dưới ngưỡng)"
+  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] process-metrics: THẤT BẠI ({0} lớp dưới ngưỡng)",
+  "log.gbuild.controlOk": "[SELFTEST] process-control: OK ({0} lớp ở trạng thái kiểm soát, cửa sổ {1})",
+  "log.gbuild.controlInsufficient": "[SELFTEST] process-control: lịch sử chưa đủ ({0} mẫu) - không có phán quyết; adoptionFloor vẫn áp dụng",
+  "log.gbuild.controlFailed": "[SELFTEST] process-control: TRƯỢT (thấp hơn giới hạn kiểm soát dưới: {0})",
+  "log.gbuild.qpmOk": "[SELFTEST] qpm: OK (tỉ lệ lỗi {0} trên {1} mẫu; MTTR {2}; lỗi thoát ra {3}; sổ hợp lệ)",
+  "log.gbuild.qpmRateFailed": "[SELFTEST] qpm: TRƯỢT (tỉ lệ lỗi {0} vượt ngưỡng {1} trên {2} mẫu)",
+  "log.gbuild.qpmLedgerFailed": "[SELFTEST] qpm: TRƯỢT (sổ lỗi thoát ra không hợp lệ: {0} lỗi)",
+  "log.hook.testRunnerMissing": "[gbuild hook] Không tìm thấy Tests/Run-CoreTests.ps1; bỏ qua các cổng kiểm thử (không bao giờ chặn vì thiếu)",
+  "log.hook.testGatesSkipped": "[gbuild hook] GBUILD_HOOK_SKIP=1 - đã bỏ qua các cổng kiểm thử (SyntaxCheck vẫn chạy)",
+  "log.hook.reviewWaiver": "[gbuild hook] pre-push: CẢNH BÁO - review Modules/ đã được WAIVER, lý do đã ghi: {0}",
+  "log.hook.reviewBlocked": "[gbuild hook] pre-push: BỊ CHẶN - lần push này thay đổi Modules/ mà không có xác nhận review độc lập.",
+  "log.hook.reviewChanged": "[gbuild hook] thay đổi dưới Modules/:",
+  "log.hook.reviewHowTo": "[gbuild hook] cách xử lý: (1) một maintainer KHÔNG phải tác giả review diff, (2) push lại với GBUILD_REVIEW_APPROVED=<tên>, hoặc (3) bổ sung trailer 'Reviewed-by: <tên>' vào các commit, hoặc (4) GBUILD_REVIEW_OVERRIDE=<lý-do> để ghi nhận waiver tường minh (không bao giờ là chấp thuận)",
+  "log.hook.reviewCi": "[gbuild hook] CI vẫn chạy bất kể; cổng này tồn tại để review là hành động có ý thức, không phải thủ tục hình thức."
 }

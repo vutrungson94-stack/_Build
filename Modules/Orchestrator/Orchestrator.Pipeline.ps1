@@ -789,7 +789,11 @@ function Resolve-PipelineYamlSteps {
 
     $hasCommand = [bool](Get-Command Get-BuildYamlPipelineDocument -ErrorAction SilentlyContinue)
     if (-not $hasCommand) {
-        $yamlPath = Join-Path $PSScriptRoot 'YamlPipeline.psm1'
+        # This file lives in Modules/Orchestrator since the split; the module
+        # root is its parent (or $PSScriptRoot itself if dot-sourced from
+        # Modules/ root, which is how the test suite dot-sources it).
+        $yamlDir = if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'YamlPipeline.psm1') -PathType Leaf) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
+        $yamlPath = Join-Path $yamlDir 'YamlPipeline.psm1'
         if (-not (Test-Path -LiteralPath $yamlPath -PathType Leaf)) { return $null }
         Import-ModuleOnDemand -ModuleNames @('YamlPipeline')
         if (-not (Get-Command Get-BuildYamlPipelineDocument -ErrorAction SilentlyContinue)) { return $null }
@@ -1020,7 +1024,7 @@ function Invoke-PipelineStep {
                 if ($stepWatch) { $stepWatch.Start() }
                 # Each attempt gets the FULL timeout (a killed job is dead and
                 # cannot be resumed), matching the standalone fallback below.
-                $output = Invoke-PipelineStepJobAttempt -Step $Step -Context $Context -State $State -TimeoutSec $timeoutSec -DisplayName $displayStepName -ModulesRoot $PSScriptRoot
+                $output = Invoke-PipelineStepJobAttempt -Step $Step -Context $Context -State $State -TimeoutSec $timeoutSec -DisplayName $displayStepName -ModulesRoot $(if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator.psm1') -PathType Leaf) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot })
                 if ($stepWatch) { $stepWatch.Stop() }
                 # Root watchdog still applies post-hoc: a step that finished
                 # inside its own timeout may still have blown the pipeline-wide
@@ -1100,7 +1104,7 @@ function Invoke-PipelineStep {
     while ($true) {
         try {
             if ($jobIsolated) {
-                $output = Invoke-PipelineStepJobAttempt -Step $Step -Context $Context -State $State -TimeoutSec $timeoutSec -DisplayName $displayStepName -ModulesRoot $PSScriptRoot
+                $output = Invoke-PipelineStepJobAttempt -Step $Step -Context $Context -State $State -TimeoutSec $timeoutSec -DisplayName $displayStepName -ModulesRoot $(if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator.psm1') -PathType Leaf) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot })
                 return $output
             }
             if ($stepTimer) { try { $stepTimer.Restart() } catch { } }

@@ -162,7 +162,10 @@ function New-HookContent {
     # Nothing caught it, because -Install was a guaranteed no-op: the template
     # directory did not exist, so New-HookContent had never executed.
     $escaped = Get-HookRelativePath -BasePath $HooksDirectory -TargetPath $TemplatePath
-    $escaped = $escaped.Replace("'", "''")
+    # A POSIX shim must use forward slashes: a backslash is an escape character
+    # to sh, while pwsh accepts '/' on every platform.
+    $escaped = $escaped.Replace('\', '/')
+    $escaped = $escaped.Replace("'", "'\''")
     # SharedUtils.Resolve-PowerShellHost owns the pwsh-then-powershell
     # preference order. This used to be a third hand-written copy of the same
     # probe, with a different candidate list.
@@ -170,8 +173,24 @@ function New-HookContent {
     if (Get-Command Resolve-PowerShellHost -ErrorAction SilentlyContinue) {
         try { $resolved = [string](Resolve-PowerShellHost); if ($resolved) { $hostCommand = $resolved } } catch { }
     }
-    $shebang = "#!/usr/bin/env $hostCommand"
-    return "$shebang`n`$GbuildManagedHook = `$true`n`$gbuildHookRoot = Split-Path -Parent `$MyInvocation.MyCommand.Path`n`$gbuildTemplate = [System.IO.Path]::GetFullPath((Join-Path `$gbuildHookRoot '$escaped'))`n& '$hostCommand' -NoProfile -File `$gbuildTemplate @args`n"
+    $shHost = $hostCommand.Replace("'", "'\''")
+    # A REAL POSIX SHIM, NOT A POWERSHELL SCRIPT. Git executes hooks itself; on
+    # Windows that goes through sh.exe, which honoured the old
+    # `#!/usr/bin/env pwsh` by running `pwsh <extensionless hook path>`. pwsh
+    # treats that argument as -File and refuses any path that does not end in
+    # '.ps1', so every commit failed with "the file does not have a '.ps1'
+    # extension" - the hook never ran at all. sh executes this file regardless
+    # of its name and only the staged template (which DOES end in .ps1) is
+    # passed to -File. The GbuildManagedHook marker stays in a comment because
+    # Test-ManagedHook searches the installed file for it.
+    return @"
+#!/bin/sh
+# Managed by gbuild (Steps/manage-githooks.ps1): `$GbuildManagedHook = `$true
+# Keep this shim POSIX sh. Git runs hooks directly; on Windows that is sh.exe,
+# and pwsh -File rejects a path without a '.ps1' extension.
+hook_dir=`$(dirname "`$0")
+exec '$shHost' -NoProfile -File "`$hook_dir/$escaped" "`$@"
+"@
 }
 
 function Install-Hooks {

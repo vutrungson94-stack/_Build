@@ -8,10 +8,16 @@
 # and invokes this file with the git-supplied @args. Editing the installed copy is
 # therefore pointless - change THIS file, or pass -Force to reinstall.
 #
+# What this hook enforces, in order:
+#   1. gbuild -SyntaxCheck (seconds) - parse every shipped file.
+#   2. -Scope Standalone + -Scope Orchestrator (minutes; GBUILD_HOOK_SCOPES,
+#      GBUILD_HOOK_SKIP=1 to skip) - the two gates whose absence let both
+#      2026-11-03 escaped defects through. A failure blocks the commit.
 # Design rules this template obeys, and why:
 #  * It NEVER blocks a commit for an unrelated reason. A hook that can wedge a
 #    developer's workflow gets uninstalled within a day, which is worse than not
-#    having had it.
+#    having had it. The test gates ARE the related reason - they are the checks
+#    that actually execute the artifact.
 #  * It degrades to a no-op when the toolchain is absent (no pwsh, no gbuild.ps1,
 #    no repository layout it recognises). Absence is not a failure.
 #  * It never leaves a non-zero exit unless a check it actually ran failed.
@@ -92,20 +98,66 @@ try {
     exit 0
 }
 
-if ($code -eq 0) {
-    Write-Host (Resolve-LogMessage -Key 'log.hook.preCommitOk' -Fallback '[gbuild hook] pre-commit: OK')
-    exit 0
+# Modules loaded from this tree are purged by gbuild.ps1 at startup (anti-shadow
+# purge), so Locale - and Resolve-LogMessage with it - is gone from the session by
+# now. Re-import it for the remaining messages (same pattern gbuild.ps1's entry
+# points use). No-op when the import is already available.
+$__localePath = Join-Path $repoRoot 'Modules/Locale.psm1'
+if (-not (Get-Command Resolve-LogMessage -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $__localePath -PathType Leaf)) {
+    Import-Module $__localePath -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+}
+Remove-Variable -Name __localePath -ErrorAction SilentlyContinue
+
+if ($code -ne 0) {
+    # SyntaxCheck failed: blocked path. Post-conditions of the tool, when it
+    # writes them, are far more actionable than a bare exit code.
+    $reasonFile = Join-Path $repoRoot 'build-reports/gate-result.json'
+    if (Test-Path -LiteralPath $reasonFile -PathType Leaf) {
+        try {
+            $j = Get-Content -LiteralPath $reasonFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+            if ($j.PSObject.Properties.Name -contains 'reason') { Write-Host (Resolve-LogMessage -Key 'log.hook.reason' -MessageArgs @([string]$j.reason) -Fallback '[gbuild hook] reason: {0}') }
+        } catch { }
+    }
+    Write-Host (Resolve-LogMessage -Key 'log.hook.preCommitBlocked' -MessageArgs @([string]$code) -Fallback '[gbuild hook] pre-commit: BLOCKED (exit {0}). Fix, or bypass once with: git commit --no-verify')
+    exit $code
 }
 
-# post-conditions of the tool, when it writes them, are far more actionable than
-# a bare exit code.
-$reasonFile = Join-Path $repoRoot 'build-reports/gate-result.json'
-if (Test-Path -LiteralPath $reasonFile -PathType Leaf) {
-    try {
-        $j = Get-Content -LiteralPath $reasonFile -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
-        if ($j.PSObject.Properties.Name -contains 'reason') { Write-Host (Resolve-LogMessage -Key 'log.hook.reason' -MessageArgs @([string]$j.reason) -Fallback '[gbuild hook] reason: {0}') }
-    } catch { }
+# ------------------------------------------------------- test gates (L5) --
+# -Scope Standalone and -Scope Orchestrator are the MINIMUM gate. They exist
+# because both escaped defects found on 2026-11-03 passed every green signal
+# that did not (a) execute a freshly emitted standalone bundle and (b) run the
+# entrypoint guides from a tool-folder CWD. The gates run after the fast
+# SyntaxCheck and honour two env knobs:
+#   GBUILD_HOOK_SKIP=1     - skip the test scopes (SyntaxCheck still ran); loud
+#   GBUILD_HOOK_SCOPES     - comma-separated scopes (default Standalone,Orchestrator)
+$runner = Join-Path $repoRoot 'Tests/Run-CoreTests.ps1'
+$runGates = $true
+if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) {
+    Write-Host (Resolve-LogMessage -Key 'log.hook.testRunnerMissing' -Fallback '[gbuild hook] Tests/Run-CoreTests.ps1 not found; skipping test gates (never block for absence)')
+    $runGates = $false
+} elseif ($env:GBUILD_HOOK_SKIP -eq '1') {
+    Write-Host (Resolve-LogMessage -Key 'log.hook.testGatesSkipped' -Fallback '[gbuild hook] GBUILD_HOOK_SKIP=1 - test gates skipped (SyntaxCheck still ran)')
+    $runGates = $false
+}
+if ($runGates) {
+    $scopes = @()
+    if ($env:GBUILD_HOOK_SCOPES) { $scopes = @($env:GBUILD_HOOK_SCOPES -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+    else { $scopes = @('Standalone', 'Orchestrator') }
+    foreach ($scope in $scopes) {
+        Write-Host ("[gbuild hook] running -Scope {0} (minimum gate)" -f $scope)
+        try {
+            & $runner -Scope $scope -StrictSkips
+            $scopeCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        } catch {
+            Write-Host ("[gbuild hook] -Scope {0} could not run ({1}); skipping, never block for absence" -f $scope, $_.Exception.Message)
+            continue
+        }
+        if ($scopeCode -ne 0) {
+            Write-Host ("[gbuild hook] -Scope {0} FAILED (exit {1}). Fix, or bypass once with: git commit --no-verify" -f $scope, $scopeCode)
+            exit $scopeCode
+        }
+    }
 }
 
-Write-Host (Resolve-LogMessage -Key 'log.hook.preCommitBlocked' -MessageArgs @([string]$code) -Fallback '[gbuild hook] pre-commit: BLOCKED (exit {0}). Fix, or bypass once with: git commit --no-verify')
-exit $code
+Write-Host (Resolve-LogMessage -Key 'log.hook.preCommitOk' -Fallback '[gbuild hook] pre-commit: OK')
+exit 0

@@ -1211,5 +1211,18 @@
   "log.gbuild.selftestEventContractFailed": "[SELFTEST] contrat d'événement : ÉCHEC ({0} violation(s))",
   "log.gbuild.syntaxError": "[SYNTAXE] {0}: {1}",
   "log.gbuild.syntaxError2": "[SYNTAXE] {0}: {1}",
-  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] process-metrics : ÉCHEC ({0} classe(s) sous le seuil)"
+  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] process-metrics : ÉCHEC ({0} classe(s) sous le seuil)",
+  "log.gbuild.controlOk": "[SELFTEST] process-control : OK ({0} classe(s) sous contrôle, fenêtre {1})",
+  "log.gbuild.controlInsufficient": "[SELFTEST] process-control : historique insuffisant ({0} échantillon(s)) - aucun verdict ; adoptionFloor reste applicable",
+  "log.gbuild.controlFailed": "[SELFTEST] process-control : ÉCHEC (sous la limite inférieure de contrôle : {0})",
+  "log.gbuild.qpmOk": "[SELFTEST] qpm : OK (taux d'échec {0} sur {1} échantillon(s) ; MTTR {2} ; défauts échappés {3} ; registre valide)",
+  "log.gbuild.qpmRateFailed": "[SELFTEST] qpm : ÉCHEC (taux d'échec {0} supérieur au plafond {1} sur {2} échantillons)",
+  "log.gbuild.qpmLedgerFailed": "[SELFTEST] qpm : ÉCHEC (registre des défauts échappés invalide : {0} erreur(s))",
+  "log.hook.testRunnerMissing": "[gbuild hook] Tests/Run-CoreTests.ps1 introuvable ; barrières de test ignorées (jamais de blocage pour absence)",
+  "log.hook.testGatesSkipped": "[gbuild hook] GBUILD_HOOK_SKIP=1 - barrières de test ignorées (SyntaxCheck a bien été exécuté)",
+  "log.hook.reviewWaiver": "[gbuild hook] pre-push : AVERTISSEMENT - révision de Modules/ DISPENSÉE, motif enregistré : {0}",
+  "log.hook.reviewBlocked": "[gbuild hook] pre-push : BLOQUÉ - ce push modifie Modules/ sans attestation de révision indépendante.",
+  "log.hook.reviewChanged": "[gbuild hook] modifié sous Modules/ :",
+  "log.hook.reviewHowTo": "[gbuild hook] marche à suivre : (1) un mainteneur qui n'est PAS l'auteur relit le diff, (2) repousser avec GBUILD_REVIEW_APPROVED=<nom>, ou (3) amender les commits avec un trailer 'Reviewed-by: <nom>', ou (4) GBUILD_REVIEW_OVERRIDE=<motif> pour enregistrer une dispense explicite (jamais une approbation)",
+  "log.hook.reviewCi": "[gbuild hook] la CI s'exécute quand même ; cette barrière existe pour que la révision soit un acte conscient, pas une formalité contournée."
 }

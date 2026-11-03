@@ -1,0 +1,36 @@
+{
+  "$schema": "./qpm-ledger.schema.json",
+  "description": "QPM escaped-defect ledger for the gbuild build process itself. Every defect that reached a 'green' state (committed/merged while verification was insufficient, or escaped every gate and was found afterwards) MUST add an entry here. Entries are append-only: never delete or rewrite one; a wrong entry is corrected by a new entry that references it. Read by Get-BuildQpmMeasures; validated by Test-BuildQpmLedger; gated on validity (not on count) by gbuild.ps1 -SelfTest. mttr is computed by the tool from detectedAtUtc/resolvedAtUtc - do not store it in the entry.",
+  "entries": [
+    {
+      "id": "QPM-2026-001",
+      "detectedAtUtc": "2026-11-03T10:51:05+07:00",
+      "resolvedAtUtc": "2026-11-03T10:56:18+07:00",
+      "class": "escaped-defect",
+      "severity": "high",
+      "scope": "Modules/Standalone.psm1 (New-StandaloneBundleScript template)",
+      "introducedInCommit": "44d9a19",
+      "detectedBy": "Pester Tests/Standalone.Tests.ps1 (Scope Standalone, isolated child)",
+      "gateThatMissed": "commit-time verification - no standalone bundle was executed before the cleanup commit was accepted",
+      "summary": "Commit 44d9a19 deleted Get-StandaloneHash from the self-contained bundle template as if it were a stray duplicate of the module-scope function. The template is an artifact boundary: it cannot call module-private functions, so every emitted standalone bundle died at startup with \"The term 'Get-StandaloneHash' is not recognized\".",
+      "escapedBecause": "The deletion was a pure 'remove looks-duplicated code' change reviewed by nobody; the only execution-level check of the bundle ran after the push.",
+      "prevention": "Standalone scope added to pre-commit/pre-push hooks; Compare-BuildProcessControl (SPC UCL/LCL) added to -SelfTest; template copy restored byte-identical to the live copy and pinned by the in-file comment contract.",
+      "note": "resolvedAtUtc is the isolated Standalone scope going green (10:56:18 run). All 3 emitted-bundle verification tests failed before the fix and pass after."
+    },
+    {
+      "id": "QPM-2026-002",
+      "detectedAtUtc": "2026-11-03T10:37:41+07:00",
+      "resolvedAtUtc": "2026-11-03T10:42:05+07:00",
+      "class": "escaped-defect",
+      "severity": "medium",
+      "scope": "gbuild.ps1 (workspace-root guard vs -Target/-Locale guides)",
+      "introducedInCommit": "99ecf48",
+      "detectedBy": "Pester Tests/Orchestrator.Tests.ps1 (Scope Orchestrator) run from the workspace root",
+      "gateThatMissed": "CWD-dependent test invocation - the suite only exercised the entrypoint with a benign CWD, so the guard silently blocked 'gbuild -Target list' from tool-folder workspaces",
+      "summary": "The workspace-root guard exempted -Help, -SelfTest and -SyntaxCheck but not the -Target/-Locale introspection guides, which resolve no project. Run from a directory holding _Build/_Sync/_Tests, 'gbuild -Target list' exited 1 instead of printing the catalog; the test failure was CWD-dependent, so it passed on 2026-11-02 and failed on 2026-11-03 from the workspace root.",
+      "escapedBecause": "The guard was placed before the guide intercepts and the test was never executed from the workspace-root CWD in CI.",
+      "prevention": "Guide intercepts moved above the workspace-root guard (same exemption class as -Help); Orchestrator scope added to pre-commit/pre-push hooks; the test now passes from any CWD.",
+      "note": "resolvedAtUtc is the first full -Scope All run confirming the fix green (10:42:05)."
+    }
+  ]
+}

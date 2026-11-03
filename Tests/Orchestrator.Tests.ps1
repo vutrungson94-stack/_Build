@@ -423,7 +423,7 @@ Describe "Cluster config path (no top-level drift)" {
         # and ClusterOrchestrator init use). A top-level 'cluster' read always
         # returns $null, silently disabling the health job / leader election /
         # operator wiring. Lock the canonical path (house tripwire style).
-        $orchFiles = @(Get-ChildItem -LiteralPath $global:GBuildModuleRoot -Filter 'Orchestrator*.ps*' -File)
+        $orchFiles = @(Get-ChildItem -LiteralPath $global:GBuildModuleRoot -Filter 'Orchestrator*.ps*' -File -Recurse)
         $text = ($orchFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
         $text | Should -Match "Get-ConfigSection -State \`$State -Path 'build.cluster'"
         $text | Should -Not -Match "-Path 'cluster'"
@@ -432,7 +432,7 @@ Describe "Cluster config path (no top-level drift)" {
 
 Describe "Quiet operational logging" {
     BeforeAll {
-        $script:orchFiles = @(Get-ChildItem -LiteralPath $global:GBuildModuleRoot -Filter 'Orchestrator*.ps*' -File)
+        $script:orchFiles = @(Get-ChildItem -LiteralPath $global:GBuildModuleRoot -Filter 'Orchestrator*.ps*' -File -Recurse)
         $script:orchText = ($script:orchFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
     }
 

@@ -1211,5 +1211,18 @@
   "log.gbuild.selftestEventContractFailed": "[SELFTEST] イベント契約: 失敗 ({0} 件の違反)",
   "log.gbuild.syntaxError": "[構文] {0}: {1}",
   "log.gbuild.syntaxError2": "[構文] {0}: {1}",
-  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] プロセスメトリック: 失敗 ({0} クラスが下限未満)"
+  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] プロセスメトリック: 失敗 ({0} クラスが下限未満)",
+  "log.gbuild.controlOk": "[SELFTEST] process-control: OK（{0} クラスが管理状態、窓 {1}）",
+  "log.gbuild.controlInsufficient": "[SELFTEST] process-control: 履歴不足（{0} サンプル）- 判定なし（adoptionFloor は引き続き適用）",
+  "log.gbuild.controlFailed": "[SELFTEST] process-control: 失敗（下方管理限界を下回った: {0}）",
+  "log.gbuild.qpmOk": "[SELFTEST] qpm: OK（失敗率 {0}、{1} サンプル、MTTR {2}、エスケープ欠陥 {3}、台帳有効）",
+  "log.gbuild.qpmRateFailed": "[SELFTEST] qpm: 失敗（失敗率 {0} が上限 {1} を超過、{2} サンプル）",
+  "log.gbuild.qpmLedgerFailed": "[SELFTEST] qpm: 失敗（エスケープ欠陥台帳が無効: {0} 件のエラー）",
+  "log.hook.testRunnerMissing": "[gbuild hook] Tests/Run-CoreTests.ps1 が見つかりません。テストゲートをスキップします（不在によるブロックはしません）",
+  "log.hook.testGatesSkipped": "[gbuild hook] GBUILD_HOOK_SKIP=1 - テストゲートをスキップしました（SyntaxCheck は実行済み）",
+  "log.hook.reviewWaiver": "[gbuild hook] pre-push: 警告 - Modules/ レビューが WAIVER されました（理由記録: {0}）",
+  "log.hook.reviewBlocked": "[gbuild hook] pre-push: ブロック - この push は Modules/ を変更するのに、独立レビューの承認がありません。",
+  "log.hook.reviewChanged": "[gbuild hook] Modules/ 配下の変更:",
+  "log.hook.reviewHowTo": "[gbuild hook] 対処手順: (1) 作者以外のメンテナーが diff をレビューし、(2) GBUILD_REVIEW_APPROVED=<名前> で再 push、または (3) コミットに 'Reviewed-by: <名前>' トレーラーを付与、または (4) GBUILD_REVIEW_OVERRIDE=<理由> で明示的な免除を記録（承認ではありません）",
+  "log.hook.reviewCi": "[gbuild hook] CI は常に実行されます。このゲートは、レビューを形骸化させず意識的な行為にするためのものです。"
 }

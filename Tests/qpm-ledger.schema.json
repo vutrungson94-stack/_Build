@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "gbuild QPM escaped-defect ledger",
+  "description": "Append-only ledger of defects that escaped the verification process. Validated by Modules/ProcessMetrics.psm1 Test-BuildQpmLedger (manual, no external validator); Test-BuildQpmLedger is the authority - this file documents the contract.",
+  "type": "object",
+  "required": ["$schema", "description", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "detectedAtUtc", "class", "severity", "scope", "summary"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^QPM-[0-9]{4}-[0-9]{3}$" },
+          "detectedAtUtc": { "type": "string", "description": "ISO-8601 with offset, e.g. 2026-11-03T10:51:05+07:00" },
+          "resolvedAtUtc": { "type": "string", "description": "ISO-8601 with offset; >= detectedAtUtc when present" },
+          "class": { "enum": ["escaped-defect", "process-failure", "near-miss"] },
+          "severity": { "enum": ["low", "medium", "high", "critical"] },
+          "scope": { "type": "string" },
+          "introducedInCommit": { "type": "string" },
+          "detectedBy": { "type": "string" },
+          "gateThatMissed": { "type": "string" },
+          "escapedBecause": { "type": "string" },
+          "prevention": { "type": "string" },
+          "summary": { "type": "string" },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

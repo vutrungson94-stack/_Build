@@ -1211,5 +1211,18 @@
   "log.gbuild.selftestEventContractFailed": "[SELFTEST] contrato de evento: FALLIDO ({0} infracción(es))",
   "log.gbuild.syntaxError": "[SINTAXIS] {0}: {1}",
   "log.gbuild.syntaxError2": "[SINTAXIS] {0}: {1}",
-  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] métricas de proceso: FALLIDO ({0} clase(s) por debajo del mínimo)"
+  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] métricas de proceso: FALLIDO ({0} clase(s) por debajo del mínimo)",
+  "log.gbuild.controlOk": "[SELFTEST] process-control: OK ({0} clase(s) bajo control, ventana {1})",
+  "log.gbuild.controlInsufficient": "[SELFTEST] process-control: historial insuficiente ({0} muestra(s)) - sin veredicto; adoptionFloor sigue vigente",
+  "log.gbuild.controlFailed": "[SELFTEST] process-control: FALLO (por debajo del límite inferior de control: {0})",
+  "log.gbuild.qpmOk": "[SELFTEST] qpm: OK (tasa de fallo {0} en {1} muestra(s); MTTR {2}; defectos escapados {3}; registro válido)",
+  "log.gbuild.qpmRateFailed": "[SELFTEST] qpm: FALLO (tasa de fallo {0} supera el techo {1} en {2} muestras)",
+  "log.gbuild.qpmLedgerFailed": "[SELFTEST] qpm: FALLO (registro de defectos escapados inválido: {0} error(es))",
+  "log.hook.testRunnerMissing": "[gbuild hook] Tests/Run-CoreTests.ps1 no encontrado; puertas de prueba omitidas (la ausencia nunca bloquea)",
+  "log.hook.testGatesSkipped": "[gbuild hook] GBUILD_HOOK_SKIP=1 - puertas de prueba omitidas (SyntaxCheck sí se ejecutó)",
+  "log.hook.reviewWaiver": "[gbuild hook] pre-push: ADVERTENCIA - revisión de Modules/ WAIVER, motivo registrado: {0}",
+  "log.hook.reviewBlocked": "[gbuild hook] pre-push: BLOQUEADO - este push cambia Modules/ sin atestación de revisión independiente.",
+  "log.hook.reviewChanged": "[gbuild hook] cambios bajo Modules/:",
+  "log.hook.reviewHowTo": "[gbuild hook] cómo proceder: (1) un mantenedor que NO es el autor revisa el diff, (2) repushear con GBUILD_REVIEW_APPROVED=<nombre>, o (3) enmendar los commits con trailer 'Reviewed-by: <nombre>', o (4) GBUILD_REVIEW_OVERRIDE=<motivo> para registrar una dispensa explícita (nunca una aprobación)",
+  "log.hook.reviewCi": "[gbuild hook] la CI se ejecuta igualmente; esta puerta existe para que la revisión sea un acto consciente, no una formalidad eludible."
 }

@@ -166,6 +166,42 @@ Describe "Steps and Hooks scripts" {
         Test-Path -LiteralPath $hook | Should -BeTrue
     }
 
+    It 'installs a hook shim that git can actually execute' {
+        # REGRESSION (2026-11-03): the shim was a PowerShell script with a
+        # `#!/usr/bin/env pwsh` shebang and no .ps1 extension. Git for Windows
+        # ran it through sh.exe, which invoked `pwsh <hook path>`; pwsh treats
+        # that as -File and rejects any path that does not end in .ps1, so
+        # `git commit` aborted with "the file does not have a '.ps1' extension"
+        # and the hook never executed. A real commit is the only assertion that
+        # covers sh -> pwsh -> staged template end to end.
+        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            Set-ItResult -Skipped -Because 'git is required to exercise an installed hook'
+            return
+        }
+        $repo = Join-Path $global:td 'hook-shim-repo'
+        New-Item -ItemType Directory -Path $repo -Force | Out-Null
+        Push-Location $repo
+        try {
+            & git init -q 2>&1 | Out-Null
+            & git config user.email 'hook-test@example.invalid'
+            & git config user.name 'hook test'
+            . (Join-Path $global:GBuildStepsDir 'manage-githooks.ps1') -RepoPath $repo -HookTypes @('pre-commit') -Install -Force
+            $hook = Join-Path $repo '.git/hooks/pre-commit'
+            Test-Path -LiteralPath $hook -PathType Leaf | Should -BeTrue
+            $text = Get-Content -LiteralPath $hook -Raw
+            $text | Should -Match '(?m)^#!/bin/sh'
+            $text | Should -Match 'GbuildManagedHook'
+            Set-Content -LiteralPath (Join-Path $repo 'file.txt') -Value 'x'
+            & git add -A
+            $out = (& git commit -m 'hook shim' 2>&1 | Out-String)
+            $code = $LASTEXITCODE
+            if ($code -ne 0) { Write-Host $out }
+            $code | Should -Be 0 -Because 'git must be able to run the installed hook end to end'
+        } finally {
+            Pop-Location
+        }
+    }
+
     It 'git hook templates carry the same worktree-root walk' {
         # pre-commit/pre-push/post-commit are staged into .git/hooks/.gbuild
         # where no shared module is reachable, so the root discovery is an

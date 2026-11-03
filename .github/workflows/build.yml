@@ -219,6 +219,41 @@ jobs:
           root="$GITHUB_WORKSPACE"
           pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$root/Tests/Run-CoreTests.ps1" -Scope Environment -StrictSkips
 
+  macos:
+    name: macOS (Apple Silicon) self-test + suite
+    runs-on: macos-14
+    needs: syntax
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) { Register-PSRepository -Default }
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object { $_.Version -ge [version]'5.0.0' -and $_.Version -lt [version]'6.0.0' })) {
+              Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+
+      - name: POSIX launcher resolves the tool and runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE"
+          chmod +x "$root/gbuild" 2>/dev/null || true
+          "$root/gbuild" -SelfTest
+          if [ $? -ne 0 ]; then echo "POSIX launcher failed on macOS"; exit 1; fi
+
+      - name: Full suite on macOS
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
   container:
     name: Multi-architecture container build
     runs-on: ubuntu-24.04

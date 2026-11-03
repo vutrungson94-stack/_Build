@@ -17,6 +17,7 @@
         "compatibility",
         "adoptionFloor",
         "adoptionFloorNote",
+        "qpm",
         "platformPathLiteralExemptions"
     ],
     "properties": {
@@ -185,6 +186,21 @@
             "type": "string",
             "minLength": 1,
             "description": "States the raise-only rule explicitly, so the intent survives whoever edits the file next."
+        },
+        "qpm": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["maxChangeFailureRate", "windowSamples", "escapedDefects", "note"],
+            "description": "Quality Performance Management gate inputs: the window change-failure rate ceiling over Tests/TestResults/process-trend.jsonl and the ledger contract for escaped defects. The build reads maxChangeFailureRate and windowSamples; the rest is recorded evidence for auditors. RATCHET: lower maxChangeFailureRate as the rate falls; never raise it to make a red run green.",
+            "properties": {
+                "maxChangeFailureRate": { "type": "number", "minimum": 0, "maximum": 1 },
+                "windowSamples": { "type": "integer", "minimum": 1 },
+                "measured": { "type": "string", "minLength": 1 },
+                "meanRecoveryTimeSeconds": { "type": "string", "minLength": 1 },
+                "escapedDefects": { "type": "integer", "minimum": 0 },
+                "ledger": { "type": "string", "minLength": 1 },
+                "note": { "type": "string", "minLength": 1 }
+            }
         },
         "platformPathLiteralExemptions": {
             "type": "array",

@@ -1,0 +1,26 @@
+# gbuild - code ownership
+#
+# The paths below are the build engine, its enforcement hooks and its
+# verification contract. Any change to them is the kind of change that can
+# break every project built with this tool, so review is requested from the
+# owner of the engine before merging.
+#
+# NOTE (solo maintainer): this file routes review requests and documents
+# ownership. It cannot make GitHub block merges for a single-account
+# repository - that needs branch protection with a required reviewer, which
+# the maintainer enables in repository settings. The local enforcement lives
+# in Hooks/git/pre-push.ps1: a push touching Modules/ is blocked unless an
+# attestation exists (GBUILD_REVIEW_APPROVED=<name>, a 'Reviewed-by:' commit
+# trailer, or GBUILD_REVIEW_OVERRIDE=<reason> as an explicit recorded waiver).
+# CI runs regardless of either gate.
+
+/Modules/              @dvlproeng-02
+/Hooks/                @dvlproeng-02
+/Steps/                @dvlproeng-02
+/.github/workflows/    @dvlproeng-02
+/Tests/                @dvlproeng-02
+/gbuild.ps1            @dvlproeng-02
+/gbuild                @dvlproeng-02
+/gbuild.bat            @dvlproeng-02
+/gbuild.config.json    @dvlproeng-02
+/gbuild.config.schema.json @dvlproeng-02

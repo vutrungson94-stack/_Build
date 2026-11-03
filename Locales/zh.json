@@ -1211,5 +1211,18 @@
   "log.gbuild.selftestEventContractFailed": "[SELFTEST] 事件契约：失败（{0} 项违规）",
   "log.gbuild.syntaxError": "[语法] {0}: {1}",
   "log.gbuild.syntaxError2": "[语法] {0}: {1}",
-  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] 进程指标：失败（{0} 个类别低于下限）"
+  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] 进程指标：失败（{0} 个类别低于下限）",
+  "log.gbuild.controlOk": "[SELFTEST] process-control: 通过（{0} 个分类处于受控状态，窗口 {1}）",
+  "log.gbuild.controlInsufficient": "[SELFTEST] process-control: 历史数据不足（{0} 个样本）- 无法判定；adoptionFloor 继续生效",
+  "log.gbuild.controlFailed": "[SELFTEST] process-control: 失败（低于下控制限：{0}）",
+  "log.gbuild.qpmOk": "[SELFTEST] qpm: 通过（失败率 {0}，{1} 个样本；MTTR {2}；逃逸缺陷 {3}；台账有效）",
+  "log.gbuild.qpmRateFailed": "[SELFTEST] qpm: 失败（失败率 {0} 超过上限 {1}，样本数 {2}）",
+  "log.gbuild.qpmLedgerFailed": "[SELFTEST] qpm: 失败（逃逸缺陷台账无效：{0} 个错误）",
+  "log.hook.testRunnerMissing": "[gbuild hook] 未找到 Tests/Run-CoreTests.ps1；跳过测试门禁（缺失时绝不阻塞）",
+  "log.hook.testGatesSkipped": "[gbuild hook] GBUILD_HOOK_SKIP=1 - 测试门禁已跳过（SyntaxCheck 已执行）",
+  "log.hook.reviewWaiver": "[gbuild hook] pre-push: 警告 - Modules/ 审查已被 WAIVER，原因已记录：{0}",
+  "log.hook.reviewBlocked": "[gbuild hook] pre-push: 已阻止 - 本次 push 修改了 Modules/，但缺少独立审查确认。",
+  "log.hook.reviewChanged": "[gbuild hook] Modules/ 下的变更：",
+  "log.hook.reviewHowTo": "[gbuild hook] 处理方式：(1) 由非作者的维护者审查 diff，(2) 使用 GBUILD_REVIEW_APPROVED=<姓名> 重新 push，或 (3) 在提交中添加 'Reviewed-by: <姓名>' trailer，或 (4) GBUILD_REVIEW_OVERRIDE=<原因> 记录显式豁免（绝非批准）",
+  "log.hook.reviewCi": "[gbuild hook] CI 无论如何都会运行；此门禁用于让审查成为有意识的行为，而不是被绕过的形式。"
 }

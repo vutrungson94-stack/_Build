@@ -42,37 +42,13 @@ Set-StrictMode -Version 1.0
 # user-facing message is emitted.
 $null = Import-Module (Join-Path $PSScriptRoot 'Modules/Locale.psm1') -Global -DisableNameChecking -ErrorAction SilentlyContinue
 
-# Refuse to run against a folder that merely holds the platform tools: that is
-# not a project, and running here is what created stray logs/build-reports
-# (and worse, git state) outside any project.
-$targetDir = if ($Project) { $Project } else { (Get-Location).Path }
-$toolFolderNames = @('_Build', '_Sync', '_Tests')
-$holdsPlatformFolders = @($toolFolderNames | Where-Object { Test-Path -LiteralPath (Join-Path $targetDir $_) -PathType Container }).Count -gt 0
-$isPlatformFolder = @((($targetDir -replace '\\', '/') -split '/') | Where-Object { $_ -in $toolFolderNames }).Count -gt 0
-if (-not ($Help -or $SelfTest -or $SyntaxCheck) -and $holdsPlatformFolders -and -not $isPlatformFolder) {
-    $msg = if (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue) { Get-LocaleMessage -Key 'log.launcher.workspaceRoot' } else { "This folder only holds the platform tools (_Build, _Sync, _Tests). Point gbuild at a project directory instead." }
-    Write-Host $msg -ForegroundColor Red
-    exit 1
-}
-
-$gbuildModulesRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Modules'))
-$gbuildModulePrefix = $gbuildModulesRoot + [System.IO.Path]::DirectorySeparatorChar
-# Anti-shadow purge: drop any gbuild module loaded from THIS tree before we go
-# on to load our own, so a previous run's copy cannot satisfy a sentinel check.
-# The case comparison follows the host filesystem. It used to be an inline
-# OSVersion.Platform ternary, which is the exact thing PathUtils.Get-PathComparison
-# exists to own - and this file imports PathUtils a few lines later, so the copy
-# had no defence other than being small.
-$gbuildPathComparison = if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
-foreach ($gbuildLoadedModule in @(Get-Module -ErrorAction SilentlyContinue)) {
-    if (-not $gbuildLoadedModule.Path) { continue }
-    try { $gbuildLoadedPath = [System.IO.Path]::GetFullPath($gbuildLoadedModule.Path) } catch { continue }
-    if ($gbuildLoadedPath.StartsWith($gbuildModulePrefix, $gbuildPathComparison)) {
-        Remove-Module -Name $gbuildLoadedModule.Name -Force -ErrorAction SilentlyContinue
-    }
-}
-Remove-Variable -Name gbuildModulesRoot,gbuildModulePrefix,gbuildPathComparison,gbuildLoadedModule,gbuildLoadedPath -ErrorAction SilentlyContinue
-
+# ============================================================================
+# Introspection guides run BEFORE the workspace-root guard: -Help, -SelfTest
+# and -SyntaxCheck are already exempt there, and the -Locale/-Target guides are
+# the same class of command - they print a catalog and exit without resolving a
+# project, so they must also work from a directory that merely holds the
+# platform tools. (Previously the guard fired first and `gbuild -Target list`
+# died with "This folder only holds the platform tools".)
 # ============================================================================
 $__localeArg = if ($PSBoundParameters.ContainsKey('Locale')) { [string]$Locale } else { $null }
 $__localeGuide = ($null -ne $__localeArg) -and (([string]::IsNullOrWhiteSpace($__localeArg)) -or (@('list', 'help', '?') -contains $__localeArg.Trim().ToLowerInvariant()))
@@ -113,6 +89,37 @@ if ($__targetGuide) {
     exit 0
 }
 Remove-Variable -Name __targetGuide -ErrorAction SilentlyContinue
+
+# Refuse to run against a folder that merely holds the platform tools: that is
+# not a project, and running here is what created stray logs/build-reports
+# (and worse, git state) outside any project.
+$targetDir = if ($Project) { $Project } else { (Get-Location).Path }
+$toolFolderNames = @('_Build', '_Sync', '_Tests')
+$holdsPlatformFolders = @($toolFolderNames | Where-Object { Test-Path -LiteralPath (Join-Path $targetDir $_) -PathType Container }).Count -gt 0
+$isPlatformFolder = @((($targetDir -replace '\\', '/') -split '/') | Where-Object { $_ -in $toolFolderNames }).Count -gt 0
+if (-not ($Help -or $SelfTest -or $SyntaxCheck) -and $holdsPlatformFolders -and -not $isPlatformFolder) {
+    $msg = if (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue) { Get-LocaleMessage -Key 'log.launcher.workspaceRoot' } else { "This folder only holds the platform tools (_Build, _Sync, _Tests). Point gbuild at a project directory instead." }
+    Write-Host $msg -ForegroundColor Red
+    exit 1
+}
+
+$gbuildModulesRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'Modules'))
+$gbuildModulePrefix = $gbuildModulesRoot + [System.IO.Path]::DirectorySeparatorChar
+# Anti-shadow purge: drop any gbuild module loaded from THIS tree before we go
+# on to load our own, so a previous run's copy cannot satisfy a sentinel check.
+# The case comparison follows the host filesystem. It used to be an inline
+# OSVersion.Platform ternary, which is the exact thing PathUtils.Get-PathComparison
+# exists to own - and this file imports PathUtils a few lines later, so the copy
+# had no defence other than being small.
+$gbuildPathComparison = if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
+foreach ($gbuildLoadedModule in @(Get-Module -ErrorAction SilentlyContinue)) {
+    if (-not $gbuildLoadedModule.Path) { continue }
+    try { $gbuildLoadedPath = [System.IO.Path]::GetFullPath($gbuildLoadedModule.Path) } catch { continue }
+    if ($gbuildLoadedPath.StartsWith($gbuildModulePrefix, $gbuildPathComparison)) {
+        Remove-Module -Name $gbuildLoadedModule.Name -Force -ErrorAction SilentlyContinue
+    }
+}
+Remove-Variable -Name gbuildModulesRoot,gbuildModulePrefix,gbuildPathComparison,gbuildLoadedModule,gbuildLoadedPath -ErrorAction SilentlyContinue
 
 # ============================================================================
 # -SyntaxCheck: parse every shipped script file without executing a build.
@@ -398,6 +405,66 @@ if ($SelfTest.IsPresent) {
             }
         } catch { $pmFail++; $failures.Add("process-metrics: $($_.Exception.Message)"); Write-Host (Resolve-LogMessage -Key 'log.gbuild.line382' -Fallback '[SELFTEST] process-metrics: FAILED') -ForegroundColor Red }
     }
+
+    # 6b. SPC control limits (UCL/LCL). The floor gate above decides "not worse
+    # than the committed minimum"; this gate decides "the process is stable".
+    # Limits come from the recorded trend history (last -Window samples); below
+    # MinSamples there is no verdict (fail-open) and the floor gate still
+    # applies. Fails only on a DOWNWARD shift below the effective LCL; UCL
+    # breaches are reported, never failed.
+    if (Get-Command Compare-BuildProcessControl -ErrorAction SilentlyContinue) {
+        try {
+            $ctl = Compare-BuildProcessControl -ToolRoot $PSScriptRoot
+            if (-not $ctl.HasLimits) {
+                $ok++
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.controlInsufficient' -MessageArgs @([string]$ctl.Samples) -Fallback ("[SELFTEST] process-control: insufficient history ({0} sample(s)) - no verdict; adoptionFloor applies" -f $ctl.Samples))
+            } elseif ($ctl.OutOfControl.Count -gt 0) {
+                $names = (@($ctl.OutOfControl | ForEach-Object { $_.Class }) -join ', ')
+                $failures.Add("process-control: below LCL: $names")
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.controlFailed' -MessageArgs @($names) -Fallback ("[SELFTEST] process-control: FAILED (below LCL: {0})" -f $names)) -ForegroundColor Red
+            } else {
+                $ok++
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.controlOk' -MessageArgs @([string]$ctl.Classes.Count, [string]$ctl.Window) -Fallback ("[SELFTEST] process-control: OK ({0} class(es) in control, window {1})" -f $ctl.Classes.Count, $ctl.Window))
+            }
+        } catch { $pmFail++; $failures.Add("process-control: $($_.Exception.Message)"); Write-Host (Resolve-LogMessage -Key 'log.gbuild.controlFailed' -MessageArgs @($_.Exception.Message) -Fallback ("[SELFTEST] process-control: FAILED ({0})" -f $_.Exception.Message)) -ForegroundColor Red }
+    } else { $pmFail++; $failures.Add('Compare-BuildProcessControl unavailable') }
+
+    # 6c. QPM measures (change failure rate + MTTR + escaped defects).
+    # The gate reads ONLY: (a) the window change-failure rate against the
+    # committed ceiling in Tests/process-baseline.json .qpm.maxChangeFailureRate,
+    # (b) the validity of the escaped-defect ledger (Tests/qpm-ledger.json).
+    # It deliberately does NOT gate on the escaped count: escapes happen, and a
+    # build cannot pass with an UNLOGGED escape - visibility plus review
+    # enforces logging, not the gate. Ceiling never rises to go green.
+    $qpmWindow = 50; $qpmMax = 0.10
+    try {
+        $b2 = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Tests/process-baseline.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+        if (($b2.PSObject.Properties.Name -contains 'qpm') -and $b2.qpm) {
+            if ($null -ne $b2.qpm.maxChangeFailureRate) { $qpmMax = [double]$b2.qpm.maxChangeFailureRate }
+            if ($null -ne $b2.qpm.windowSamples) { $qpmWindow = [int]$b2.qpm.windowSamples }
+        }
+    } catch { }
+    if (Get-Command Get-BuildQpmMeasures -ErrorAction SilentlyContinue) {
+        try {
+            $qpm = Get-BuildQpmMeasures -ToolRoot $PSScriptRoot -WindowSamples $qpmWindow
+            $qpmGateOk = $true
+            if (-not $qpm.LedgerValid) {
+                $qpmGateOk = $false; $pmFail++
+                $failures.Add("qpm ledger invalid: $(@($qpm.LedgerErrors) -join '; ')")
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.qpmLedgerFailed' -MessageArgs @([string]@($qpm.LedgerErrors).Count) -Fallback ("[SELFTEST] qpm: FAILED (escaped-defect ledger invalid: {0} error(s))" -f @($qpm.LedgerErrors).Count)) -ForegroundColor Red
+            }
+            if (($null -ne $qpm.ChangeFailureRate) -and ($qpm.ChangeFailureRate -gt $qpmMax)) {
+                $qpmGateOk = $false; $pmFail++
+                $failures.Add("qpm change failure rate $($qpm.ChangeFailureRate) exceeds ceiling $qpmMax over $($qpm.Samples) samples")
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.qpmRateFailed' -MessageArgs @([string]$qpm.ChangeFailureRate, [string]$qpmMax, [string]$qpm.Samples) -Fallback ("[SELFTEST] qpm: FAILED (change failure rate {0} exceeds ceiling {1} over {2} samples)" -f $qpm.ChangeFailureRate, $qpmMax, $qpm.Samples)) -ForegroundColor Red
+            }
+            if ($qpmGateOk) {
+                $ok++
+                $mttrText = if ($null -eq $qpm.MeanRecoveryTimeSeconds) { 'n/a' } else { "$($qpm.MeanRecoveryTimeSeconds)s" }
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.qpmOk' -MessageArgs @([string]$qpm.ChangeFailureRate, [string]$qpm.Samples, $mttrText, [string]$qpm.EscapedDefects) -Fallback ("[SELFTEST] qpm: OK (failure rate {0} over {1} sample(s); MTTR {2}; escaped defects {3}; ledger valid)" -f $qpm.ChangeFailureRate, $qpm.Samples, $mttrText, $qpm.EscapedDefects))
+            }
+        } catch { $pmFail++; $failures.Add("qpm: $($_.Exception.Message)") }
+    } else { $pmFail++; $failures.Add('Get-BuildQpmMeasures unavailable') }
 
     # PSScriptAnalyzer gate (error/warning). Runs only when the analyzer module
     # is available (CI installs PSScriptAnalyzer 1.25.0; local dev may use the

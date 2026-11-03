@@ -76,7 +76,7 @@ Describe 'Level 5 parity - single source of truth' {
 
     Context 'ModuleMap parity' {
         It 'Orchestrator defaultMap matches config build.menu.moduleMap keys' {
-            $orchFiles = @(Get-ChildItem -LiteralPath (Join-Path $buildRoot 'Modules') -Filter 'Orchestrator*.ps*' -File)
+            $orchFiles = @(Get-ChildItem -LiteralPath (Join-Path $buildRoot 'Modules') -Filter 'Orchestrator*.ps*' -File -Recurse)
             $orchText = ($orchFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
             $cfgMap = $script:cfg.build.menu.moduleMap
             foreach ($k in $cfgMap.PSObject.Properties.Name) {
@@ -85,7 +85,7 @@ Describe 'Level 5 parity - single source of truth' {
             }
         }
         It 'Get-ModuleMapFromConfig is exported (no orphan export gap)' {
-            $orchFiles = @(Get-ChildItem -LiteralPath (Join-Path $buildRoot 'Modules') -Filter 'Orchestrator*.ps*' -File)
+            $orchFiles = @(Get-ChildItem -LiteralPath (Join-Path $buildRoot 'Modules') -Filter 'Orchestrator*.ps*' -File -Recurse)
             $orchText = ($orchFiles | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8 }) -join "`n"
             $orchText | Should -Match 'Get-ModuleMapFromConfig' -Because 'function must exist'
             $orchText | Should -Match "Export-ModuleMember.*Get-ModuleMapFromConfig" -Because 'function must be exported'

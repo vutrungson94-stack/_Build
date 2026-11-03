@@ -1211,5 +1211,18 @@
   "log.gbuild.selftestEventContractFailed": "[SELFTEST] Ereignisvertrag: FEHLGESCHLAGEN ({0} Verstoß(e))",
   "log.gbuild.syntaxError": "[SYNTAX] {0}: {1}",
   "log.gbuild.syntaxError2": "[SYNTAX] {0}: {1}",
-  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] Prozessmetriken: FEHLGESCHLAGEN ({0} Klasse(n) unter dem Schwellwert)"
+  "log.gbuild.selftestProcessMetricsFailed": "[SELFTEST] Prozessmetriken: FEHLGESCHLAGEN ({0} Klasse(n) unter dem Schwellwert)",
+  "log.gbuild.controlOk": "[SELFTEST] process-control: OK ({0} Klasse(n) unter Kontrolle, Fenster {1})",
+  "log.gbuild.controlInsufficient": "[SELFTEST] process-control: unzureichende Historie ({0} Stichprobe(n)) - kein Urteil; adoptionFloor gilt weiterhin",
+  "log.gbuild.controlFailed": "[SELFTEST] process-control: FEHLGESCHLAGEN (unter der unteren Kontrollgrenze: {0})",
+  "log.gbuild.qpmOk": "[SELFTEST] qpm: OK (Fehlerrate {0} über {1} Stichprobe(n); MTTR {2}; entkommene Defekte {3}; Ledger gültig)",
+  "log.gbuild.qpmRateFailed": "[SELFTEST] qpm: FEHLGESCHLAGEN (Fehlerrate {0} überschreitet Obergrenze {1} bei {2} Stichproben)",
+  "log.gbuild.qpmLedgerFailed": "[SELFTEST] qpm: FEHLGESCHLAGEN (Escape-Defekt-Ledger ungültig: {0} Fehler)",
+  "log.hook.testRunnerMissing": "[gbuild hook] Tests/Run-CoreTests.ps1 nicht gefunden; Test-Gates übersprungen (bei Abwesenheit nie blockieren)",
+  "log.hook.testGatesSkipped": "[gbuild hook] GBUILD_HOOK_SKIP=1 - Test-Gates übersprungen (SyntaxCheck lief)",
+  "log.hook.reviewWaiver": "[gbuild hook] pre-push: WARNUNG - Review von Modules/ WAIVER, Grund vermerkt: {0}",
+  "log.hook.reviewBlocked": "[gbuild hook] pre-push: BLOCKIERT - dieser Push ändert Modules/ ohne unabhängige Review-Bestätigung.",
+  "log.hook.reviewChanged": "[gbuild hook] geändert unter Modules/:",
+  "log.hook.reviewHowTo": "[gbuild hook] Vorgehen: (1) ein Maintainer, der NICHT der Autor ist, prüft den Diff, (2) erneut pushen mit GBUILD_REVIEW_APPROVED=<name>, oder (3) die Commits mit Trailer 'Reviewed-by: <name>' ergänzen, oder (4) GBUILD_REVIEW_OVERRIDE=<grund> für einen expliziten, protokollierten Waiver (niemals eine Freigabe)",
+  "log.hook.reviewCi": "[gbuild hook] Die CI läuft trotzdem; dieses Gate existiert, damit Review ein bewusster Akt ist und keine umgangene Formalie."
 }

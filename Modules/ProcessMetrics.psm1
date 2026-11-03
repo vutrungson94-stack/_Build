@@ -1242,6 +1242,264 @@ function Find-RatchetCandidates {
     return @($out)
 }
 
+<#
+.SYNOPSIS
+    SPC gate: compares the CURRENT metrics against control limits (UCL/LCL) computed from the recorded trend history.
+.DESCRIPTION
+    The adoptionFloor in Tests/process-baseline.json is a point threshold - it cannot
+    tell a stable process from a drifting one. This function reads the last -Window
+    recorded runs from process-trend.jsonl, computes per-class control limits with
+    Get-ProcessControlLimits (population sigma, k = -Sigma), and fails when the
+    current run falls below its LCL, i.e. the process shifted DOWNWARD.
+
+    Two properties are deliberate:
+      * ZERO-VARIANCE HISTORY needs a slack or every microscopic wobble fails. The
+        slack is 1.5 quanta of ONE item not adopted (1/Total per class), so in a
+        perfect process one slipped item reports in-control and two fail.
+      * UCL breaches are REPORTED, never failed: this is an adoption metric, upper
+        is better, and a gate that fails on improvement trains people to fear it.
+      * Below -MinSamples there is no verdict (fail-open); a thin history never
+        fails a build, it prints insufficient-history instead.
+.PARAMETER Metrics
+    Current-run metrics object from Get-BuildProcessMetrics.
+.PARAMETER ToolRoot
+    Tool root that holds Tests/TestResults/process-trend.jsonl.
+.PARAMETER Window
+    Number of trailing samples used to compute the limits.
+.PARAMETER MinSamples
+    Minimum history size before a verdict is given.
+.PARAMETER Sigma
+    Width of the control limits in population standard deviations.
+.OUTPUTS
+    [PSCustomObject] with HasLimits, Classes[], OutOfControl[], Warnings[], Passed.
+#>
+function Compare-BuildProcessControl {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [PSCustomObject]$Metrics,
+        [string]$ToolRoot,
+        [int]$Window = 50,
+        [int]$MinSamples = 12,
+        [double]$Sigma = 3
+    )
+    if (-not $ToolRoot) { $ToolRoot = Split-Path -Parent $PSScriptRoot }
+    if (-not $Metrics) { $Metrics = Get-BuildProcessMetrics -ToolRoot $ToolRoot }
+    if ($Sigma -le 0) { $Sigma = 3 }
+    $history = @(Get-BuildProcessTrend -ToolRoot $ToolRoot -Last $Window)
+    $samples = $history.Count
+    $byClass = @{}
+    foreach ($h in $history) {
+        foreach ($c in @($h.classes)) {
+            $name = [string]$c.class
+            if (-not $byClass.ContainsKey($name)) { $byClass[$name] = New-Object System.Collections.Generic.List[double] }
+            try { $byClass[$name].Add([double]$c.adoption) | Out-Null } catch { }
+        }
+    }
+    $classes = [System.Collections.ArrayList]::new()
+    $outOfControl = [System.Collections.ArrayList]::new()
+    $warnings = [System.Collections.ArrayList]::new()
+    $insufficient = [System.Collections.ArrayList]::new()
+    foreach ($c in @($Metrics.Classes)) {
+        $name = [string]$c.Class
+        $total = [double]([int]([math]::Max(1, [int]$c.Total)))
+        $quantum = 1.0 / $total
+        $vals = if ($byClass.ContainsKey($name)) { @($byClass[$name]) } else { @() }
+        $cl = Get-ProcessControlLimits -Values $vals -Sigma $Sigma
+        if ($null -eq $cl) { [void]$insufficient.Add($name); continue }
+        $cur = [double]$c.Adoption
+        # Zero-variance slack: one slipped item is noise, two is signal.
+        $lclEff = [double]$cl.LCL - (1.5 * $quantum)
+        $failLow = $cur -lt $lclEff
+        $warnLow = (-not $failLow) -and ($cl.StdDev -gt 0) -and ($cur -lt ([double]$cl.Mean - (2.0 * [double]$cl.StdDev)))
+        $uclBreach = $cur -gt [double]$cl.UCL
+        if ($failLow) {
+            [void]$outOfControl.Add([PSCustomObject]@{ Class = $name; Current = [math]::Round($cur, 4); LCL = $cl.LCL; Mean = $cl.Mean; StdDev = $cl.StdDev; Quantum = [math]::Round($quantum, 4) })
+        } elseif ($warnLow) {
+            [void]$warnings.Add([PSCustomObject]@{ Class = $name; Current = [math]::Round($cur, 4); Mean = $cl.Mean; Note = 'below mean-2sigma (report only)' })
+        }
+        $classes.Add([PSCustomObject]@{
+            Class      = $name
+            Current    = [math]::Round($cur, 4)
+            Mean       = $cl.Mean
+            StdDev     = $cl.StdDev
+            UCL        = $cl.UCL
+            LCL        = $cl.LCL
+            LCLEffective = [math]::Round($lclEff, 4)
+            InControl  = (-not $failLow)
+            Notes      = if ($uclBreach) { 'above UCL (improvement)' } else { '' }
+        }) | Out-Null
+    }
+    $hasLimits = ($classes.Count -gt 0) -and ($samples -ge $MinSamples)
+    $passed = if (-not $hasLimits) { $true } else { $outOfControl.Count -eq 0 }
+    return [PSCustomObject]@{
+        Schema         = 'gbuild.process-control.v1'
+        MeasuredAtUtc  = (Get-Date).ToString('o')
+        Window         = $Window
+        MinSamples     = $MinSamples
+        Sigma          = $Sigma
+        Samples        = $samples
+        HasLimits      = $hasLimits
+        Classes        = @($classes)
+        OutOfControl   = @($outOfControl)
+        Warnings       = @($warnings)
+        Insufficient   = @($insufficient)
+        Passed         = $passed
+    }
+}
+
+<#
+.SYNOPSIS
+    Validates the QPM escaped-defect ledger (Tests/qpm-ledger.json).
+.DESCRIPTION
+    The ledger is the ONLY source for escaped-defect measures; without it every
+    QPM figure would be invented. Validation is manual (no Test-Json dependency,
+    PS 5.1-safe): parse, entry shape, id uniqueness and format, enum domains,
+    timestamps parse and are ordered. Returns Passed=$false with human-readable
+    Errors when anything is wrong - the self-test gate fails on that alone.
+.OUTPUTS
+    [PSCustomObject] with Passed, Entries, Errors, MeanRepairTimeSeconds.
+#>
+function Test-BuildQpmLedger {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [string]$ToolRoot,
+        [string]$Path
+    )
+    if (-not $ToolRoot) { $ToolRoot = Split-Path -Parent $PSScriptRoot }
+    if (-not $Path) { $Path = Join-Path $ToolRoot 'Tests/qpm-ledger.json' }
+    $errors = [System.Collections.ArrayList]::new()
+    $entries = @()
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        [void]$errors.Add("ledger not found: $Path")
+        return [PSCustomObject]@{ Schema = 'gbuild.qpm-ledger.v1'; Path = $Path; Passed = $false; Entries = @(); Errors = @($errors); MeanRepairTimeSeconds = $null }
+    }
+    try {
+        $raw = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
+        $doc = $raw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        [void]$errors.Add("ledger is not valid JSON: $($_.Exception.Message)")
+        return [PSCustomObject]@{ Schema = 'gbuild.qpm-ledger.v1'; Path = $Path; Passed = $false; Entries = @(); Errors = @($errors); MeanRepairTimeSeconds = $null }
+    }
+    if ($null -eq $doc -or -not ($doc.PSObject.Properties.Name -contains 'entries')) {
+        [void]$errors.Add('ledger has no entries[] array')
+        return [PSCustomObject]@{ Schema = 'gbuild.qpm-ledger.v1'; Path = $Path; Passed = $false; Entries = @(); Errors = @($errors); MeanRepairTimeSeconds = $null }
+    }
+    $entries = @($doc.entries)
+    $seen = @{}
+    $idPattern = '^QPM-[0-9]{4}-[0-9]{3}$'
+    $classes = @('escaped-defect', 'process-failure', 'near-miss')
+    $severities = @('low', 'medium', 'high', 'critical')
+    $repairSeconds = [System.Collections.Generic.List[double]]::new()
+    $idx = 0
+    foreach ($e in $entries) {
+        $idx++
+        $where = "entries[$idx]"
+        foreach ($field in @('id', 'detectedAtUtc', 'class', 'severity', 'scope', 'summary')) {
+            if (-not ($e.PSObject.Properties.Name -contains $field) -or $null -eq $e.$field -or [string]::IsNullOrWhiteSpace([string]$e.$field)) {
+                [void]$errors.Add("$where missing required field '$field'")
+            }
+        }
+        $id = [string]$e.id
+        if ($id -and ($id -notmatch $idPattern)) { [void]$errors.Add("$where id '$id' does not match $idPattern") }
+        if ($id) { if ($seen.ContainsKey($id)) { [void]$errors.Add("$where duplicate id '$id'") } else { $seen[$id] = $true } }
+        $cls = [string]$e.class
+        if ($cls -and ($classes -notcontains $cls)) { [void]$errors.Add("$where class '$cls' not in {$($classes -join ', ')}") }
+        $sev = [string]$e.severity
+        if ($sev -and ($severities -notcontains $sev)) { [void]$errors.Add("$where severity '$sev' not in {$($severities -join ', ')}") }
+        $detected = $null; $resolved = $null
+        try { $detected = [datetimeoffset]::Parse([string]$e.detectedAtUtc, [System.Globalization.CultureInfo]::InvariantCulture) } catch { [void]$errors.Add("$where detectedAtUtc '$($e.detectedAtUtc)' does not parse") }
+        if ($e.PSObject.Properties.Name -contains 'resolvedAtUtc' -and -not [string]::IsNullOrWhiteSpace([string]$e.resolvedAtUtc)) {
+            try { $resolved = [datetimeoffset]::Parse([string]$e.resolvedAtUtc, [System.Globalization.CultureInfo]::InvariantCulture) } catch { [void]$errors.Add("$where resolvedAtUtc '$($e.resolvedAtUtc)' does not parse") }
+        }
+        if ($detected -and $resolved) {
+            if ($resolved -lt $detected) { [void]$errors.Add("$where resolvedAtUtc is before detectedAtUtc") }
+            else { [void]$repairSeconds.Add(($resolved - $detected).TotalSeconds) | Out-Null }
+        }
+    }
+    $meanRepair = if ($repairSeconds.Count -gt 0) { [math]::Round(($repairSeconds | Measure-Object -Average).Average, 1) } else { $null }
+    return [PSCustomObject]@{
+        Schema                = 'gbuild.qpm-ledger.v1'
+        Path                  = $Path
+        Passed                = ($errors.Count -eq 0)
+        Entries               = @($entries)
+        Errors                = @($errors)
+        MeanRepairTimeSeconds = $meanRepair
+    }
+}
+
+<#
+.SYNOPSIS
+    QPM measures: change failure rate and meantime-to-recovery, from the trend file and the escaped-defect ledger.
+.DESCRIPTION
+    Two data sources, both local and honest - nothing is fabricated when data is absent, it reports DataQuality instead:
+      1. Tests/TestResults/process-trend.jsonl (schema gbuild.process-trend.v2) gives the
+         CHANGE FAILURE RATE of the verification process over the last -WindowSamples runs
+         (fraction with atParity=false) and the MEAN TIME TO RECOVERY, measured from each
+         failing streak to the first passing sample after it.
+      2. Tests/qpm-ledger.json (validated by Test-BuildQpmLedger) gives the ESCAPED DEFECT
+         count and the mean repair time across ledger entries that carry both timestamps.
+    All-time figures are always included for context; the gate reads only the window rate
+    and the ledger validity (see gbuild.ps1 -SelfTest and Tests/process-baseline.json .qpm).
+.OUTPUTS
+    [PSCustomObject] gbuild.qpm.v1
+#>
+function Get-BuildQpmMeasures {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [string]$ToolRoot,
+        [int]$WindowSamples = 50,
+        [int]$MinSamples = 12
+    )
+    if (-not $ToolRoot) { $ToolRoot = Split-Path -Parent $PSScriptRoot }
+    if ($WindowSamples -lt 1) { $WindowSamples = 50 }
+    $history = @(Get-BuildProcessTrend -ToolRoot $ToolRoot -Last $WindowSamples)
+    $samples = $history.Count
+    $failures = 0
+    foreach ($r in $history) { if (-not [bool]$r.atParity) { $failures++ } }
+    $rate = if ($samples -gt 0) { [math]::Round($failures / [double]$samples, 4) } else { $null }
+    $all = @(Get-BuildProcessTrend -ToolRoot $ToolRoot -Last 0)
+    $allFailures = 0
+    foreach ($r in $all) { if (-not [bool]$r.atParity) { $allFailures++ } }
+    $allRate = if ($all.Count -gt 0) { [math]::Round($allFailures / [double]$all.Count, 4) } else { $null }
+    $streakStart = $null
+    $recoveries = [System.Collections.Generic.List[double]]::new()
+    foreach ($r in $history) {
+        if (-not [bool]$r.atParity) {
+            if ($null -eq $streakStart) { try { $streakStart = [datetimeoffset]::Parse([string]$r.recordedAtUtc, [System.Globalization.CultureInfo]::InvariantCulture) } catch { } }
+        } else {
+            if ($null -ne $streakStart) {
+                try { [void]$recoveries.Add(([datetimeoffset]::Parse([string]$r.recordedAtUtc, [System.Globalization.CultureInfo]::InvariantCulture) - $streakStart).TotalSeconds) } catch { }
+                $streakStart = $null
+            }
+        }
+    }
+    $meanRecovery = if ($recoveries.Count -gt 0) { [math]::Round(($recoveries | Measure-Object -Average).Average, 1) } else { $null }
+    $ledger = Test-BuildQpmLedger -ToolRoot $ToolRoot
+    $escaped = @($ledger.Entries | Where-Object { $_.class -eq 'escaped-defect' })
+    $quality = if ($samples -ge $MinSamples) { 'measured' } else { 'insufficient-history' }
+    return [PSCustomObject]@{
+        Schema                  = 'gbuild.qpm.v1'
+        MeasuredAtUtc           = (Get-Date).ToString('o')
+        WindowSamples           = $WindowSamples
+        Samples                 = $samples
+        Failures                = $failures
+        ChangeFailureRate       = $rate
+        AllTimeSamples          = $all.Count
+        AllTimeFailures         = $allFailures
+        AllTimeChangeFailureRate = $allRate
+        RecoveryIncidents       = $recoveries.Count
+        MeanRecoveryTimeSeconds = $meanRecovery
+        EscapedDefects          = $escaped.Count
+        MeanRepairTimeSeconds   = $ledger.MeanRepairTimeSeconds
+        LedgerValid             = $ledger.Passed
+        LedgerErrors            = @($ledger.Errors)
+        DataQuality             = $quality
+    }
+}
+
 Export-ModuleMember -Function @(
     'Get-BuildProcessMetrics',
     'Get-BuildProcessTrendPath',
@@ -1251,6 +1509,9 @@ Export-ModuleMember -Function @(
     'Get-BuildProcessSparkline',
     'Get-ProcessControlLimits',
     'Test-ProcessInControl',
+    'Compare-BuildProcessControl',
+    'Test-BuildQpmLedger',
+    'Get-BuildQpmMeasures',
     'Get-FleetSLOSummary',
     'Publish-FleetSLOSummary',
     'Invoke-FleetRollup',
