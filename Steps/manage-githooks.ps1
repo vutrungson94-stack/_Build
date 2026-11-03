@@ -173,6 +173,15 @@ function New-HookContent {
     if (Get-Command Resolve-PowerShellHost -ErrorAction SilentlyContinue) {
         try { $resolved = [string](Resolve-PowerShellHost); if ($resolved) { $hostCommand = $resolved } } catch { }
     }
+    # Resolve to a FULL PATH when possible. A bare 'pwsh' relies on PATH being
+    # visible to the shell that runs the hook (sh.exe on Windows, which inherits
+    # a converted PATH that may not contain PowerShell's directory). Baking the
+    # absolute path removes that dependency. Portability is not a concern here:
+    # hooks are installed per-repository on the machine that uses them.
+    try {
+        $cmd = Get-Command $hostCommand -ErrorAction Stop
+        if ($cmd.Source -and (Test-Path -LiteralPath $cmd.Source -PathType Leaf)) { $hostCommand = $cmd.Source }
+    } catch { }
     $shHost = $hostCommand.Replace("'", "'\''")
     # A REAL POSIX SHIM, NOT A POWERSHELL SCRIPT. Git executes hooks itself; on
     # Windows that goes through sh.exe, which honoured the old
