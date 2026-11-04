@@ -633,15 +633,28 @@ function Test-PathUnderRoots {
     )
     if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
     $canonical = try { [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') } catch { return $false }
+    # On Unix/macOS /var is a symlink to /private/var. Resolve existing paths so
+    # a caller passing /var/folders/.../T/... matches a root that was resolved
+    # through GetFullPath/Resolve-Path to /private/var/folders/.../T/.
+    if ($IsMacOS -or $IsLinux) {
+        $resolved = $null
+        try { $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { }
+        if ($resolved) { $canonical = $resolved }
+    }
     # Case-insensitive matching ONLY on Windows (NTFS is case-insensitive);
     # ordinal everywhere else (Linux/macOS paths are case-sensitive).
     $cmp = Get-PathComparison
     foreach ($root in $AllowedRoots) {
         if ([string]::IsNullOrWhiteSpace($root)) { continue }
         $rootNorm = try { [System.IO.Path]::GetFullPath($root).TrimEnd('\', '/') } catch { continue }
+        if ($IsMacOS -or $IsLinux) {
+            $resolvedRoot = $null
+            try { $resolvedRoot = (Resolve-Path -LiteralPath $root -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { }
+            if ($resolvedRoot) { $rootNorm = $resolvedRoot }
+        }
         # Anchor on the trailing separator (mirrors Test-SafePath): exact match
-        # is accepted, but a SIBLING sharing the prefix (root 'C:\base' vs
-        # target 'C:\baseFoo\...') must be rejected.
+        # is accepted, but a SIBLING sharing the prefix (root 'C:\\base' vs
+        # target 'C:\\baseFoo\\...') must be rejected.
         if (($canonical -eq $rootNorm) -or
             $canonical.StartsWith($rootNorm + [System.IO.Path]::DirectorySeparatorChar, $cmp)) { return $true }
     }

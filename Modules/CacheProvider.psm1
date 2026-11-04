@@ -378,6 +378,17 @@ function Invoke-CacheEviction {
     foreach ($t in @('/tmp', '/private/tmp')) {
         if (-not ($safeRoots -contains $t)) { $safeRoots += $t }
     }
+    if ($IsMacOS) {
+        $varFolders = '/var/folders'
+        if (Test-Path -LiteralPath $varFolders -PathType Container) {
+            Get-ChildItem -Path $varFolders -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+                $tDir = Join-Path $_.FullName 'T'
+                if (Test-Path -LiteralPath $tDir -PathType Container -ErrorAction SilentlyContinue) {
+                    if (-not ($safeRoots -contains $tDir)) { $safeRoots += $tDir }
+                }
+            }
+        }
+    }
     if ($root -eq [System.IO.Path]::GetPathRoot($root)) { return 0 }
     foreach ($safeRoot in $safeRoots) { try { if ($root -eq ([System.IO.Path]::GetFullPath($safeRoot)).TrimEnd('\', '/')) { return 0 } } catch { } }
     $safe = $false; foreach ($safeRoot in $safeRoots) { if (Test-CachePathUnderRoot -Path $root -Root $safeRoot) { $safe = $true; break } }

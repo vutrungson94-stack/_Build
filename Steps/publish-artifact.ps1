@@ -90,6 +90,21 @@ foreach ($v in @($env:TEMP, $env:TMP, $env:TMPDIR)) { if ($v -and -not ($safeRoo
 foreach ($t in @('/tmp', '/private/tmp')) {
     if (-not ($safeRoots -contains $t)) { $safeRoots += $t }
 }
+# On macOS the per-user temp directory is /var/folders/<hash>/T/. Pester
+# TestDrive and New-IntegrationTempDir can land there, but .NET GetTempPath()
+# may return /tmp/ instead. Walk /var/folders/*/T so containment validation
+# accepts those test fixtures even when TMPDIR/GetTempPath() are not aligned.
+if ($IsMacOS) {
+    $varFolders = '/var/folders'
+    if (Test-Path -LiteralPath $varFolders -PathType Container) {
+        Get-ChildItem -Path $varFolders -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            $tDir = Join-Path $_.FullName 'T'
+            if (Test-Path -LiteralPath $tDir -PathType Container -ErrorAction SilentlyContinue) {
+                if (-not ($safeRoots -contains $tDir)) { $safeRoots += $tDir }
+            }
+        }
+    }
+}
 if (-not $SourceDir) {
     $publishOutput = Resolve-ConfigValue -State $State -Path 'paths.publishOutput' -Default (Get-BuildConstant -Key 'PublishOutputDir' -Fallback 'publish-output')
     $SourceDir = Resolve-StepPath -Base $root -Path $publishOutput

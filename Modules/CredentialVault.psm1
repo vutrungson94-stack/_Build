@@ -106,6 +106,17 @@ function Resolve-SafeVaultPath {
     foreach ($t in $unixTmpRoots) {
         if (-not $tmpRoots.Contains($t)) { $tmpRoots += $t }
     }
+    if ($IsMacOS) {
+        $varFolders = '/var/folders'
+        if (Test-Path -LiteralPath $varFolders -PathType Container) {
+            Get-ChildItem -Path $varFolders -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+                $tDir = Join-Path $_.FullName 'T'
+                if (Test-Path -LiteralPath $tDir -PathType Container -ErrorAction SilentlyContinue) {
+                    if (-not $tmpRoots.Contains($tDir)) { $tmpRoots += $tDir }
+                }
+            }
+        }
+    }
     $allowedRoots = @($root) + $tmpRoots
     # Containment itself is owned by PathUtils.Test-PathUnderRoots. The null /
     # placeholder checks above remain here because they produce different
