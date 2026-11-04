@@ -98,6 +98,14 @@ function Resolve-SafeVaultPath {
     $full = [System.IO.Path]::GetFullPath($candidate)
     $tmpRoots = @([System.IO.Path]::GetTempPath())
     foreach ($v in @($env:TEMP, $env:TMP, $env:TMPDIR)) { if ($v -and -not $tmpRoots.Contains($v)) { $tmpRoots += $v } }
+    # Pester on macOS/macOS runner uses /private/tmp (and /tmp is a symlink to it).
+    # .NET GetTempPath() may return the per-user TMPDIR (/var/folders/.../T/), which
+    # is a different directory. Add both so test fixtures under Pester's TestDrive
+    # are not rejected as "outside permitted roots".
+    $unixTmpRoots = @('/tmp', '/private/tmp')
+    foreach ($t in $unixTmpRoots) {
+        if (-not $tmpRoots.Contains($t)) { $tmpRoots += $t }
+    }
     $allowedRoots = @($root) + $tmpRoots
     # Containment itself is owned by PathUtils.Test-PathUnderRoots. The null /
     # placeholder checks above remain here because they produce different

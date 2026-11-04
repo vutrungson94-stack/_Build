@@ -371,6 +371,13 @@ function Invoke-CacheEviction {
     $safeRoots = @([System.IO.Path]::GetTempPath())
     if ($State -and $State.PSObject.Properties.Name -contains 'ProjectRoot' -and $State.ProjectRoot) { $safeRoots += [string]$State.ProjectRoot }
     if ($State -and $State.PSObject.Properties.Name -contains 'ScriptRoot' -and $State.ScriptRoot) { $safeRoots += [string]$State.ScriptRoot }
+    # Pester on macOS/macOS runner uses /private/tmp (and /tmp is a symlink to it).
+    # .NET GetTempPath() may return the per-user TMPDIR (/var/folders/.../T/), which
+    # is a different directory. Add both so test fixtures under Pester's TestDrive
+    # are not rejected as outside permitted roots.
+    foreach ($t in @('/tmp', '/private/tmp')) {
+        if (-not ($safeRoots -contains $t)) { $safeRoots += $t }
+    }
     if ($root -eq [System.IO.Path]::GetPathRoot($root)) { return 0 }
     foreach ($safeRoot in $safeRoots) { try { if ($root -eq ([System.IO.Path]::GetFullPath($safeRoot)).TrimEnd('\', '/')) { return 0 } } catch { } }
     $safe = $false; foreach ($safeRoot in $safeRoots) { if (Test-CachePathUnderRoot -Path $root -Root $safeRoot) { $safe = $true; break } }

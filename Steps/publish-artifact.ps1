@@ -90,6 +90,13 @@ if ($State -and $State.PSObject.Properties.Name -contains 'WorkingDir' -and $Sta
 # or output that lives under %TEMP% (which is where Pester and CI place them).
 $safeRoots += [System.IO.Path]::GetTempPath()
 foreach ($v in @($env:TEMP, $env:TMP)) { if ($v -and -not ($safeRoots -contains $v)) { $safeRoots += $v } }
+# Pester on macOS/macOS runner uses /private/tmp (and /tmp is a symlink to it).
+# .NET GetTempPath() may return the per-user TMPDIR (/var/folders/.../T/), which
+# is a different directory. Add both so test fixtures under Pester's TestDrive
+# are not rejected by containment validation.
+foreach ($t in @('/tmp', '/private/tmp')) {
+    if (-not ($safeRoots -contains $t)) { $safeRoots += $t }
+}
 if (-not $SourceDir) {
     $publishOutput = Resolve-ConfigValue -State $State -Path 'paths.publishOutput' -Default (Get-BuildConstant -Key 'PublishOutputDir' -Fallback 'publish-output')
     $SourceDir = Resolve-StepPath -Base $root -Path $publishOutput
