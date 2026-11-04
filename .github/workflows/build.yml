@@ -241,7 +241,8 @@ jobs:
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils' -StrictSkips
+          $env:GBUILD_SS_LIST = 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils'
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Diagnose Environment (on failure)
@@ -295,7 +296,8 @@ jobs:
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils' -StrictSkips
+          $env:GBUILD_SS_LIST = 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils'
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   container:
