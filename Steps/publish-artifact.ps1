@@ -85,23 +85,24 @@ $root = if ($State -and $State.ScriptRoot) { [string]$State.ScriptRoot } else { 
 $safeRoots = @($root)
 if ($State -and $State.PSObject.Properties.Name -contains 'ProjectRoot' -and $State.ProjectRoot) { $safeRoots += [string]$State.ProjectRoot }
 if ($State -and $State.PSObject.Properties.Name -contains 'WorkingDir' -and $State.WorkingDir) { $safeRoots += [string]$State.WorkingDir }
-# System temp is always a legitimate location for test fixtures and ephemeral
-# working directories; without it, containment validation rejects any source
-# or output that lives under %TEMP% (which is where Pester and CI place them).
 $safeRoots += [System.IO.Path]::GetTempPath()
 foreach ($v in @($env:TEMP, $env:TMP, $env:TMPDIR)) { if ($v -and -not ($safeRoots -contains $v)) { $safeRoots += $v } }
-# Pester on macOS/macOS runner uses /private/tmp (and /tmp is a symlink to it).
-# .NET GetTempPath() may return the per-user TMPDIR (/var/folders/.../T/), which
-# is a different directory. Add both so test fixtures under Pester's TestDrive
-# are not rejected by containment validation.
 foreach ($t in @('/tmp', '/private/tmp')) {
     if (-not ($safeRoots -contains $t)) { $safeRoots += $t }
 }
+Write-Host "[ARTIFACT-DEBUG] root=$root"
+Write-Host "[ARTIFACT-DEBUG] GetTempPath=$([System.IO.Path]::GetTempPath())"
+Write-Host "[ARTIFACT-DEBUG] TEMP=$env:TEMP"
+Write-Host "[ARTIFACT-DEBUG] TMP=$env:TMP"
+Write-Host "[ARTIFACT-DEBUG] TMPDIR=$env:TMPDIR"
+Write-Host "[ARTIFACT-DEBUG] safeRoots=$($safeRoots -join ',')"
 if (-not $SourceDir) {
     $publishOutput = Resolve-ConfigValue -State $State -Path 'paths.publishOutput' -Default (Get-BuildConstant -Key 'PublishOutputDir' -Fallback 'publish-output')
     $SourceDir = Resolve-StepPath -Base $root -Path $publishOutput
 }
 $SourceDir = Resolve-StepPath -Base $root -Path $SourceDir
+Write-Host "[ARTIFACT-DEBUG] SourceDir=$SourceDir"
+Write-Host "[ARTIFACT-DEBUG] SourceDir-containment=$(Test-StepPathUnderAny -Path $SourceDir -Roots $safeRoots)"
 if (-not $SourceDir -or -not (Test-StepPathUnderAny -Path $SourceDir -Roots $safeRoots)) { Write-Log (Resolve-LogMessage -Key 'log.artifact.sourceContainmentFailed' -MessageArgs @([string]$SourceDir) -Fallback '[ARTIFACT] Source failed containment validation: {0}') 'Err' $State; exit 1 }
 if (-not (Test-Path -LiteralPath $SourceDir -PathType Container)) { Write-Log (Resolve-LogMessage -Key 'log.artifact.sourceNotFound' -MessageArgs @([string]$SourceDir) -Fallback '[ARTIFACT] Source not found: {0}') 'Err' $State; exit 1 }
 if (Test-ReparsePointItem -Path $SourceDir) { Write-Log (Resolve-LogMessage -Key 'log.artifact.reparseSourceRejected' -Fallback '[ARTIFACT] Reparse-point source is not accepted.') 'Err' $State; exit 1 }
@@ -114,6 +115,8 @@ try {
 }
 if (-not $OutputDir) { $OutputDir = Join-Path $root (Get-BuildConstant -Key 'ReportOutputDir' -Fallback 'build-reports') }
 $OutputDir = Resolve-StepPath -Base $root -Path $OutputDir
+Write-Host "[ARTIFACT-DEBUG] OutputDir=$OutputDir"
+Write-Host "[ARTIFACT-DEBUG] OutputDir-containment=$(Test-StepPathUnderAny -Path $OutputDir -Roots $safeRoots)"
 if (-not $OutputDir -or -not (Test-StepPathUnderAny -Path $OutputDir -Roots $safeRoots)) { Write-Log (Resolve-LogMessage -Key 'log.artifact.invalidOutputDir' -Fallback '[ARTIFACT] Invalid output directory.') 'Err' $State; exit 1 }
 if (-not (Test-Path -LiteralPath $OutputDir -PathType Container)) { New-Item -ItemType Directory -Path $OutputDir -Force -ErrorAction Stop | Out-Null }
 if (Test-ReparsePointItem -Path $OutputDir) { Write-Log (Resolve-LogMessage -Key 'log.artifact.reparseOutputRejected' -Fallback '[ARTIFACT] Reparse-point output is not accepted.') 'Err' $State; exit 1 }
