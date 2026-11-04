@@ -294,11 +294,27 @@ jobs:
 
       - name: Smoke suite on macOS (critical scopes only)
         shell: pwsh
+        env:
+          GBUILD_SS_LIST: 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils'
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          $env:GBUILD_SS_LIST = 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils'
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Diagnose macOS test paths (on failure)
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "=== Temp paths on macOS ==="
+          Write-Host "GetTempPath(): $([System.IO.Path]::GetTempPath())"
+          Write-Host "TMPDIR: $env:TMPDIR"
+          Write-Host "TEMP: $env:TEMP"
+          Write-Host "TMP: $env:TMP"
+          Write-Host "=== Isolated scope logs ==="
+          Get-ChildItem -Path /tmp -Filter 'gbuild-scope-*.log' -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "----- $($_.FullName) -----"
+            Get-Content $_.FullName -ErrorAction SilentlyContinue
+          }
 
   container:
     name: Multi-architecture container build
