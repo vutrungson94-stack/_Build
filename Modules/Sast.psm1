@@ -509,7 +509,9 @@ function ConvertTo-SastFindings {
                 $findings.Add([PSCustomObject]@{ Tool = 'npm audit'; Severity = $severity; Rule = 'npm-audit'; File = 'package.json'; Line = ''; Message = Protect-SastText -Text ([string]$prop.Name) -State $null })
             }
         }
-        return @($findings.ToArray())
+        $result = @($findings.ToArray())
+        if ($result.Count -eq 0) { return @() }
+        return ,$result
     }
     if ($Tool -eq 'bandit') {
         $result = $Output | ConvertFrom-Json -ErrorAction Stop
@@ -518,7 +520,9 @@ function ConvertTo-SastFindings {
             if ($null -eq $item) { continue }
             $findings.Add([PSCustomObject]@{ Tool = 'bandit'; Severity = [string]$item.issue_severity; Rule = [string]$item.test_id; File = [string]$item.filename; Line = [string]$item.line_number; Message = Protect-SastText -Text ([string]$item.issue_text) -State $null })
         }
-        return @($findings.ToArray())
+        $result = @($findings.ToArray())
+        if ($result.Count -eq 0) { return @() }
+        return ,$result
     }
     if ($Tool -eq 'dotnet') {
         # A zero-finding report must yield ZERO findings. The `return ,@(...)`
@@ -543,7 +547,9 @@ function ConvertTo-SastFindings {
             if ($snippet.Length -gt 300) { $snippet = $snippet.Substring(0, 300) + '...' }
             throw (Resolve-LogMessage -Key 'log.sast.line543' -MessageArgs @([string]$snippet) -Fallback "unrecognized dotnet output: $snippet")
         }
-        return @($findings.ToArray())
+        $result = @($findings.ToArray())
+        if ($result.Count -eq 0) { return @() }
+        return ,$result
     }
     if ($Tool -eq 'cargo-audit') {
         $result = $Output | ConvertFrom-Json -ErrorAction Stop
@@ -551,7 +557,9 @@ function ConvertTo-SastFindings {
         foreach ($v in @($result.vulnerabilities.list)) {
             $findings.Add([PSCustomObject]@{ Tool = 'cargo-audit'; Severity = [string]$v.severity; Rule = [string]$v.advisory.id; File = ''; Line = ''; Message = Protect-SastText -Text ([string]$v.advisory.title) -State $null })
         }
-        return @($findings.ToArray())
+        $result = @($findings.ToArray())
+        if ($result.Count -eq 0) { return @() }
+        return ,$result
     }
     if ($Tool -eq 'gosec') {
         $result = $Output | ConvertFrom-Json -ErrorAction Stop
@@ -559,7 +567,9 @@ function ConvertTo-SastFindings {
         foreach ($i in @($result.Issues)) {
             $findings.Add([PSCustomObject]@{ Tool = 'gosec'; Severity = [string]$i.severity; Rule = [string]$i.rule_id; File = [string]$i.file; Line = [string]$i.line; Message = Protect-SastText -Text ([string]$i.details) -State $null })
         }
-        return @($findings.ToArray())
+        $result = @($findings.ToArray())
+        if ($result.Count -eq 0) { return @() }
+        return ,$result
     }
     $safe = Protect-SastText -Text $Output.Trim() -State $null
     if ($safe) {
@@ -568,7 +578,9 @@ function ConvertTo-SastFindings {
     }
     # Same zero-finding contract as the branches above: a whitespace-only report
     # from an unrecognised tool must yield zero findings, not one empty one.
-    return @($findings.ToArray())
+    $result = @($findings.ToArray())
+    if ($result.Count -eq 0) { return @() }
+    return ,$result
 }
 
 function Invoke-SastTool {

@@ -1,6 +1,9 @@
 ﻿#Requires -Version 5.1
 #Requires -Module Pester
 
+# PS 5.1 compatibility shim for $IsWindows/$IsLinux/$IsMacOS
+. (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'PlatformShim.ps1'))
+
 Set-StrictMode -Version 1.0
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSCommandPath)) 'Modules'
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop

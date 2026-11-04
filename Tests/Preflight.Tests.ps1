@@ -1,5 +1,8 @@
 ﻿Set-StrictMode -Version 1.0
 
+# PS 5.1 compatibility shim for $IsWindows/$IsLinux/$IsMacOS
+. (Join-Path $PSScriptRoot 'Helpers/PlatformShim.ps1')
+
 $modulePath = Join-Path $PSScriptRoot '../Modules/Preflight.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
