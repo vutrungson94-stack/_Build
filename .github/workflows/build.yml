@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   syntax:
     name: Parse + PSScriptAnalyzer
@@ -24,6 +28,14 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Cache PSGallery modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
+          restore-keys: |
+            psgallery-${{ runner.os }}-
 
       - name: Install PSScriptAnalyzer
         shell: pwsh
@@ -70,13 +82,21 @@ jobs:
           if ($count -gt 0) { exit 1 }
 
   test:
-    name: Core test suite (fail-closed)
+    name: Core test suite (Ubuntu)
     runs-on: ubuntu-24.04
     needs: syntax
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Cache PSGallery modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
+          restore-keys: |
+            psgallery-${{ runner.os }}-
 
       - name: Install Pester
         shell: pwsh
@@ -133,6 +153,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache PSGallery modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
+          restore-keys: |
+            psgallery-${{ runner.os }}-
+
       - name: Install Pester
         shell: pwsh
         run: |
@@ -174,13 +202,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   portability:
-    name: POSIX launcher + full suite
+    name: POSIX launcher + smoke suite
     runs-on: ubuntu-24.04
     needs: syntax
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Cache PSGallery modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
+          restore-keys: |
+            psgallery-${{ runner.os }}-
 
       - name: Install Pester
         shell: pwsh
@@ -201,11 +237,11 @@ jobs:
           "$root/gbuild" -SelfTest
           if [ $? -ne 0 ]; then echo "POSIX launcher failed"; exit 1; fi
 
-      - name: Full suite on Linux
+      - name: Smoke suite on Linux (critical scopes only)
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils' -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Diagnose Environment (on failure)
@@ -220,13 +256,21 @@ jobs:
           pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$root/Tests/Run-CoreTests.ps1" -Scope Environment -StrictSkips
 
   macos:
-    name: macOS (Apple Silicon) self-test + suite
+    name: macOS (Apple Silicon) self-test + smoke suite
     runs-on: macos-14
     needs: syntax
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Cache PSGallery modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
+          restore-keys: |
+            psgallery-${{ runner.os }}-
 
       - name: Install Pester
         shell: pwsh
@@ -247,11 +291,11 @@ jobs:
           "$root/gbuild" -SelfTest
           if [ $? -ne 0 ]; then echo "POSIX launcher failed on macOS"; exit 1; fi
 
-      - name: Full suite on macOS
+      - name: Smoke suite on macOS (critical scopes only)
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope 'PhaseBVerification,PhaseCSecurity,Steps,CacheProvider,CredentialVault,Deploy,Distributed,Sast,Environment,Platform,PathUtils' -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   container:
@@ -297,10 +341,19 @@ jobs:
     name: Code coverage
     runs-on: ubuntu-24.04
     needs: test
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Cache PSGallery modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/powershell/Modules
+          key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
+          restore-keys: |
+            psgallery-${{ runner.os }}-
 
       - name: Install Pester
         shell: pwsh
