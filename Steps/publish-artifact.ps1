@@ -90,19 +90,11 @@ foreach ($v in @($env:TEMP, $env:TMP, $env:TMPDIR)) { if ($v -and -not ($safeRoo
 foreach ($t in @('/tmp', '/private/tmp')) {
     if (-not ($safeRoots -contains $t)) { $safeRoots += $t }
 }
-Write-Host "[ARTIFACT-DEBUG] root=$root"
-Write-Host "[ARTIFACT-DEBUG] GetTempPath=$([System.IO.Path]::GetTempPath())"
-Write-Host "[ARTIFACT-DEBUG] TEMP=$env:TEMP"
-Write-Host "[ARTIFACT-DEBUG] TMP=$env:TMP"
-Write-Host "[ARTIFACT-DEBUG] TMPDIR=$env:TMPDIR"
-Write-Host "[ARTIFACT-DEBUG] safeRoots=$($safeRoots -join ',')"
 if (-not $SourceDir) {
     $publishOutput = Resolve-ConfigValue -State $State -Path 'paths.publishOutput' -Default (Get-BuildConstant -Key 'PublishOutputDir' -Fallback 'publish-output')
     $SourceDir = Resolve-StepPath -Base $root -Path $publishOutput
 }
 $SourceDir = Resolve-StepPath -Base $root -Path $SourceDir
-Write-Host "[ARTIFACT-DEBUG] SourceDir=$SourceDir"
-Write-Host "[ARTIFACT-DEBUG] SourceDir-containment=$(Test-StepPathUnderAny -Path $SourceDir -Roots $safeRoots)"
 if (-not $SourceDir -or -not (Test-StepPathUnderAny -Path $SourceDir -Roots $safeRoots)) { Write-Log (Resolve-LogMessage -Key 'log.artifact.sourceContainmentFailed' -MessageArgs @([string]$SourceDir) -Fallback '[ARTIFACT] Source failed containment validation: {0}') 'Err' $State; exit 1 }
 if (-not (Test-Path -LiteralPath $SourceDir -PathType Container)) { Write-Log (Resolve-LogMessage -Key 'log.artifact.sourceNotFound' -MessageArgs @([string]$SourceDir) -Fallback '[ARTIFACT] Source not found: {0}') 'Err' $State; exit 1 }
 if (Test-ReparsePointItem -Path $SourceDir) { Write-Log (Resolve-LogMessage -Key 'log.artifact.reparseSourceRejected' -Fallback '[ARTIFACT] Reparse-point source is not accepted.') 'Err' $State; exit 1 }
@@ -115,8 +107,6 @@ try {
 }
 if (-not $OutputDir) { $OutputDir = Join-Path $root (Get-BuildConstant -Key 'ReportOutputDir' -Fallback 'build-reports') }
 $OutputDir = Resolve-StepPath -Base $root -Path $OutputDir
-Write-Host "[ARTIFACT-DEBUG] OutputDir=$OutputDir"
-Write-Host "[ARTIFACT-DEBUG] OutputDir-containment=$(Test-StepPathUnderAny -Path $OutputDir -Roots $safeRoots)"
 if (-not $OutputDir -or -not (Test-StepPathUnderAny -Path $OutputDir -Roots $safeRoots)) { Write-Log (Resolve-LogMessage -Key 'log.artifact.invalidOutputDir' -Fallback '[ARTIFACT] Invalid output directory.') 'Err' $State; exit 1 }
 if (-not (Test-Path -LiteralPath $OutputDir -PathType Container)) { New-Item -ItemType Directory -Path $OutputDir -Force -ErrorAction Stop | Out-Null }
 if (Test-ReparsePointItem -Path $OutputDir) { Write-Log (Resolve-LogMessage -Key 'log.artifact.reparseOutputRejected' -Fallback '[ARTIFACT] Reparse-point output is not accepted.') 'Err' $State; exit 1 }
