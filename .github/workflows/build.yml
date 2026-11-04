@@ -311,7 +311,8 @@ jobs:
           Write-Host "TEMP: $env:TEMP"
           Write-Host "TMP: $env:TMP"
           Write-Host "=== Isolated scope logs ==="
-          Get-ChildItem -Path /tmp -Filter 'gbuild-scope-*.log' -ErrorAction SilentlyContinue | ForEach-Object {
+          $logDir = [System.IO.Path]::GetTempPath()
+          Get-ChildItem -Path $logDir -Filter 'gbuild-scope-*.log' -ErrorAction SilentlyContinue | ForEach-Object {
             Write-Host "----- $($_.FullName) -----"
             Get-Content $_.FullName -ErrorAction SilentlyContinue
           }
