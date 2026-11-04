@@ -67,6 +67,7 @@ if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.C
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Targets.ps1')) { . (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Targets.ps1') }
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Modules.ps1')) { . (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Modules.ps1') }
 if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Pipeline.ps1')) { . (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Pipeline.ps1') }
+if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Pipeline.Events.ps1')) { . (Join-Path $PSScriptRoot 'Orchestrator/Orchestrator.Pipeline.Events.ps1') }
 Set-StrictMode -Version 1.0
 # Lazy module loader - imports a module only if not already loaded (idempotent).
 # Used to defer loading of non-core modules until a menu choice actually needs them.
