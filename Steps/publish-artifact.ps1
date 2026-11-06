@@ -82,8 +82,35 @@ function Test-StepOutputPath {
 
 function Test-StepPathUnderAny {
     param([string]$Path, [string[]]$Roots)
+    # Containment only. Reparse-point handling is performed separately by the
+    # caller (Test-ReparsePointItem) so an OS-level alias such as macOS /var
+    # does not make a legitimate temp path fail this check.
     foreach ($candidateRoot in @($Roots)) {
-        if (Test-StepOutputPath -Path $Path -Root $candidateRoot) { return $true }
+        if ([string]::IsNullOrWhiteSpace($candidateRoot)) { continue }
+        $pathFull = try { [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') } catch { continue }
+        $rootFull = try { [System.IO.Path]::GetFullPath($candidateRoot).TrimEnd('\', '/') } catch { continue }
+        if (Test-Path -LiteralPath $Path) { try { $pathFull = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { } }
+        if (Test-Path -LiteralPath $candidateRoot) { try { $rootFull = (Resolve-Path -LiteralPath $candidateRoot -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { } }
+        $rootCandidates = @($rootFull)
+        if ($rootFull -like '/var/*') { $rootCandidates += ('/private' + $rootFull) }
+        if ($rootFull -like '/private/var/*') { $rootCandidates += ($rootFull -replace '^/private', '') }
+        if ($rootFull -like '/tmp/*' -or $rootFull -eq '/tmp') { $rootCandidates += ('/private' + $rootFull) }
+        if ($rootFull -like '/private/tmp/*' -or $rootFull -eq '/private/tmp') { $rootCandidates += ($rootFull -replace '^/private', '') }
+        $pathCandidates = @($pathFull)
+        if ($pathFull -like '/var/*') { $pathCandidates += ('/private' + $pathFull) }
+        if ($pathFull -like '/private/var/*') { $pathCandidates += ($pathFull -replace '^/private', '') }
+        if ($pathFull -like '/tmp/*' -or $pathFull -eq '/tmp') { $pathCandidates += ('/private' + $pathFull) }
+        if ($pathFull -like '/private/tmp/*' -or $pathFull -eq '/private/tmp') { $pathCandidates += ($pathFull -replace '^/private', '') }
+        foreach ($r in $rootCandidates) {
+            if ([string]::IsNullOrWhiteSpace($r)) { continue }
+            $cmp = Get-PathComparison
+            foreach ($pc in $pathCandidates) {
+                if ([string]::IsNullOrWhiteSpace($pc)) { continue }
+                if ($pc -eq $r) { return $true }
+                $sep = [System.IO.Path]::DirectorySeparatorChar
+                if ($pc.StartsWith($r + $sep, $cmp)) { return $true }
+            }
+        }
     }
     return $false
 }
