@@ -50,17 +50,33 @@ function Resolve-StepPath {
 function Test-StepOutputPath {
     param([string]$Path, [string]$Root)
     if ([string]::IsNullOrWhiteSpace($Path) -or [string]::IsNullOrWhiteSpace($Root)) { return $false }
-    if ((Get-Command Test-PathUnderRoots -ErrorAction SilentlyContinue) -and (Get-Command Test-NoReparsePointInPath -ErrorAction SilentlyContinue)) {
-        try {
-            if (-not (Test-PathUnderRoots -Path $Path -AllowedRoots @($Root))) { return $false }
-            return [bool](Test-NoReparsePointInPath -Path $Path)
-        } catch { return $false }
+    $sharedOk = $false
+    if ((Get-Command Test-PathUnderRoots -ErrorAction SilentlyContinue)) {
+        try { if (Test-PathUnderRoots -Path $Path -AllowedRoots @($Root)) { $sharedOk = $true } } catch { }
     }
-    # Fail closed. This was the sixth copy of the containment + reparse walk
-    # (Android, CacheProvider, Deploy, DeployTargets, Distributed and this
-    # step), each with its own hand-inlined copy of PathUtils' canonical rule.
-    # The safe answer when that single source is unavailable is to refuse the
-    # path - an archive must never be written outside its declared root.
+    if ($sharedOk) {
+        if (Get-Command Test-NoReparsePointInPath -ErrorAction SilentlyContinue) {
+            try { return [bool](Test-NoReparsePointInPath -Path $Path) } catch { return $false }
+        }
+        return $true
+    }
+    # Cross-platform fallback. On macOS, /var is a symlink to /private/var, and
+    # a path that does not yet exist cannot be resolved by Resolve-Path. Compare
+    # both the raw and resolved forms, and account for the /var <-> /private/var
+    # alias, so containment checks do not fail closed on legitimate paths.
+    $pathFull = try { [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') } catch { return $false }
+    $rootFull = try { [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/') } catch { return $false }
+    if (Test-Path -LiteralPath $Path) { try { $pathFull = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { } }
+    if (Test-Path -LiteralPath $Root) { try { $rootFull = (Resolve-Path -LiteralPath $Root -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { } }
+    $candidates = @($rootFull)
+    if ($rootFull -like '/var/*') { $candidates += ('/private' + $rootFull) }
+    if ($rootFull -like '/private/var/*') { $candidates += ($rootFull -replace '^/private', '') }
+    foreach ($r in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($r)) { continue }
+        if ($pathFull -eq $r) { return $true }
+        $sep = [System.IO.Path]::DirectorySeparatorChar
+        if ($pathFull.StartsWith($r + $sep)) { return $true }
+    }
     return $false
 }
 
