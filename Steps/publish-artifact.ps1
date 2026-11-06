@@ -89,6 +89,10 @@ function Test-StepPathUnderAny {
     if (Get-Command Get-PathComparison -ErrorAction SilentlyContinue) { try { $cmp = Get-PathComparison } catch { } }
     foreach ($candidateRoot in @($Roots)) {
         if ([string]::IsNullOrWhiteSpace($candidateRoot)) { continue }
+        # Try shared containment owner first (no reparse check here).
+        if (Get-Command Test-PathUnderRoots -ErrorAction SilentlyContinue) {
+            try { if (Test-PathUnderRoots -Path $Path -AllowedRoots @($candidateRoot)) { return $true } } catch { }
+        }
         $pathFull = try { [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') } catch { continue }
         $rootFull = try { [System.IO.Path]::GetFullPath($candidateRoot).TrimEnd('\', '/') } catch { continue }
         if (Test-Path -LiteralPath $Path) { try { $pathFull = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { } }
