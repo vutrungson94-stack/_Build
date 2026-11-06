@@ -258,7 +258,7 @@ jobs:
 
   macos:
     name: macOS (Apple Silicon) self-test + smoke suite
-    runs-on: macos-14
+    runs-on: macos-15
     needs: syntax
     steps:
       - uses: actions/checkout@v7
