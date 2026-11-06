@@ -636,6 +636,9 @@ function Test-PathUnderRoots {
     # On Unix/macOS /var is a symlink to /private/var. Resolve existing paths so
     # a caller passing /var/folders/.../T/... matches a root that was resolved
     # through GetFullPath/Resolve-Path to /private/var/folders/.../T/.
+    # On Unix/macOS /var is a symlink to /private/var. Resolve existing paths so
+    # a caller passing /var/folders/.../T/... matches a root that was resolved
+    # through GetFullPath/Resolve-Path to /private/var/folders/.../T/.
     if ($IsMacOS -or $IsLinux) {
         $resolved = $null
         try { $resolved = (Resolve-Path -LiteralPath $Path -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { }
@@ -652,11 +655,26 @@ function Test-PathUnderRoots {
             try { $resolvedRoot = (Resolve-Path -LiteralPath $root -ErrorAction Stop).Path.TrimEnd('\', '/') } catch { }
             if ($resolvedRoot) { $rootNorm = $resolvedRoot }
         }
-        # Anchor on the trailing separator (mirrors Test-SafePath): exact match
-        # is accepted, but a SIBLING sharing the prefix (root 'C:\\base' vs
-        # target 'C:\\baseFoo\\...') must be rejected.
-        if (($canonical -eq $rootNorm) -or
-            $canonical.StartsWith($rootNorm + [System.IO.Path]::DirectorySeparatorChar, $cmp)) { return $true }
+        # macOS /var <-> /private/var alias handling for paths that do not
+        # exist yet (e.g. a zip file about to be created): GetFullPath leaves
+        # /var/... untouched while an existing root resolves to /private/var/...,
+        # which would otherwise make a legitimate child fail containment.
+        $rootCandidates = @($rootNorm)
+        if ($rootNorm -like '/var/*') { $rootCandidates += ('/private' + $rootNorm) }
+        if ($rootNorm -like '/private/var/*') { $rootCandidates += ($rootNorm -replace '^/private', '') }
+        if ($rootNorm -like '/tmp/*' -or $rootNorm -eq '/tmp') { $rootCandidates += ('/private' + $rootNorm) }
+        if ($rootNorm -like '/private/tmp/*' -or $rootNorm -eq '/private/tmp') { $rootCandidates += ($rootNorm -replace '^/private', '') }
+        $pathCandidates = @($canonical)
+        if ($canonical -like '/var/*') { $pathCandidates += ('/private' + $canonical) }
+        if ($canonical -like '/private/var/*') { $pathCandidates += ($canonical -replace '^/private', '') }
+        if ($canonical -like '/tmp/*' -or $canonical -eq '/tmp') { $pathCandidates += ('/private' + $canonical) }
+        if ($canonical -like '/private/tmp/*' -or $canonical -eq '/private/tmp') { $pathCandidates += ($canonical -replace '^/private', '') }
+        foreach ($rc in $rootCandidates) {
+            foreach ($pc in $pathCandidates) {
+                if ([string]::IsNullOrWhiteSpace($rc) -or [string]::IsNullOrWhiteSpace($pc)) { continue }
+                if (($pc -eq $rc) -or $pc.StartsWith($rc + [System.IO.Path]::DirectorySeparatorChar, $cmp)) { return $true }
+            }
+        }
     }
     return $false
 }
