@@ -85,6 +85,8 @@ function Test-StepPathUnderAny {
     # Containment only. Reparse-point handling is performed separately by the
     # caller (Test-ReparsePointItem) so an OS-level alias such as macOS /var
     # does not make a legitimate temp path fail this check.
+    $cmp = [System.StringComparison]::Ordinal
+    if (Get-Command Get-PathComparison -ErrorAction SilentlyContinue) { try { $cmp = Get-PathComparison } catch { } }
     foreach ($candidateRoot in @($Roots)) {
         if ([string]::IsNullOrWhiteSpace($candidateRoot)) { continue }
         $pathFull = try { [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/') } catch { continue }
@@ -103,7 +105,6 @@ function Test-StepPathUnderAny {
         if ($pathFull -like '/private/tmp/*' -or $pathFull -eq '/private/tmp') { $pathCandidates += ($pathFull -replace '^/private', '') }
         foreach ($r in $rootCandidates) {
             if ([string]::IsNullOrWhiteSpace($r)) { continue }
-            $cmp = Get-PathComparison
             foreach ($pc in $pathCandidates) {
                 if ([string]::IsNullOrWhiteSpace($pc)) { continue }
                 if ($pc -eq $r) { return $true }
