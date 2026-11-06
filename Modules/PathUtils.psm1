@@ -741,6 +741,20 @@ function Test-NoReparsePointInPath {
     if ([string]::IsNullOrWhiteSpace($Path)) { return $false }
     try {
         $current = [System.IO.Path]::GetFullPath($Path)
+        # On macOS /var (and /tmp) are symlinks to /private/var (and /private/tmp).
+        # Resolve the path (or its parent when it does not exist yet, e.g. a zip
+        # about to be created) so the reparse-point walk does not reject the
+        # OS-level alias itself while still catching symlinks inside a project.
+        $probe = $current
+        if (-not (Test-Path -LiteralPath $probe)) {
+            $probe = Split-Path -Parent $probe
+        }
+        if ($probe -and (Test-Path -LiteralPath $probe)) {
+            try {
+                $resolved = (Resolve-Path -LiteralPath $probe -ErrorAction Stop).Path
+                if ($resolved) { $current = $resolved }
+            } catch { }
+        }
         while ($current) {
             if (Test-Path -LiteralPath $current) {
                 $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
