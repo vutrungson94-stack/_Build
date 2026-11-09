@@ -88,6 +88,7 @@ single-repo platform that is the expected ceiling.
 | 7 | `Set-StrictMode` absent from 3 production files | — | Intentional: `ModuleBootstrap.ps1`, `OrchestratorLifecycle.ps1`, `Orchestrator.Pipeline.Events.ps1` are dot-sourced and inherit it from the caller |
 | 8 | `README.md` claims `Docs/` holds ADRs | Low | Open — see recommendation 5 |
 | 9 | `_Tests/gtest.ps1 -Project .` on `_Build` reports ~16 false failures | Medium | Documented in `AGENTS.md`; the harness's PowerShell runner is not scope-isolated. Authoritative path is `Tests/Run-CoreTests.ps1` |
+| 10 | macOS CI failed 12 tests (Steps / CacheProvider / Deploy / Distributed / Sast) with "Archive path escaped output directory" while Windows + Linux were green | High | `PathUtils.Test-NoReparsePointInPath` now stops at the `/var`, `/tmp`, `/private/var`, `/private/tmp` OS aliases instead of rejecting every temp path; regression test added to `Tests/PathUtils.Tests.ps1` |
 
 ## Prioritised remediation
 

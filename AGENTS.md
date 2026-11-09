@@ -80,9 +80,16 @@ Real escaped defects from this repo, both found after a "green" commit:
 - `publish-artifact.ps1` — a containment check compared raw paths, so a macOS
   `/var/folders/...` fixture was rejected as outside the permitted roots and the
   artifact step failed on every macOS run.
+- `PathUtils.Test-NoReparsePointInPath` — a macOS CI run failed 12 tests across
+  Steps / CacheProvider / Deploy / Distributed / Sast with "Archive path escaped
+  output directory". Every temp path goes through `/var` → `/private/var`, and
+  `Resolve-Path` does not resolve that alias, so the chain walk rejected every
+  temp path on the platform. Windows and Linux were green, which is exactly why
+  a local run could not see it.
 
-Both were invisible to a single "it works on my machine" pass. Both are now
-pinned by tests and by `-SelfTest` gates.
+All of these were invisible to a single "it works on my machine" pass. They are
+now pinned by tests and by `-SelfTest` gates — and the macOS ones by a test that
+runs on the platform that exposed them.
 
 ## 4. Invariants — breaking these is a regression, not a feature
 
@@ -121,6 +128,14 @@ pinned by tests and by `-SelfTest` gates.
   - macOS: `/var` is a symlink to `/private/var`; Pester `$TestDrive` is under
     `/private/tmp`; the per-user TMPDIR is `/var/folders/<hash>/T/`. Containment
     checks must accept all of these.
+  - **A reparse-point walk must STOP at an OS alias, never reject it.**
+    `Resolve-Path` does NOT resolve symlinks (proven on a Windows junction and
+    on the macOS CI runner), so a chain walk that flags every `ReparsePoint`
+    rejects EVERY temp path on macOS (`/var`, `/tmp`). The single owner,
+    `PathUtils.Test-NoReparsePointInPath`, stops at `/var`, `/tmp`,
+    `/private/var` and `/private/tmp` on POSIX. Do not "simplify" that away,
+    and do not add a new reparse walk without the same stop. A user-planted
+    symlink BELOW the boundary must still be rejected.
   - Windows PowerShell 5.1 has no `$IsWindows` / `$IsLinux` / `$IsMacOS`.
     Import `Tests/Helpers/PlatformShim.ps1` in tests that branch on them.
   - `-Encoding UTF8` on every file read/write.

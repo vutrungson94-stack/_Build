@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+#Re#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -66,6 +66,27 @@ Describe 'PathUtils - security (path traversal guard)' {
 
     It 'Test-SafePath rejects mixed-separator traversal' {
         Test-SafePath -Path 'sub\..\..\secret' -Base $global:ptBase | Should -BeFalse
+    }
+
+    It 'Test-NoReparsePointInPath accepts a not-yet-created child under the temp root' {
+        # Regression (macOS CI 2026-11-09): every temp path goes through
+        # /var -> /private/var, an OS alias that Resolve-Path does NOT resolve
+        # (proven on a Windows junction and on the macOS runner). The walk must
+        # STOP at the alias instead of rejecting the path; without it
+        # Steps/CacheProvider/Deploy/Distributed fail on macOS with
+        # "Archive path escaped output directory".
+        $out = Join-Path $global:ptBase 'out'
+        New-Item -ItemType Directory -Path $out -Force | Out-Null
+        Test-NoReparsePointInPath -Path (Join-Path $out 'build-output.zip') | Should -BeTrue
+    }
+
+    It 'Test-NoReparsePointInPath stops at the OS aliases (/var, /tmp), not above them' -Skip:([System.Environment]::OSVersion.Platform -eq 'Win32NT') {
+        # On macOS /var and /tmp are symlinks to /private/var and /private/tmp.
+        # The walk must treat them as the boundary, exactly as it treats a
+        # project root: a symlink ABOVE the boundary is infrastructure, a
+        # symlink BELOW it is a traversal.
+        Test-NoReparsePointInPath -Path '/var/folders/xx/T/gbutil/out/build-output.zip' | Should -BeTrue
+        Test-NoReparsePointInPath -Path '/tmp/gbutil/out/build-output.zip' | Should -BeTrue
     }
 }
 

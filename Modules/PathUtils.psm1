@@ -755,10 +755,25 @@ function Test-NoReparsePointInPath {
                 if ($resolved) { $current = $resolved }
             } catch { }
         }
+        $isPosixHost = -not (Test-IsWindowsHost)
         while ($current) {
             if (Test-Path -LiteralPath $current) {
                 $item = Get-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue
-                if ($item -and ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { return $false }
+                if ($item -and ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+                    # OS-level alias symlinks are mapping infrastructure, not a
+                    # user-planted traversal. On macOS /var -> /private/var and
+                    # /tmp -> /private/tmp, and EVERY temp path goes through one
+                    # of them. Resolve-Path does NOT resolve them (proven on a
+                    # Windows junction and on the macOS CI runner), so the walk
+                    # must STOP at the alias instead of rejecting the path.
+                    # Without this, Steps / CacheProvider / Deploy / Distributed
+                    # fail on macOS with "Archive path escaped output directory".
+                    if ($isPosixHost) {
+                        $norm = $current.TrimEnd('\\', '/')
+                        if ($norm -eq '/var' -or $norm -eq '/tmp' -or $norm -eq '/private/var' -or $norm -eq '/private/tmp') { break }
+                    }
+                    return $false
+                }
             }
             $root = [System.IO.Path]::GetPathRoot($current)
             if ($root -and $current.TrimEnd('\', '/') -eq $root.TrimEnd('\', '/')) { break }
