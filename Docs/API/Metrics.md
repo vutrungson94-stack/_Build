@@ -1,6 +1,10 @@
 # Metrics
 
-48 function(s). Source: `Modules/Metrics.psm1`
+52 function(s). Source: `Modules/Metrics.psm1`
+
+### Write-MetricLog
+
+Parameters: Key :String, MessageArgs :String[], Level :String, State :Object
 
 ### Update-MetricsText
 
@@ -28,10 +32,6 @@ Parameters: State :Object, Path :String, Default :Object
 
 Parameters: Section :Object, Key :String, Default :Object
 
-### Protect-MetricText
-
-Parameters: Text :Object
-
 ### Get-TelemetryConfig
 
 Parameters: State :PSObject
@@ -46,7 +46,7 @@ Parameters: Name :String, Help :String, Value :Double, Labels :Hashtable
 
 ### Add-Metric
 
-Parameters: Metric :PSObject
+Parameters: Metric :PSObject, Name :String, Value :Double, Labels :Hashtable
 
 ### Get-MetricsAsPrometheus
 
@@ -111,6 +111,22 @@ Parameters: State :PSObject
 Parameters: State :PSObject, Path :String
 
 ### Get-MetricSnapshot
+
+### Get-BaselineSeriesKey
+
+Parameters: Name :Object, Labels :Object
+
+### Get-BaselineMedian
+
+Parameters: Values :Double[]
+
+### Get-BaselineStepLabel
+
+Parameters: Labels :Object
+
+### Format-BaselineDriftIdentity
+
+Parameters: Name :Object, Labels :Object
 
 ### Compare-MetricsBaseline
 

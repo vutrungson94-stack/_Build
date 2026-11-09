@@ -26,10 +26,6 @@ Parameters: Name :String
 
 Parameters: Url :String
 
-### Invoke-BuildSecretProtect
-
-Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
-
 ### Protect-AlertText
 
 Parameters: Text :Object, State :PSObject
@@ -53,6 +49,8 @@ Parameters: Config :Object, MaxAttempts :Int32, RetryDelayMs :Int32, State :PSOb
 ### Invoke-WebhookPost
 
 Parameters: Url :String, Payload :Object, Label :String, Headers :Hashtable, State :PSObject, TimeoutSec :Int32, MaxAttempts :Int32, RetryDelayMs :Int32, IdempotencyKey :String, Config :Object
+
+### Get-AlertRotationHours
 
 ### New-WebhookToken
 
@@ -120,13 +118,13 @@ Parameters: State :PSObject, AdbPath :String, Device :String, AppId :String
 
 ## AnomalyDetector
 
-### Get-AnomalyValue
-
-Parameters: Object :Object, Name :String, Default :Object
-
-### Get-AnomalyRoot
+### Get-DiagnosticRoot
 
 Parameters: State :PSObject
+
+### Resolve-DiagnosticPath
+
+Parameters: State :PSObject, Path :String
 
 ### Resolve-AnomalyPath
 
@@ -135,18 +133,6 @@ Parameters: State :PSObject, Path :String
 ### Get-AnomalyConfig
 
 Parameters: State :PSObject
-
-### Enter-AnomalyHistoryLock
-
-Parameters: Path :String
-
-### Read-AnomalyLines
-
-Parameters: Path :String
-
-### Write-AnomalyLines
-
-Parameters: Path :String, Lines :String[]
 
 ### ConvertTo-AnomalySampleRecord
 
@@ -210,7 +196,7 @@ Parameters: Report :PSObject, State :PSObject
 
 ### Protect-AnomalyText
 
-Parameters: Text :Object
+Parameters: Text :Object, State :PSObject
 
 ### Send-AnomalyAlert
 
@@ -233,17 +219,21 @@ Parameters: Override :Object
 
 ### Initialize-AuditLedger
 
+Parameters: State :PSObject, Force :SwitchParameter
+
+### Assert-LedgerBackendProvider
+
 Parameters: State :PSObject
 
 ### Get-LedgerField
 
-Parameters: Entry :Object, Name :String
+Parameters: Entry :Object, Name :String, Default :Object
 
 ### ConvertTo-LedgerScalar
 
 Parameters: Value :Object
 
-### Compute-MerkleRoot
+### Get-MerkleRoot
 
 Parameters: LeafHashes :String[]
 
@@ -251,7 +241,7 @@ Parameters: LeafHashes :String[]
 
 Parameters: State :PSObject, Format :String, OutputPath :String, Filter :Hashtable
 
-### Enforce-AuditRetention
+### Update-AuditRetention
 
 Parameters: State :PSObject
 
@@ -263,6 +253,10 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject
 
+### Get-AuditLedgerRoot
+
+Parameters: State :PSObject
+
 ### Get-LedgerPath
 
 Parameters: State :PSObject
@@ -271,7 +265,7 @@ Parameters: State :PSObject
 
 Parameters: Entry :Object, PreviousHash :String, ForSigning :SwitchParameter
 
-### Compute-EntryHash
+### Get-EntryHash
 
 Parameters: Entry :Object, PreviousHash :String
 
@@ -283,11 +277,15 @@ Parameters: Entry :Object, PreviousHash :String
 
 Parameters: Pem :String, Password :String
 
-### Sign-Data
+### Get-LedgerSignaturePrimitive
+
+Parameters: Algorithm :String
+
+### Get-DataSignature
 
 Parameters: Data :String, KeyPath :String, Algorithm :String
 
-### Verify-Signature
+### Test-Signature
 
 Parameters: Data :String, Signature :String, CertPath :String, Algorithm :String
 
@@ -303,19 +301,27 @@ Parameters: Path :String
 
 Parameters: Path :String
 
+### Repair-LedgerTornTail
+
+Parameters: Path :String, State :PSObject
+
 ### Save-AuditLedgerCheckpoint
 
 Parameters: State :PSObject, Sequence :Int32
+
+### Get-AuditLedgerAnchor
+
+Parameters: State :PSObject
 
 ### Write-AuditLedgerEntry
 
 Parameters: State :PSObject, Entry :Hashtable, Force :SwitchParameter
 
-### Verify-AuditLedger
+### Test-AuditLedger
 
 Parameters: State :PSObject, MaxEntries :Int32, FullChain :SwitchParameter
 
-### Verify-AuditLedgerRange
+### Test-AuditLedgerRange
 
 Parameters: State :PSObject, FromSequence :Int32, ToSequence :Int32
 
@@ -325,14 +331,10 @@ Parameters: State :PSObject
 
 ### Set-WormProtection
 
-Parameters: Path :String, Enable :SwitchParameter
+Parameters: Path :String, Enable :SwitchParameter, Disable :SwitchParameter
 
 
 ## AutoTuner
-
-### Get-AutoTuneValue
-
-Parameters: Object :Object, Name :String, Default :Object
 
 ### Get-AutoTuneRoot
 
@@ -371,18 +373,6 @@ Parameters: Stats :Hashtable, DurationSec :Double, Success :Boolean, ParallelJob
 ### AutoTuneStatsFinalize
 
 Parameters: Stats :Hashtable
-
-### Enter-AutoTuneHistoryLock
-
-Parameters: Path :String
-
-### Read-AutoTuneHistoryLines
-
-Parameters: Path :String
-
-### Write-AutoTuneHistoryLines
-
-Parameters: Path :String, Lines :String[]
 
 ### ConvertTo-AutoTuneRecord
 
@@ -431,6 +421,22 @@ Parameters: State :PSObject
 ### Get-AutoTuneRecommendations
 
 Parameters: State :PSObject
+
+### Resolve-AutoTuneProposalPath
+
+Parameters: State :PSObject
+
+### New-AutoTuneProposal
+
+Parameters: Changes :Hashtable, State :PSObject, PilotScope :String
+
+### Test-AutoTunePilotApproved
+
+Parameters: State :PSObject, ProposalId :String
+
+### Approve-AutoTuneProposal
+
+Parameters: Id :String, Decision :String, Evidence :String, State :PSObject
 
 
 ## Build
@@ -498,9 +504,15 @@ Parameters: State :PSObject, Projects :String[]
 
 ## BuildConstants
 
+### Get-BuildPathLiteralPatterns
+
 ### Get-BuildDefault
 
 Parameters: Key :String, Fallback :Object
+
+### Get-BuildTimestamp
+
+Parameters: Kind :String, At :DateTime
 
 ### Get-BuildSetting
 
@@ -509,10 +521,6 @@ Parameters: Key :String, State :PSObject, Fallback :Object
 ### Get-ProjectMarkers
 
 Parameters: State :PSObject
-
-### Get-BuildConfigPath
-
-Parameters: Key :String
 
 ### Get-SeverityRank
 
@@ -791,10 +799,6 @@ Parameters: Path :String, MaxBytes :Int64
 
 Parameters: SourcePath :String, DestinationPath :String
 
-### Enter-CacheIndexLock
-
-Parameters: IndexPath :String, TimeoutMs :Int32
-
 ### Compress-CacheFile
 
 Parameters: SourcePath :String, DestinationPath :String
@@ -809,7 +813,7 @@ Parameters: State :PSObject, CacheDir :String
 
 ### Invoke-UnifiedCacheEviction
 
-Parameters: State :PSObject, CacheDir :String, MaxSizeMB :Int32
+Parameters: State :PSObject, CacheDir :String
 
 ### Resolve-CacheAddressValue
 
@@ -895,7 +899,7 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject
 
-### Replicate-ToRegion
+### Copy-ToRegion
 
 Parameters: SourceRegion :Hashtable, TargetRegion :Hashtable, Key :String, LocalFilePath :String, State :PSObject
 
@@ -921,6 +925,10 @@ Parameters: State :PSObject
 ### Invoke-ChaosScenario
 
 Parameters: Scenario :String, State :PSObject
+
+### Remove-ChaosInjection
+
+Parameters: State :PSObject
 
 ### Invoke-ChaosSuite
 
@@ -1046,10 +1054,6 @@ Parameters: BuildId :String, ClusterName :String, Namespace :String, State :PSOb
 
 Parameters: BuildId :String, ClusterName :String, Namespace :String, State :PSObject
 
-### Cancel-ClusterBuild
-
-Parameters: BuildId :String, ClusterName :String, Namespace :String, State :PSObject
-
 ### Wait-ClusterBuild
 
 Parameters: BuildId :String, ClusterName :String, Namespace :String, TimeoutSec :Int32, State :PSObject, CancellationToken :CancellationToken
@@ -1091,7 +1095,7 @@ Parameters: Object :Object, Name :String
 
 Parameters: BuildSection :Object, RemoveLegacy :SwitchParameter
 
-### Normalize-ConfigAliases
+### Update-ConfigAliases
 
 Parameters: Config :Object, RemoveLegacy :SwitchParameter
 
@@ -1164,6 +1168,14 @@ Parameters: Section :Object, Key :String, Default :Object
 ### ConvertTo-TargetType
 
 Parameters: Value :Object, Type :String
+
+### Test-BuildConfigSchemaObject
+
+Parameters: Instance :Object, Schema :Object, Path :String, MaxErrors :Int32
+
+### Test-BuildConfigSchema
+
+Parameters: Instance :Object, Schema :Object, Strict :SwitchParameter
 
 ### Test-ConfigSchema
 
@@ -1267,14 +1279,6 @@ Parameters: Value :String, Purpose :String, State :PSObject, KeyFilePath :String
 
 Parameters: ProtectedValue :String, Purpose :String, State :PSObject, KeyFilePath :String
 
-### Resolve-SecretValue
-
-Parameters: Value :String, Purpose :String, State :PSObject, KeyFilePath :String
-
-### ConvertTo-EncryptedSecret
-
-Parameters: Value :String, Purpose :String, State :PSObject, KeyFilePath :String
-
 ### Resolve-ConfigSecrets
 
 Parameters: Node :Object, State :PSObject, KeyFilePath :String
@@ -1316,7 +1320,7 @@ Parameters: State :Object, ProjPath :Object, Tfm :Object, OutputSubDir :Object, 
 
 ### Test-WebAppReady
 
-Parameters: Proc :Object, Url :String, Port :Int32, State :Object
+Parameters: Proc :Object, Url :String, Port :Int32, State :Object, MaxAttempts :Int32, ProbeDelayMs :Int32, ProbeDelayMinMs :Int32, PortProbe :Boolean
 
 ### Test-ProcessExited
 
@@ -1623,13 +1627,17 @@ Parameters: Url :String, TimeoutMs :Int32, State :PSObject
 
 ## ErrorHandling
 
+### Set-NonRetryableOperation
+
+Parameters: State :PSObject, Operation :String, Clear :SwitchParameter
+
 ### Get-ErrorCategoryInfo
 
 Parameters: Category :String
 
 ### Get-ErrorCategory
 
-Parameters: ErrorRecord :Object
+Parameters: ErrorRecord :Object, State :PSObject
 
 ### New-BuildError
 
@@ -1638,6 +1646,10 @@ Parameters: Message :String, Category :String, Code :String, Suggestion :String,
 ### Invoke-WithRetry
 
 Parameters: Action :ScriptBlock, OperationName :String, MaxRetries :Int32, BaseDelayMs :Int32, MaxDelayMs :Int32, TotalTimeoutSec :Int32, State :PSObject
+
+### Invoke-HistoryWriteWithRetry
+
+Parameters: Action :ScriptBlock, OperationName :String, MaxAttempts :Int32, BaseDelayMs :Int32
 
 ### Initialize-CircuitBreaker
 
@@ -1685,11 +1697,13 @@ Parameters: State :PSObject
 
 ### Save-BuildState
 
-Parameters: State :PSObject, Path :String
+Parameters: State :PSObject, Path :String, Completed :Boolean
 
 ### Restore-BuildState
 
 Parameters: Path :String, State :PSObject
+
+### Get-RestoredStateInfo
 
 ### Get-ErrorSummary
 
@@ -1707,10 +1721,6 @@ Parameters: Message :String, Category :String, Suggestion :String, Code :String,
 
 
 ## EventBus
-
-### Get-EventValue
-
-Parameters: Object :Object, Name :String, Default :Object
 
 ### Get-EventTenant
 
@@ -1731,6 +1741,8 @@ Parameters: Data :Object
 ### Subscribe
 
 ### Unsubscribe
+
+### UnsubscribeAll
 
 ### Publish
 
@@ -1754,13 +1766,13 @@ Parameters: EventName :String, Handler :ScriptBlock, TenantId :String
 
 Parameters: EventName :String, Source :Object, Data :Object, TenantId :String
 
-### Get-BuildEventContract
-
 ### Get-BuildEventErrors
 
 Parameters: TenantId :String
 
 ### Get-BuildEventSubscribers
+
+Parameters: EventName :String, Handler :ScriptBlock, TenantId :String
 
 ### Get-BuildEventHandlers
 
@@ -1772,12 +1784,16 @@ Parameters: TenantId :String
 
 ### Get-BuildEventBus
 
+### Get-EventPayloadField
+
+Parameters: Data :Object, Field :String, EventName :String, Default :Object
+
+### Test-BuildEventPayloadContract
+
+Parameters: ModulesRoot :String, ExtraFiles :String[]
+
 
 ## HealthCheck
-
-### Get-HealthValue
-
-Parameters: Object :Object, Name :String, Default :Object
 
 ### Get-HealthConfigValue
 
@@ -1802,10 +1818,6 @@ Parameters: Status :String
 ### New-HealthResult
 
 Parameters: Name :String, Status :String, Message :String, Suggestion :String, Details :String, CheckedPorts :Int32[], InUsePorts :Int32[]
-
-### Get-HealthToolPath
-
-Parameters: Tool :String
 
 ### Test-DotnetSdk
 
@@ -1837,7 +1849,7 @@ Parameters: Url :String
 
 ### Protect-HealthText
 
-Parameters: Text :Object
+Parameters: Text :Object, State :PSObject
 
 ### Test-NetworkConnectivity
 
@@ -1922,10 +1934,6 @@ Parameters: PluginPaths :String[], ThrowOnFailure :SwitchParameter
 
 ## InfraVerification
 
-### Get-InfraValue
-
-Parameters: Object :Object, Name :String, Default :Object
-
 ### Get-InfraTimeout
 
 Parameters: Value :Int32, Fallback :Int32
@@ -1978,15 +1986,7 @@ Parameters: State :PSObject, SendTest :Boolean, RequestTimeout :Int32
 
 Parameters: State :PSObject, Checks :Object[], Config :PSObject
 
-### Invoke-InfraAutoRemediate
-
-Parameters: State :PSObject, Checks :Object[], Config :PSObject
-
 ### Invoke-InfraVerification
-
-Parameters: State :PSObject, Force :SwitchParameter, Remediate :SwitchParameter, AutoRemediate :SwitchParameter
-
-### Invoke-InfraVerify
 
 Parameters: State :PSObject, Force :SwitchParameter, Remediate :SwitchParameter, AutoRemediate :SwitchParameter
 
@@ -2018,6 +2018,8 @@ Parameters: FilePath :String, State :PSObject
 
 ## Loader
 
+### Get-DispatchManifestFiles
+
 ### Register
 
 ### Get
@@ -2026,15 +2028,11 @@ Parameters: FilePath :String, State :PSObject
 
 ### Clear
 
-### Count
-
-### Invoke-PluginCommand
-
-Parameters: ScriptBlock :ScriptBlock, State :PSObject, ProjectDir :String, Label :String, WorkingDir :String, ArgumentList :Object[], Quiet :SwitchParameter
-
 ### Test-PluginInterface
 
 Parameters: ModuleName :String, State :PSObject
+
+### Get-ExternalPluginRoots
 
 ### Register-Plugins
 
@@ -2073,6 +2071,10 @@ Parameters: Result :Object, State :PSObject, ProjectDir :String
 ### Invoke-PluginBuildFor
 
 Parameters: State :PSObject, Language :String, ProjectDir :String, ProjectFile :String, Configuration :String, Incremental :SwitchParameter, Detailed :SwitchParameter
+
+### Invoke-PluginActionFor
+
+Parameters: State :PSObject, Verb :String, Language :String, ProjectDir :String, ProjectFile :String, Configuration :String, Arguments :String, Incremental :SwitchParameter, WithManifestFiles :SwitchParameter, PassIncremental :SwitchParameter, PassArguments :SwitchParameter, Detailed :SwitchParameter
 
 ### Invoke-PluginTestFor
 
@@ -2150,7 +2152,9 @@ Parameters: Key :String, Fallback :Object
 
 ### Resolve-LogMessage
 
-Parameters: Key :String, MessageArgs :String[]
+Parameters: Key :String, MessageArgs :String[], Fallback :String
+
+### Get-LogDisplayTimestamp
 
 ### Get-LogLocalized
 
@@ -2242,10 +2246,6 @@ Parameters: Text :String, Color :String, ShowSeparator :Boolean, State :PSObject
 
 Parameters: Title :String, Color :String, State :PSObject
 
-### Import-ModuleIfExists
-
-Parameters: ModulePath :String, Required :SwitchParameter
-
 ### Set-StateColors
 
 Parameters: State :PSObject
@@ -2306,6 +2306,10 @@ Parameters: State :PSObject, ProjPath :String, ProjectDir :String, ProjectType :
 
 ## Metrics
 
+### Write-MetricLog
+
+Parameters: Key :String, MessageArgs :String[], Level :String, State :Object
+
 ### Update-MetricsText
 
 ### MetricRegistry
@@ -2332,10 +2336,6 @@ Parameters: State :Object, Path :String, Default :Object
 
 Parameters: Section :Object, Key :String, Default :Object
 
-### Protect-MetricText
-
-Parameters: Text :Object
-
 ### Get-TelemetryConfig
 
 Parameters: State :PSObject
@@ -2350,7 +2350,7 @@ Parameters: Name :String, Help :String, Value :Double, Labels :Hashtable
 
 ### Add-Metric
 
-Parameters: Metric :PSObject
+Parameters: Metric :PSObject, Name :String, Value :Double, Labels :Hashtable
 
 ### Get-MetricsAsPrometheus
 
@@ -2416,6 +2416,22 @@ Parameters: State :PSObject, Path :String
 
 ### Get-MetricSnapshot
 
+### Get-BaselineSeriesKey
+
+Parameters: Name :Object, Labels :Object
+
+### Get-BaselineMedian
+
+Parameters: Values :Double[]
+
+### Get-BaselineStepLabel
+
+Parameters: Labels :Object
+
+### Format-BaselineDriftIdentity
+
+Parameters: Name :Object, Labels :Object
+
 ### Compare-MetricsBaseline
 
 Parameters: State :PSObject, Path :String, Persist :SwitchParameter
@@ -2479,164 +2495,30 @@ Parameters: ModulesRoot :String
 
 Parameters: ModulesRoot :String, DependencyMap :Hashtable
 
-### Visit-Node
+### Enter-Node
 
 
 ## Orchestrator
-
-### Import-ModuleOnDemand
-
-Parameters: ModuleNames :String[]
-
-### Test-BuildConfig
-
-Parameters: State :PSObject, Strict :SwitchParameter
 
 ### Test-PreFlight
 
 Parameters: State :PSObject
 
-### Merge-Profile
+### Assert-BuildCommandAvailable
 
-Parameters: Base :PSObject, Override :PSObject
-
-### Get-ActiveProfile
-
-Parameters: State :PSObject, ProfileName :String
-
-### Get-BuildTestConfig
-
-Parameters: State :PSObject
-
-### Invoke-SdkDetection
-
-Parameters: State :PSObject, ProjectType :String, Tfms :String[]
-
-### Resolve-TargetFrameworks
-
-Parameters: Tfms :String[], ProjectType :String, DefaultTfm :String
-
-### Test-ActionAllowed
-
-Parameters: State :PSObject, Action :String
+Parameters: Command :String, MessageKey :String, Fallback :String
 
 ### Send-AnomalyAlertIfNeeded
 
 Parameters: Report :PSObject, State :PSObject
 
-### Get-ModuleMapFromConfig
-
-Parameters: State :PSObject
-
-### Get-DefaultActionsFromConfig
-
-Parameters: State :PSObject
-
-### Invoke-RegisteredDeploy
-
-Parameters: Choice :String, State :PSObject, ProjectDir :String, ProjectType :String
-
-### Get-DeployChoiceArgs
-
-Parameters: Kind :String, State :PSObject
-
-### Get-DeployDefaultRid
-
-Parameters: State :PSObject
-
-### Get-TargetCatalog
-
-Parameters: State :PSObject
-
-### Show-TargetList
-
-Parameters: State :PSObject
-
-### Resolve-AutoBuildChoice
-
-Parameters: MenuConfig :Hashtable, State :PSObject, ProjectType :String, BuildContext :PSObject
-
-### Invoke-GuildChoice
-
-Parameters: Choice :String, MenuConfig :Hashtable, State :PSObject, ProjPath :String, ProjectDir :String, ProjectType :String, Tfms :String[], DefaultTfm :String, WinTfm :String, AndroidTfm :String, IosTfm :String, MacTfm :String, ParallelProjects :String[], Incremental :SwitchParameter, PipelineContext :Hashtable
-
-### Resolve-PipelineSteps
-
-Parameters: State :PSObject, CallerSteps :Array
-
-### Get-PipelineStepDisplayName
-
-Parameters: StepName :String
-
-### Invoke-PipelineStep
-
-Parameters: Step :Hashtable, Context :Hashtable, State :PSObject, LeftBracket :String, RightBracket :String
-
-### Invoke-GBuildPipeline
-
-Parameters: State :PSObject, Context :Hashtable, Steps :Array
-
-### Initialize-BuildIdentity
-
-Parameters: State :PSObject
-
-### Get-FlowLogLevel
-
-Parameters: State :PSObject, ScopedLevel :String, VerboseLevel :String
-
-### Register-BuildEventSubscribers
-
-Parameters: State :PSObject
-
-### Unregister-BuildEventSubscribers
-
-### Register-BuildServices
-
-Parameters: State :PSObject
-
-### Resolve-BuildEnvironmentAndStrategy
-
-Parameters: State :PSObject, Incremental :SwitchParameter, Clean :SwitchParameter, LogLevel :String
-
-### Show-TargetUsageTip
-
-Parameters: MenuConfig :Hashtable, State :PSObject
-
-### Initialize-BuildLogging
-
-Parameters: State :PSObject, LogLevel :String
-
-### Invoke-StandaloneOperation
-
-Parameters: State :PSObject, CacheClear :SwitchParameter, CacheOptimize :SwitchParameter, CacheStats :SwitchParameter, VersionBump :SwitchParameter
-
-### Initialize-BuildConfigAndProfile
-
-Parameters: State :PSObject
-
 ### Assert-CoreCommands
 
 Parameters: State :PSObject, Repair :SwitchParameter
 
-### Resolve-BuildSdk
-
-Parameters: State :PSObject
-
 ### Start-GBuild
 
 Parameters: GitHub :SwitchParameter, NonInteractive :SwitchParameter, Incremental :SwitchParameter, Clean :SwitchParameter, CacheClear :SwitchParameter, CacheOptimize :SwitchParameter, CacheStats :SwitchParameter, VersionBump :SwitchParameter, Force :SwitchParameter, Security :SwitchParameter, Distributed :SwitchParameter, VerifyInfra :SwitchParameter, Target :String, LogLevel :String
-
-### Write-SkippedStep
-
-Parameters: Step :String, Reason :String, Context :Object
-
-### Show-GBuildBanner
-
-Parameters: State :PSObject
-
-### Invoke-GBuildHook
-
-Parameters: HookName :String, State :PSObject, Success :Boolean
 
 
 ## Parallel
@@ -2672,6 +2554,14 @@ Parameters: Path :String, Base :String
 
 Parameters: Base :String, Child :String
 
+### Get-PathComparison
+
+### Test-IsWindowsHost
+
+### Get-CanonicalOSName
+
+Parameters: OS :String
+
 ### Test-BuildProjectMarker
 
 Parameters: Path :String
@@ -2680,13 +2570,21 @@ Parameters: Path :String
 
 Parameters: StartDir :String, ExplicitProject :String, MaxDepth :Int32, State :Object
 
+### Test-BuildPathEqual
+
+Parameters: PathA :String, PathB :String
+
+### Get-BuildProjectCandidateDirectories
+
+Parameters: Path :String, MaxDepth :Int32, MaxResults :Int32
+
 ### Test-BuildVolumeRoot
 
 Parameters: Path :String
 
 ### Test-SafePath
 
-Parameters: Path :String, Base :String, AllowRelative :SwitchParameter
+Parameters: Path :String, Base :String
 
 ### Get-BuildRootDirectory
 
@@ -2699,6 +2597,10 @@ Parameters: RelativePath :String, State :Object
 ### Test-PathUnderRoots
 
 Parameters: Path :String, AllowedRoots :String[]
+
+### Test-ReparsePointItem
+
+Parameters: Path :String
 
 ### Test-NoReparsePointInPath
 
@@ -2715,6 +2617,10 @@ Parameters: Path :String
 ### Resolve-NativePath
 
 Parameters: Path :String
+
+### Resolve-BuildContainedPath
+
+Parameters: Path :String, Base :String, State :PSObject, RequireDirectory :SwitchParameter, MustExist :SwitchParameter
 
 ### Find-ProjectManifest
 
@@ -2786,6 +2692,10 @@ Parameters: Package :String, ProjectDir :String
 
 Parameters: State :PSObject
 
+### Get-DotnetManifestFilters
+
+Parameters: IncludeSolution :SwitchParameter, SolutionOnly :SwitchParameter
+
 ### Resolve-DotnetProjectFile
 
 Parameters: ProjectFile :String, ProjectDir :String, Filters :String[]
@@ -2813,6 +2723,10 @@ Parameters: State :PSObject, ProjectDir :String, ProjectFile :String, ManifestFi
 
 Parameters: ProjectFile :String, ProjectDir :String, ManifestFiles :String[]
 
+### Get-PluginLocaleText
+
+Parameters: Key :String, MessageArgs :String[], Fallback :String
+
 ### Get-SimplePluginPreflight
 
 Parameters: ToolName :String, FallbackToolNames :String[], AnyToolNames :String[], SecondaryToolNames :String[], ManifestFiles :String[], ManifestLabel :String, State :PSObject, ProjectDir :String, ProjectFile :String
@@ -2824,6 +2738,18 @@ Parameters: ToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], 
 ### Invoke-SimplePluginLint
 
 Parameters: ToolName :String, LintToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], LintCommand :String, State :PSObject, ProjectDir :String, ProjectFile :String, Configuration :String, MissingToolLevel :String, SoftFail :SwitchParameter, Detailed :SwitchParameter
+
+### Invoke-SimplePluginClean
+
+Parameters: ToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], CleanCommand :String, State :PSObject, ProjectDir :String, ProjectFile :String, Configuration :String, Detailed :SwitchParameter
+
+### Invoke-SimplePluginRun
+
+Parameters: ToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], RunCommand :String, State :PSObject, ProjectDir :String, ProjectFile :String, Configuration :String, Arguments :String, Detailed :SwitchParameter
+
+### Resolve-PluginRunEntry
+
+Parameters: ProjectDir :String, ProjectFile :String, AllowedExtensions :String[]
 
 ### Resolve-PluginBuild
 
@@ -2929,7 +2855,7 @@ Parameters: ProjectDir :String, Name :String, State :PSObject
 
 ## PowerShell
 
-### Resolve-PowerShellHost
+### Resolve-PowerShellHostPath
 
 ### Get-PesterInfo
 
@@ -3027,6 +2953,8 @@ Parameters: Rule :Object, Name :String, Default :Object
 
 Parameters: Value :String, Pattern :String
 
+### Get-PolicyExcludePattern
+
 ### Test-PolicyPathMatch
 
 Parameters: Value :String, Pattern :String
@@ -3073,6 +3001,89 @@ Parameters: Tools :String[], State :PSObject
 ### Invoke-PreflightValidation
 
 Parameters: State :PSObject, ProjectDir :String, ProjectFile :String
+
+### Test-ToolchainHermetic
+
+Parameters: ToolRoot :String
+
+
+## ProcessMetrics
+
+### Get-ProcessCodeFile
+
+Parameters: ToolRoot :String
+
+### Get-ProcessCodeText
+
+Parameters: Files :Object[]
+
+### New-ProcessAdoptionClass
+
+Parameters: Class :String, Description :String, Adopted :Int32, Total :Int32, Metric :String, Offenders :String[]
+
+### Get-BuildProcessMetrics
+
+Parameters: ToolRoot :String
+
+### Get-BuildProcessTrendPath
+
+Parameters: ToolRoot :String
+
+### Write-BuildProcessTrend
+
+Parameters: Metrics :PSObject, ToolRoot :String, RunId :String, Channel :String, ProjectType :String
+
+### Get-BuildProcessTrend
+
+Parameters: ToolRoot :String, Last :Int32
+
+### Compare-BuildProcessTrend
+
+Parameters: Metrics :PSObject, ToolRoot :String
+
+### Get-BuildProcessSparkline
+
+Parameters: Metrics :PSObject, ToolRoot :String, Width :Int32, Ascii :SwitchParameter
+
+### Get-ProcessControlLimits
+
+Parameters: Values :Double[], Sigma :Double
+
+### Test-ProcessInControl
+
+Parameters: Value :Double, Limits :Object
+
+### Get-FleetSLOSummary
+
+Parameters: Records :Object[], Sigma :Double
+
+### Publish-FleetSLOSummary
+
+Parameters: Records :Object[], State :PSObject, FileName :String
+
+### Invoke-FleetRollup
+
+Parameters: FleetDir :String, OutputPath :String
+
+### Get-FleetBillingSummary
+
+Parameters: Tenants :Object[], Rates :Hashtable
+
+### Find-RatchetCandidates
+
+Parameters: Floor :Object, CurrentMetrics :PSObject, History :Object[], MinSustained :Int32
+
+### Compare-BuildProcessControl
+
+Parameters: Metrics :PSObject, ToolRoot :String, Window :Int32, MinSamples :Int32, Sigma :Double
+
+### Test-BuildQpmLedger
+
+Parameters: ToolRoot :String, Path :String
+
+### Get-BuildQpmMeasures
+
+Parameters: ToolRoot :String, WindowSamples :Int32, MinSamples :Int32
 
 
 ## Project
@@ -3193,23 +3204,7 @@ Parameters: RawOS :String
 
 ## RBAC
 
-### New-RBACRole
-
-Parameters: RoleName :String, Permissions :String[], Description :String, Inherits :String, State :PSObject
-
-### Remove-RBACRole
-
-Parameters: RoleName :String, State :PSObject
-
-### Set-RBACRolePermissions
-
-Parameters: RoleName :String, Permissions :String[], Description :String, Inherits :String, State :PSObject
-
-### Get-RBACRoles
-
-Parameters: State :PSObject
-
-### Get-RBACResources
+### Get-RbacCacheKey
 
 Parameters: State :PSObject
 
@@ -3285,9 +3280,13 @@ Parameters: State :PSObject, Action :String, ReportType :String, UserName :Strin
 
 Parameters: State :PSObject, Action :String, ArtifactType :String, UserName :String
 
+### Get-RbacEnforcementMode
+
+Parameters: State :PSObject
+
 ### Test-PolicyAuthorization
 
-Parameters: State :PSObject, PolicyName :String, Input :Hashtable
+Parameters: State :PSObject, PolicyName :String, PolicyInput :Hashtable
 
 ### Write-RBACAuditEntry
 
@@ -3296,6 +3295,18 @@ Parameters: State :PSObject, Action :String, Allowed :Boolean, UserName :String,
 ### Assert-RBACAuthorization
 
 Parameters: State :PSObject, Permission :String, Resource :String, Action :String, UserName :String, Message :String
+
+### Get-BuildActionPermission
+
+Parameters: Action :String
+
+### Get-RbacPrivilegedActions
+
+Parameters: Kind :String
+
+### Test-ActionAllowed
+
+Parameters: State :PSObject, Action :String
 
 
 ## Report
@@ -3311,10 +3322,6 @@ Parameters: State :PSObject, Key :String, Default :Object
 ### Write-ReportLog
 
 Parameters: Message :String, Level :String, State :PSObject
-
-### Read-ReportJson
-
-Parameters: FilePath :String
 
 ### Initialize-ReportDir
 
@@ -3346,16 +3353,44 @@ Parameters: State :PSObject, LastN :Int32
 
 Parameters: State :PSObject, LastN :Int32
 
-
-## RootCause
-
-### Get-RootCauseValue
+### Get-ReportFieldValue
 
 Parameters: Object :Object, Name :String, Default :Object
 
-### Get-RootCauseRoot
+### Export-JUnitReport
+
+Parameters: Results :Object[], OutputPath :String, SuiteName :String
+
+### Export-SarifReport
+
+Parameters: Findings :Object[], OutputPath :String, ToolName :String
+
+### Get-BuildTraceContext
 
 Parameters: State :PSObject
+
+### Add-BuildTestResult
+
+Parameters: State :PSObject, Result :Object, Suite :String
+
+### Publish-BuildJUnitArtifact
+
+Parameters: State :PSObject, SuiteName :String, OutputPath :String
+
+### Publish-BuildSarifArtifact
+
+Parameters: State :PSObject, Findings :Object[], ToolName :String, OutputPath :String
+
+
+## RootCause
+
+### Get-DiagnosticRoot
+
+Parameters: State :PSObject
+
+### Resolve-DiagnosticPath
+
+Parameters: State :PSObject, Path :String
 
 ### Resolve-RootCausePath
 
@@ -3365,21 +3400,13 @@ Parameters: State :PSObject, Path :String
 
 Parameters: State :PSObject
 
-### Enter-RootCauseHistoryLock
+### Get-RootCauseClassifiers
 
-Parameters: Path :String
-
-### Read-RootCauseLines
-
-Parameters: Path :String
-
-### Write-RootCauseLines
-
-Parameters: Path :String, Lines :String[]
+Parameters: State :PSObject
 
 ### Protect-RootCauseText
 
-Parameters: Text :Object
+Parameters: Text :Object, State :PSObject
 
 ### Get-RootCauseAnalysis
 
@@ -3389,9 +3416,37 @@ Parameters: ErrorRecord :ErrorRecord, State :PSObject
 
 Parameters: Analysis :Hashtable, State :PSObject
 
+### New-CARRecord
+
+Parameters: Category :String, Confidence :Double, Severity :String, Suggestion :String, State :PSObject
+
+### Resolve-CARPath
+
+Parameters: State :PSObject
+
+### Write-CARRecord
+
+Parameters: Record :PSObject, State :PSObject
+
+### Confirm-CARClosure
+
+Parameters: Id :String, Evidence :String, State :PSObject
+
 ### Get-RootCauseSummary
 
 Parameters: State :PSObject
+
+### Get-TenantUsageSummary
+
+Parameters: State :PSObject
+
+### Export-CARAuditPack
+
+Parameters: State :PSObject, OutputPath :String
+
+### Test-CARAuditPack
+
+Parameters: PackPath :String
 
 
 ## Sast
@@ -3416,25 +3471,39 @@ Parameters: State :PSObject
 
 Parameters: Language :String, State :PSObject
 
+### Resolve-SastToolPath
+
+Parameters: Tool :String, State :PSObject
+
 ### Test-SastToolAvailable
 
-Parameters: Tool :String
-
-### Invoke-BuildSecretProtect
-
-Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
+Parameters: Tool :String, State :PSObject
 
 ### Protect-SastText
 
 Parameters: Text :String, State :PSObject
 
+### Get-SastToolName
+
+Parameters: Fallback :String
+
 ### Get-SastToolPolicy
 
 Parameters: State :PSObject
 
+### Get-SastExcludePattern
+
+### Test-SastTestFixturePath
+
+Parameters: FullName :String
+
 ### Get-SastProjectLanguages
 
 Parameters: ProjectDir :String, State :PSObject
+
+### ConvertTo-ScriptAnalyzerFindings
+
+Parameters: Records :Object[]
 
 ### ConvertTo-SastFindings
 
@@ -3458,6 +3527,10 @@ Parameters: State :PSObject, ProjectDir :String
 Parameters: PropertyName :String, State :PSObject
 
 ### Update-AndroidSdkConfig
+
+Parameters: State :PSObject
+
+### GetAndroidPriorityPaths
 
 Parameters: State :PSObject
 
@@ -3543,13 +3616,55 @@ Parameters: State :PSObject
 
 Parameters: DotnetExe :String
 
+### ConvertTo-DotnetVersionTriple
+
+Parameters: Version :String
+
+### Get-GlobalJsonSdkPin
+
+Parameters: State :PSObject
+
+### Get-InstalledDotnetSdks
+
+Parameters: DotnetExe :String
+
+### Test-DotnetPinSatisfied
+
+Parameters: RequiredVersion :String, InstalledSdks :String[], RollForward :String
+
+### Compare-DotnetVersion
+
+Parameters: A :String, B :String
+
+### Get-ReleaseMetadataCachePath
+
+Parameters: State :PSObject
+
+### Get-LatestReleasedSdkVersion
+
+Parameters: State :PSObject, Channel :String
+
 ### Install-SdkFromRemote
 
-Parameters: State :PSObject, ToolType :String
+Parameters: State :PSObject, ToolType :String, RequiredVersion :String
+
+### Get-SdkMemoKey
+
+Parameters: ToolType :String, State :PSObject
+
+### Reset-SdkMemo
 
 ### Get-SmartSdk
 
 Parameters: State :PSObject, ToolType :String
+
+### Resolve-PinnedDotnetSdk
+
+Parameters: State :PSObject, CandidateExe :String
+
+### Resolve-DotnetSdkCommand
+
+Parameters: State :PSObject, PreferredPath :String
 
 
 ## Security
@@ -3561,10 +3676,6 @@ Parameters: State :PSObject
 ### Get-SecurityConfigValue
 
 Parameters: State :PSObject, Path :String, Default :Object
-
-### Invoke-BuildSecretProtect
-
-Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
 
 ### Protect-SecurityText
 
@@ -3578,6 +3689,10 @@ Parameters: Tool :String, Operation :String, ExitCode :Int32
 
 Parameters: State :PSObject
 
+### Get-CodeSigningStatus
+
+Parameters: State :PSObject
+
 ### ConvertTo-CanonicalLicenseKey
 
 Parameters: Value :String
@@ -3585,6 +3700,8 @@ Parameters: Value :String
 ### Test-SecurityInventoryFile
 
 Parameters: FileName :String, Extension :String
+
+### Reset-AuditLogPath
 
 ### Write-AuditLog
 
@@ -3608,17 +3725,17 @@ Parameters: State :PSObject, SearchRoot :String, ExcludeDirs :String[]
 
 Parameters: Tool :String, Arguments :String[], WorkingDirectory :String, State :PSObject
 
-### Get-SecurityManifestFiles
-
-Parameters: Root :String, Names :String[]
-
 ### ConvertTo-SecurityJson
 
 Parameters: Text :String
 
-### Get-SecurityToolFailure
+### Resolve-SecuritySearchRoot
 
-Parameters: Tool :String, Operation :String, ExitCode :Int32, State :PSObject
+Parameters: State :PSObject, Caller :String
+
+### Get-SecurityManifestSearchDepth
+
+Parameters: State :PSObject
 
 ### Get-SecurityScanDepth
 
@@ -3691,14 +3808,6 @@ Parameters: Path :String
 
 Parameters: Path :String
 
-### Import-DotEnvFile
-
-Parameters: Path :String, Override :SwitchParameter
-
-### Remove-DotEnvFile
-
-Parameters: Path :String
-
 ### Invoke-SafeRemove
 
 Parameters: Path :String, AllowedRoots :String[], Force :SwitchParameter, Recurse :SwitchParameter
@@ -3719,6 +3828,8 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject, DefaultFileName :String
 
+### Get-SecretTokenFamilyMap
+
 ### Get-SecretDetectionPatterns
 
 Parameters: State :PSObject
@@ -3734,6 +3845,10 @@ Parameters: Object :Object, Name :String[]
 ### Get-BuildSecretRedactPatterns
 
 Parameters: State :PSObject, Patterns :Array
+
+### Invoke-BuildSecretProtect
+
+Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
 
 ### Protect-BuildSecretText
 
@@ -3763,11 +3878,55 @@ Parameters: Root :String, IncludeExtensions :String[], ExcludeDirs :String[], Ex
 
 Parameters: Root :String, Recurse :SwitchParameter
 
+### Get-BuildStringHash
+
+Parameters: Text :String, Algorithm :String, Case :String, OnFailure :String
+
+### Get-BuildFileSha256
+
+Parameters: Path :String, Case :String
+
+### Write-BuildTextFileAtomic
+
+Parameters: Path :String, Lines :String[], PreCommit :ScriptBlock
+
+### Move-StagedBuildFile
+
+Parameters: Source :String, Destination :String, UseBackup :SwitchParameter
+
+### Move-BuildFileAtomic
+
+Parameters: Source :String, Destination :String
+
+### Get-BuildTextLines
+
+Parameters: Path :String
+
+### Enter-BuildFileLock
+
+Parameters: Path :String, TimeoutMs :Int32, PollMs :Int32
+
+### Exit-BuildFileLock
+
+Parameters: Lock :Object
+
+### Write-BuildTextFileUtf8
+
+Parameters: Path :String, Value :String[], Append :SwitchParameter, NoNewline :SwitchParameter
+
+### Read-BuildJsonFile
+
+Parameters: FilePath :String
+
 ### Write-BuildJsonFile
 
 Parameters: Path :String, Data :Object, Depth :Int32, Atomic :SwitchParameter
 
 ### Resolve-PublishOutputDir
+
+Parameters: State :PSObject
+
+### Resolve-BuildOpenOutput
 
 Parameters: State :PSObject
 
@@ -3791,6 +3950,16 @@ Parameters: State :PSObject, Path :String
 
 Parameters: ToolName :String, Aliases :String[]
 
+### Get-BuildVendoredToolsRoot
+
+Parameters: State :PSObject
+
+### Resolve-VendoredToolModule
+
+Parameters: Name :String, EntryPoint :String, Version :String, State :PSObject
+
+### Test-BuildCIHost
+
 ### Resolve-PowerShellHost
 
 ### Remove-JsonComments
@@ -3811,26 +3980,34 @@ Parameters: Result :Object, Operation :String, Throw :SwitchParameter
 
 ### Test-BuildGateResult
 
-Parameters: Result :Object, Operation :String, StageLabel :String
+Parameters: Result :Object, Operation :String, StageLabel :String, State :PSObject
 
-### Assert-RequiredResult
+### Write-BuildGateDiagnostics
 
-Parameters: Result :Object, Operation :String
+Parameters: Gate :Object, State :PSObject, MaxLines :Int32
 
 ### Get-ExecutableExtension
 
 Parameters: State :PSObject, Fallback :String
 
-### Get-FileHashSHA256
+### ConvertTo-BuildArgument
 
-Parameters: Path :String, Recursive :SwitchParameter, Aggregate :SwitchParameter
+Parameters: Value :String
+
+### New-BuildProcessStartInfo
+
+Parameters: FilePath :String, Arguments :String, WorkingDirectory :String, AllowBatch :SwitchParameter
+
+### Stop-BuildProcess
+
+Parameters: Process :Process, WaitMs :Int32, EntireTree :SwitchParameter
+
+### Update-ProjectGitignore
+
+Parameters: State :PSObject, ProjectDir :String
 
 
 ## Siem
-
-### Get-SiemValue
-
-Parameters: Object :Object, Name :String, Default :Object
 
 ### Get-SiemConfig
 
@@ -3844,15 +4021,15 @@ Parameters: State :PSObject
 
 Parameters: Entry :Hashtable
 
-### Escape-SiemHeader
+### Format-SiemHeader
 
 Parameters: Value :Object
 
-### Escape-SiemExtension
+### Format-SiemExtension
 
 Parameters: Value :Object
 
-### Escape-SiemStructuredValue
+### Format-SiemStructuredValue
 
 Parameters: Value :Object
 
@@ -3903,11 +4080,11 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject
 
-### Sign-StandaloneBundle
+### Get-StandaloneBundleSignature
 
 Parameters: BundlePath :String, State :PSObject, Detailed :SwitchParameter
 
-### Generate-StandaloneBundleSupplyChain
+### New-StandaloneBundleSupplyChain
 
 Parameters: BundlePath :String, State :PSObject, Detailed :SwitchParameter
 
@@ -3933,13 +4110,13 @@ Parameters: RelPath :String
 
 Parameters: Path :String
 
-### Get-StandaloneSha256
+### Get-StandaloneHash
 
 Parameters: Bytes :Byte[]
 
 ### Get-StandaloneObjectProperty
 
-Parameters: Object :Object, Name :String
+Parameters: Object :Object, Name :String, Default :Object
 
 ### Assert-StandaloneResourceSet
 
@@ -4014,7 +4191,7 @@ Parameters: Path :String, Data :Object
 
 ### Get-DependencyInventory
 
-Parameters: ProjectDir :String, ProjectFile :String
+Parameters: ProjectDir :String, ProjectFile :String, State :PSObject
 
 ### New-BuildSbom
 
@@ -4048,12 +4225,32 @@ Parameters: State :PSObject, Sbom :Object
 
 Parameters: State :PSObject, ProjectDir :String, PublishOutput :String
 
+### Resolve-TransparencyLogPath
+
+Parameters: State :PSObject
+
+### Write-TransparencyLogEntry
+
+Parameters: Statement :Object, State :PSObject
+
+### Send-TransparencyEntryToRekor
+
+Parameters: Entry :Object, State :PSObject
+
+### Test-TransparencyLog
+
+Parameters: State :PSObject, ExpectedTip :String
+
 ### Get-ArtifactDigest
 
 Parameters: Path :String
 
 
 ## Versioning
+
+### Resolve-VersionSearchRoot
+
+Parameters: State :PSObject
 
 ### Find-VersionCsproj
 
@@ -4080,56 +4277,121 @@ Parameters: State :PSObject, CommitCount :Int32, OutputPath :String
 Parameters: State :PSObject
 
 
+## YamlPipeline
+
+### PipelineYamlError
+
+### ConvertTo-PipelineYamlMessage
+
+Parameters: Code :String, ErrorArgs :Object[]
+
+### New-PipelineYamlError
+
+Parameters: Code :String, ErrorArgs :Object[], Origin :String
+
+### Remove-YamlComment
+
+Parameters: Value :String
+
+### ConvertFrom-YamlScalar
+
+Parameters: Value :String
+
+### ConvertFrom-YamlFlowSequence
+
+Parameters: Value :String, Line :String, LineNumber :Int32
+
+### Split-YamlKeyValue
+
+Parameters: Line :String
+
+### ConvertFrom-GBuildYaml
+
+Parameters: Text :Object, Origin :String
+
+### Test-YamlUnsupportedMarker
+
+Parameters: Text :String
+
+### Convert-YamlInlineValue
+
+Parameters: Value :String, Line :String, LineNumber :Int32, Origin :String
+
+### Resolve-PipelineYamlPath
+
+Parameters: Path :String, State :PSObject
+
+### Get-BuildYamlPipelineDocument
+
+Parameters: State :PSObject, Path :String
+
+### Test-PipelineYamlDocument
+
+Parameters: Document :Object, State :PSObject, PassThru :SwitchParameter
+
+### Set-PipelineYamlEnvironment
+
+Parameters: Document :Object, State :PSObject
+
+### Clear-PipelineYamlEnvironment
+
+Parameters: Applied :Hashtable
+
+### ConvertFrom-PipelineYamlStep
+
+Parameters: Document :Object, State :PSObject
+
+
 ## Index
 
 | Module | Functions |
 | --- | --- |
 | [Alerting](API/Alerting.md) | 19 |
 | [Android](API/Android.md) | 8 |
-| [AnomalyDetector](API/AnomalyDetector.md) | 24 |
-| [AuditLedger](API/AuditLedger.md) | 27 |
+| [AnomalyDetector](API/AnomalyDetector.md) | 21 |
+| [AuditLedger](API/AuditLedger.md) | 32 |
 | [AutoTuner](API/AutoTuner.md) | 26 |
 | [Build](API/Build.md) | 15 |
-| [BuildConstants](API/BuildConstants.md) | 7 |
+| [BuildConstants](API/BuildConstants.md) | 8 |
 | [BuildContext](API/BuildContext.md) | 6 |
 | [BuildImport](API/BuildImport.md) | 3 |
 | [BuildProgress](API/BuildProgress.md) | 6 |
 | [Cache](API/Cache.md) | 35 |
-| [CacheProvider](API/CacheProvider.md) | 51 |
-| [Chaos](API/Chaos.md) | 3 |
+| [CacheProvider](API/CacheProvider.md) | 50 |
+| [Chaos](API/Chaos.md) | 4 |
 | [Clean](API/Clean.md) | 9 |
-| [ClusterOrchestrator](API/ClusterOrchestrator.md) | 26 |
-| [ConfigProvider](API/ConfigProvider.md) | 26 |
+| [ClusterOrchestrator](API/ClusterOrchestrator.md) | 25 |
+| [ConfigProvider](API/ConfigProvider.md) | 27 |
 | [Container](API/Container.md) | 6 |
-| [CredentialVault](API/CredentialVault.md) | 23 |
+| [CredentialVault](API/CredentialVault.md) | 21 |
 | [Deploy](API/Deploy.md) | 9 |
 | [DeployTargets](API/DeployTargets.md) | 32 |
 | [Distributed](API/Distributed.md) | 17 |
 | [Documentation](API/Documentation.md) | 3 |
 | [Environment](API/Environment.md) | 22 |
-| [ErrorHandling](API/ErrorHandling.md) | 23 |
-| [EventBus](API/EventBus.md) | 22 |
-| [HealthCheck](API/HealthCheck.md) | 29 |
+| [ErrorHandling](API/ErrorHandling.md) | 26 |
+| [EventBus](API/EventBus.md) | 23 |
+| [HealthCheck](API/HealthCheck.md) | 27 |
 | [HotReload](API/HotReload.md) | 1 |
 | [IContract](API/IContract.md) | 5 |
-| [InfraVerification](API/InfraVerification.md) | 17 |
+| [InfraVerification](API/InfraVerification.md) | 14 |
 | [LanguageDetector](API/LanguageDetector.md) | 6 |
-| [Loader](API/Loader.md) | 22 |
+| [Loader](API/Loader.md) | 23 |
 | [Locale](API/Locale.md) | 13 |
 | [Logging](API/Logging.md) | 36 |
 | [Menu](API/Menu.md) | 4 |
-| [Metrics](API/Metrics.md) | 48 |
+| [Metrics](API/Metrics.md) | 52 |
 | [ModuleDependencies](API/ModuleDependencies.md) | 3 |
-| [Orchestrator](API/Orchestrator.md) | 39 |
+| [Orchestrator](API/Orchestrator.md) | 5 |
 | [Parallel](API/Parallel.md) | 4 |
-| [PathUtils](API/PathUtils.md) | 15 |
+| [PathUtils](API/PathUtils.md) | 22 |
 | [Avalonia](API/Avalonia.md) | 1 |
 | [Cpp](API/Cpp.md) | 4 |
 | [Docker](API/Docker.md) | 4 |
 | [Elixir](API/Elixir.md) | 1 |
 | [Go](API/Go.md) | 1 |
-| [DotnetHelpers](API/DotnetHelpers.md) | 6 |
-| [PluginHelpers](API/PluginHelpers.md) | 23 |
+| [DotnetHelpers](API/DotnetHelpers.md) | 7 |
+| [PluginHelpers](API/PluginHelpers.md) | 27 |
 | [Java](API/Java.md) | 2 |
 | [Node](API/Node.md) | 1 |
 | [PHP](API/PHP.md) | 1 |
@@ -4137,23 +4399,25 @@ Parameters: State :PSObject
 | [Python](API/Python.md) | 2 |
 | [Ruby](API/Ruby.md) | 1 |
 | [PluginSDK](API/PluginSDK.md) | 13 |
-| [Policy](API/Policy.md) | 14 |
-| [Preflight](API/Preflight.md) | 3 |
+| [Policy](API/Policy.md) | 15 |
+| [Preflight](API/Preflight.md) | 4 |
+| [ProcessMetrics](API/ProcessMetrics.md) | 19 |
 | [Project](API/Project.md) | 8 |
 | [AndroidSdkProvider](API/AndroidSdkProvider.md) | 8 |
 | [BuildStrategyProvider](API/BuildStrategyProvider.md) | 10 |
 | [EnvironmentProvider](API/EnvironmentProvider.md) | 7 |
 | [RBAC](API/RBAC.md) | 26 |
-| [Report](API/Report.md) | 12 |
-| [RootCause](API/RootCause.md) | 11 |
-| [Sast](API/Sast.md) | 13 |
-| [SDK](API/SDK.md) | 26 |
-| [Security](API/Security.md) | 27 |
-| [SharedUtils](API/SharedUtils.md) | 42 |
-| [Siem](API/Siem.md) | 16 |
+| [Report](API/Report.md) | 18 |
+| [RootCause](API/RootCause.md) | 16 |
+| [Sast](API/Sast.md) | 17 |
+| [SDK](API/SDK.md) | 38 |
+| [Security](API/Security.md) | 28 |
+| [SharedUtils](API/SharedUtils.md) | 59 |
+| [Siem](API/Siem.md) | 15 |
 | [Standalone](API/Standalone.md) | 23 |
-| [SupplyChain](API/SupplyChain.md) | 16 |
-| [Versioning](API/Versioning.md) | 6 |
+| [SupplyChain](API/SupplyChain.md) | 20 |
+| [Versioning](API/Versioning.md) | 7 |
+| [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 70 module(s), 1020 function(s).
+Total: 72 module(s), 1089 function(s).
 

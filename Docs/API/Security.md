@@ -1,6 +1,6 @@
 # Security
 
-27 function(s). Source: `Modules/Security.psm1`
+28 function(s). Source: `Modules/Security.psm1`
 
 ### Get-SecretPatterns
 
@@ -9,10 +9,6 @@ Parameters: State :PSObject
 ### Get-SecurityConfigValue
 
 Parameters: State :PSObject, Path :String, Default :Object
-
-### Invoke-BuildSecretProtect
-
-Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
 
 ### Protect-SecurityText
 
@@ -26,6 +22,10 @@ Parameters: Tool :String, Operation :String, ExitCode :Int32
 
 Parameters: State :PSObject
 
+### Get-CodeSigningStatus
+
+Parameters: State :PSObject
+
 ### ConvertTo-CanonicalLicenseKey
 
 Parameters: Value :String
@@ -33,6 +33,8 @@ Parameters: Value :String
 ### Test-SecurityInventoryFile
 
 Parameters: FileName :String, Extension :String
+
+### Reset-AuditLogPath
 
 ### Write-AuditLog
 
@@ -56,17 +58,17 @@ Parameters: State :PSObject, SearchRoot :String, ExcludeDirs :String[]
 
 Parameters: Tool :String, Arguments :String[], WorkingDirectory :String, State :PSObject
 
-### Get-SecurityManifestFiles
-
-Parameters: Root :String, Names :String[]
-
 ### ConvertTo-SecurityJson
 
 Parameters: Text :String
 
-### Get-SecurityToolFailure
+### Resolve-SecuritySearchRoot
 
-Parameters: Tool :String, Operation :String, ExitCode :Int32, State :PSObject
+Parameters: State :PSObject, Caller :String
+
+### Get-SecurityManifestSearchDepth
+
+Parameters: State :PSObject
 
 ### Get-SecurityScanDepth
 

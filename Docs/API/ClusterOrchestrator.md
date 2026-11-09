@@ -1,6 +1,6 @@
 # ClusterOrchestrator
 
-26 function(s). Source: `Modules/ClusterOrchestrator.psm1`
+25 function(s). Source: `Modules/ClusterOrchestrator.psm1`
 
 ### Get-ClusterDefault
 
@@ -79,10 +79,6 @@ Parameters: State :PSObject, BuildSpec :Hashtable, Requirements :Hashtable
 Parameters: BuildId :String, ClusterName :String, Namespace :String, State :PSObject
 
 ### Stop-ClusterBuild
-
-Parameters: BuildId :String, ClusterName :String, Namespace :String, State :PSObject
-
-### Cancel-ClusterBuild
 
 Parameters: BuildId :String, ClusterName :String, Namespace :String, State :PSObject
 

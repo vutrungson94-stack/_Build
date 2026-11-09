@@ -1,10 +1,16 @@
 # BuildConstants
 
-7 function(s). Source: `Modules/BuildConstants.psm1`
+8 function(s). Source: `Modules/BuildConstants.psm1`
+
+### Get-BuildPathLiteralPatterns
 
 ### Get-BuildDefault
 
 Parameters: Key :String, Fallback :Object
+
+### Get-BuildTimestamp
+
+Parameters: Kind :String, At :DateTime
 
 ### Get-BuildSetting
 
@@ -13,10 +19,6 @@ Parameters: Key :String, State :PSObject, Fallback :Object
 ### Get-ProjectMarkers
 
 Parameters: State :PSObject
-
-### Get-BuildConfigPath
-
-Parameters: Key :String
 
 ### Get-SeverityRank
 

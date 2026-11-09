@@ -1,6 +1,6 @@
 # CredentialVault
 
-23 function(s). Source: `Modules/CredentialVault.psm1`
+21 function(s). Source: `Modules/CredentialVault.psm1`
 
 ### Get-SafeVaultTenant
 
@@ -71,14 +71,6 @@ Parameters: Value :String, Purpose :String, State :PSObject, KeyFilePath :String
 ### Unprotect-CredentialValue
 
 Parameters: ProtectedValue :String, Purpose :String, State :PSObject, KeyFilePath :String
-
-### Resolve-SecretValue
-
-Parameters: Value :String, Purpose :String, State :PSObject, KeyFilePath :String
-
-### ConvertTo-EncryptedSecret
-
-Parameters: Value :String, Purpose :String, State :PSObject, KeyFilePath :String
 
 ### Resolve-ConfigSecrets
 

@@ -2,23 +2,7 @@
 
 26 function(s). Source: `Modules/RBAC.psm1`
 
-### New-RBACRole
-
-Parameters: RoleName :String, Permissions :String[], Description :String, Inherits :String, State :PSObject
-
-### Remove-RBACRole
-
-Parameters: RoleName :String, State :PSObject
-
-### Set-RBACRolePermissions
-
-Parameters: RoleName :String, Permissions :String[], Description :String, Inherits :String, State :PSObject
-
-### Get-RBACRoles
-
-Parameters: State :PSObject
-
-### Get-RBACResources
+### Get-RbacCacheKey
 
 Parameters: State :PSObject
 
@@ -94,9 +78,13 @@ Parameters: State :PSObject, Action :String, ReportType :String, UserName :Strin
 
 Parameters: State :PSObject, Action :String, ArtifactType :String, UserName :String
 
+### Get-RbacEnforcementMode
+
+Parameters: State :PSObject
+
 ### Test-PolicyAuthorization
 
-Parameters: State :PSObject, PolicyName :String, Input :Hashtable
+Parameters: State :PSObject, PolicyName :String, PolicyInput :Hashtable
 
 ### Write-RBACAuditEntry
 
@@ -105,5 +93,17 @@ Parameters: State :PSObject, Action :String, Allowed :Boolean, UserName :String,
 ### Assert-RBACAuthorization
 
 Parameters: State :PSObject, Permission :String, Resource :String, Action :String, UserName :String, Message :String
+
+### Get-BuildActionPermission
+
+Parameters: Action :String
+
+### Get-RbacPrivilegedActions
+
+Parameters: Kind :String
+
+### Test-ActionAllowed
+
+Parameters: State :PSObject, Action :String
 
 

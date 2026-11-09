@@ -32,7 +32,7 @@ Parameters: State :Object, ProjPath :Object, Tfm :Object, OutputSubDir :Object, 
 
 ### Test-WebAppReady
 
-Parameters: Proc :Object, Url :String, Port :Int32, State :Object
+Parameters: Proc :Object, Url :String, Port :Int32, State :Object, MaxAttempts :Int32, ProbeDelayMs :Int32, ProbeDelayMinMs :Int32, PortProbe :Boolean
 
 ### Test-ProcessExited
 

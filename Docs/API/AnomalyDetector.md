@@ -1,14 +1,14 @@
 # AnomalyDetector
 
-24 function(s). Source: `Modules/AnomalyDetector.psm1`
+21 function(s). Source: `Modules/AnomalyDetector.psm1`
 
-### Get-AnomalyValue
-
-Parameters: Object :Object, Name :String, Default :Object
-
-### Get-AnomalyRoot
+### Get-DiagnosticRoot
 
 Parameters: State :PSObject
+
+### Resolve-DiagnosticPath
+
+Parameters: State :PSObject, Path :String
 
 ### Resolve-AnomalyPath
 
@@ -17,18 +17,6 @@ Parameters: State :PSObject, Path :String
 ### Get-AnomalyConfig
 
 Parameters: State :PSObject
-
-### Enter-AnomalyHistoryLock
-
-Parameters: Path :String
-
-### Read-AnomalyLines
-
-Parameters: Path :String
-
-### Write-AnomalyLines
-
-Parameters: Path :String, Lines :String[]
 
 ### ConvertTo-AnomalySampleRecord
 
@@ -92,7 +80,7 @@ Parameters: Report :PSObject, State :PSObject
 
 ### Protect-AnomalyText
 
-Parameters: Text :Object
+Parameters: Text :Object, State :PSObject
 
 ### Send-AnomalyAlert
 

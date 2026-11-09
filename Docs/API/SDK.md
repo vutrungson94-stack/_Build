@@ -1,6 +1,6 @@
 # SDK
 
-26 function(s). Source: `Modules/SDK.psm1`
+38 function(s). Source: `Modules/SDK.psm1`
 
 ### Get-SdkConfigDefaults
 
@@ -9,6 +9,10 @@
 Parameters: PropertyName :String, State :PSObject
 
 ### Update-AndroidSdkConfig
+
+Parameters: State :PSObject
+
+### GetAndroidPriorityPaths
 
 Parameters: State :PSObject
 
@@ -94,12 +98,54 @@ Parameters: State :PSObject
 
 Parameters: DotnetExe :String
 
+### ConvertTo-DotnetVersionTriple
+
+Parameters: Version :String
+
+### Get-GlobalJsonSdkPin
+
+Parameters: State :PSObject
+
+### Get-InstalledDotnetSdks
+
+Parameters: DotnetExe :String
+
+### Test-DotnetPinSatisfied
+
+Parameters: RequiredVersion :String, InstalledSdks :String[], RollForward :String
+
+### Compare-DotnetVersion
+
+Parameters: A :String, B :String
+
+### Get-ReleaseMetadataCachePath
+
+Parameters: State :PSObject
+
+### Get-LatestReleasedSdkVersion
+
+Parameters: State :PSObject, Channel :String
+
 ### Install-SdkFromRemote
 
-Parameters: State :PSObject, ToolType :String
+Parameters: State :PSObject, ToolType :String, RequiredVersion :String
+
+### Get-SdkMemoKey
+
+Parameters: ToolType :String, State :PSObject
+
+### Reset-SdkMemo
 
 ### Get-SmartSdk
 
 Parameters: State :PSObject, ToolType :String
+
+### Resolve-PinnedDotnetSdk
+
+Parameters: State :PSObject, CandidateExe :String
+
+### Resolve-DotnetSdkCommand
+
+Parameters: State :PSObject, PreferredPath :String
 
 

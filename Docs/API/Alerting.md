@@ -22,10 +22,6 @@ Parameters: Name :String
 
 Parameters: Url :String
 
-### Invoke-BuildSecretProtect
-
-Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
-
 ### Protect-AlertText
 
 Parameters: Text :Object, State :PSObject
@@ -49,6 +45,8 @@ Parameters: Config :Object, MaxAttempts :Int32, RetryDelayMs :Int32, State :PSOb
 ### Invoke-WebhookPost
 
 Parameters: Url :String, Payload :Object, Label :String, Headers :Hashtable, State :PSObject, TimeoutSec :Int32, MaxAttempts :Int32, RetryDelayMs :Int32, IdempotencyKey :String, Config :Object
+
+### Get-AlertRotationHours
 
 ### New-WebhookToken
 

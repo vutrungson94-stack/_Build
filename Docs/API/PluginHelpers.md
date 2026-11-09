@@ -1,10 +1,14 @@
 # PluginHelpers
 
-23 function(s). Source: `Modules/Plugins\helpers\PluginHelpers.psm1`
+27 function(s). Source: `Modules/Plugins\helpers\PluginHelpers.psm1`
 
 ### Resolve-PluginManifest
 
 Parameters: ProjectFile :String, ProjectDir :String, ManifestFiles :String[]
+
+### Get-PluginLocaleText
+
+Parameters: Key :String, MessageArgs :String[], Fallback :String
 
 ### Get-SimplePluginPreflight
 
@@ -17,6 +21,18 @@ Parameters: ToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], 
 ### Invoke-SimplePluginLint
 
 Parameters: ToolName :String, LintToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], LintCommand :String, State :PSObject, ProjectDir :String, ProjectFile :String, Configuration :String, MissingToolLevel :String, SoftFail :SwitchParameter, Detailed :SwitchParameter
+
+### Invoke-SimplePluginClean
+
+Parameters: ToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], CleanCommand :String, State :PSObject, ProjectDir :String, ProjectFile :String, Configuration :String, Detailed :SwitchParameter
+
+### Invoke-SimplePluginRun
+
+Parameters: ToolName :String, ToolNotFoundMsg :String, ManifestFiles :String[], RunCommand :String, State :PSObject, ProjectDir :String, ProjectFile :String, Configuration :String, Arguments :String, Detailed :SwitchParameter
+
+### Resolve-PluginRunEntry
+
+Parameters: ProjectDir :String, ProjectFile :String, AllowedExtensions :String[]
 
 ### Resolve-PluginBuild
 

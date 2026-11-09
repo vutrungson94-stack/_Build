@@ -1,6 +1,6 @@
 # SupplyChain
 
-16 function(s). Source: `Modules/SupplyChain.psm1`
+20 function(s). Source: `Modules/SupplyChain.psm1`
 
 ### Get-SupplyChainProjectName
 
@@ -28,7 +28,7 @@ Parameters: Path :String, Data :Object
 
 ### Get-DependencyInventory
 
-Parameters: ProjectDir :String, ProjectFile :String
+Parameters: ProjectDir :String, ProjectFile :String, State :PSObject
 
 ### New-BuildSbom
 
@@ -61,6 +61,22 @@ Parameters: State :PSObject, Sbom :Object
 ### Invoke-SupplyChainChecks
 
 Parameters: State :PSObject, ProjectDir :String, PublishOutput :String
+
+### Resolve-TransparencyLogPath
+
+Parameters: State :PSObject
+
+### Write-TransparencyLogEntry
+
+Parameters: Statement :Object, State :PSObject
+
+### Send-TransparencyEntryToRekor
+
+Parameters: Entry :Object, State :PSObject
+
+### Test-TransparencyLog
+
+Parameters: State :PSObject, ExpectedTip :String
 
 ### Get-ArtifactDigest
 

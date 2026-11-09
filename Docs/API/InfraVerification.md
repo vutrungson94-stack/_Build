@@ -1,10 +1,6 @@
 # InfraVerification
 
-17 function(s). Source: `Modules/InfraVerification.psm1`
-
-### Get-InfraValue
-
-Parameters: Object :Object, Name :String, Default :Object
+14 function(s). Source: `Modules/InfraVerification.psm1`
 
 ### Get-InfraTimeout
 
@@ -58,15 +54,7 @@ Parameters: State :PSObject, SendTest :Boolean, RequestTimeout :Int32
 
 Parameters: State :PSObject, Checks :Object[], Config :PSObject
 
-### Invoke-InfraAutoRemediate
-
-Parameters: State :PSObject, Checks :Object[], Config :PSObject
-
 ### Invoke-InfraVerification
-
-Parameters: State :PSObject, Force :SwitchParameter, Remediate :SwitchParameter, AutoRemediate :SwitchParameter
-
-### Invoke-InfraVerify
 
 Parameters: State :PSObject, Force :SwitchParameter, Remediate :SwitchParameter, AutoRemediate :SwitchParameter
 

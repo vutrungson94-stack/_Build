@@ -2,10 +2,6 @@
 
 26 function(s). Source: `Modules/AutoTuner.psm1`
 
-### Get-AutoTuneValue
-
-Parameters: Object :Object, Name :String, Default :Object
-
 ### Get-AutoTuneRoot
 
 Parameters: State :PSObject
@@ -43,18 +39,6 @@ Parameters: Stats :Hashtable, DurationSec :Double, Success :Boolean, ParallelJob
 ### AutoTuneStatsFinalize
 
 Parameters: Stats :Hashtable
-
-### Enter-AutoTuneHistoryLock
-
-Parameters: Path :String
-
-### Read-AutoTuneHistoryLines
-
-Parameters: Path :String
-
-### Write-AutoTuneHistoryLines
-
-Parameters: Path :String, Lines :String[]
 
 ### ConvertTo-AutoTuneRecord
 
@@ -103,5 +87,21 @@ Parameters: State :PSObject
 ### Get-AutoTuneRecommendations
 
 Parameters: State :PSObject
+
+### Resolve-AutoTuneProposalPath
+
+Parameters: State :PSObject
+
+### New-AutoTuneProposal
+
+Parameters: Changes :Hashtable, State :PSObject, PilotScope :String
+
+### Test-AutoTunePilotApproved
+
+Parameters: State :PSObject, ProposalId :String
+
+### Approve-AutoTuneProposal
+
+Parameters: Id :String, Decision :String, Evidence :String, State :PSObject
 
 

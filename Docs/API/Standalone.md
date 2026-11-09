@@ -10,11 +10,11 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject
 
-### Sign-StandaloneBundle
+### Get-StandaloneBundleSignature
 
 Parameters: BundlePath :String, State :PSObject, Detailed :SwitchParameter
 
-### Generate-StandaloneBundleSupplyChain
+### New-StandaloneBundleSupplyChain
 
 Parameters: BundlePath :String, State :PSObject, Detailed :SwitchParameter
 
@@ -40,13 +40,13 @@ Parameters: RelPath :String
 
 Parameters: Path :String
 
-### Get-StandaloneSha256
+### Get-StandaloneHash
 
 Parameters: Bytes :Byte[]
 
 ### Get-StandaloneObjectProperty
 
-Parameters: Object :Object, Name :String
+Parameters: Object :Object, Name :String, Default :Object
 
 ### Assert-StandaloneResourceSet
 

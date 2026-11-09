@@ -1,6 +1,6 @@
 # CacheProvider
 
-51 function(s). Source: `Modules/CacheProvider.psm1`
+50 function(s). Source: `Modules/CacheProvider.psm1`
 
 ### Get-ProcessEnvironmentSnapshot
 
@@ -86,10 +86,6 @@ Parameters: Path :String, MaxBytes :Int64
 
 Parameters: SourcePath :String, DestinationPath :String
 
-### Enter-CacheIndexLock
-
-Parameters: IndexPath :String, TimeoutMs :Int32
-
 ### Compress-CacheFile
 
 Parameters: SourcePath :String, DestinationPath :String
@@ -104,7 +100,7 @@ Parameters: State :PSObject, CacheDir :String
 
 ### Invoke-UnifiedCacheEviction
 
-Parameters: State :PSObject, CacheDir :String, MaxSizeMB :Int32
+Parameters: State :PSObject, CacheDir :String
 
 ### Resolve-CacheAddressValue
 
@@ -190,7 +186,7 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject
 
-### Replicate-ToRegion
+### Copy-ToRegion
 
 Parameters: SourceRegion :Hashtable, TargetRegion :Hashtable, Key :String, LocalFilePath :String, State :PSObject
 

@@ -1,6 +1,6 @@
 # Preflight
 
-3 function(s). Source: `Modules/Preflight.psm1`
+4 function(s). Source: `Modules/Preflight.psm1`
 
 ### Test-ProjectManifest
 
@@ -13,5 +13,9 @@ Parameters: Tools :String[], State :PSObject
 ### Invoke-PreflightValidation
 
 Parameters: State :PSObject, ProjectDir :String, ProjectFile :String
+
+### Test-ToolchainHermetic
+
+Parameters: ToolRoot :String
 
 

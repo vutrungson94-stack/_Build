@@ -1,13 +1,13 @@
 {
   "$schema": "./process-baseline.schema.json",
-  "description": "Quantitative baseline of the gbuild verification process itself. This file is the L4 artefact: the numbers below are MEASURED, not aspirational. CI regenerates the per-run counterpart (Tests/TestResults/process-baseline.json, gitignored) and the Hygiene gate compares the two with tolerance. Update this file only when the process itself changes (new scope, new gate, accepted skip) - never to make a red run green.",
-  "generatedAtUtc": "2026-10-12T00:00:00Z",
+  "description": "Quantitative baseline of the gbuild verification process itself. This file is the L4 artefact: the numbers below are MEASURED, not aspirational. The per-run adoption curve is appended to Tests/TestResults/process-trend.jsonl (gitignored); the Hygiene gate reads the committed floor in this file, so it works on a fresh checkout with no history. Nothing regenerates a per-run process-baseline.json - that claim was removed when the trend file became the per-run artefact. Update this file only when the process itself changes (new scope, new gate, accepted skip) - never to make a red run green.",
+  "generatedAtUtc": "2026-11-09T10:30:00Z",
   "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All + Tests/Run-E2ETests.ps1 -Scope All",
   "host": "windows-2025 / pwsh 7.6",
   "core": {
-    "scopes": 94,
-    "testsTotal": 1123,
-    "passed": 1117,
+    "scopes": 112,
+    "testsTotal": 1566,
+    "passed": 1560,
     "failedAllowed": 0,
     "skipped": 6,
     "skippedMaxAllowed": 8,

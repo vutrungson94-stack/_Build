@@ -1,6 +1,6 @@
 # Sast
 
-13 function(s). Source: `Modules/Sast.psm1`
+17 function(s). Source: `Modules/Sast.psm1`
 
 ### Get-SastConfig
 
@@ -22,25 +22,39 @@ Parameters: State :PSObject
 
 Parameters: Language :String, State :PSObject
 
+### Resolve-SastToolPath
+
+Parameters: Tool :String, State :PSObject
+
 ### Test-SastToolAvailable
 
-Parameters: Tool :String
-
-### Invoke-BuildSecretProtect
-
-Parameters: Text :String, State :PSObject, Patterns :Array, RedactUrls :SwitchParameter, UrlRedactor :ScriptBlock
+Parameters: Tool :String, State :PSObject
 
 ### Protect-SastText
 
 Parameters: Text :String, State :PSObject
 
+### Get-SastToolName
+
+Parameters: Fallback :String
+
 ### Get-SastToolPolicy
 
 Parameters: State :PSObject
 
+### Get-SastExcludePattern
+
+### Test-SastTestFixturePath
+
+Parameters: FullName :String
+
 ### Get-SastProjectLanguages
 
 Parameters: ProjectDir :String, State :PSObject
+
+### ConvertTo-ScriptAnalyzerFindings
+
+Parameters: Records :Object[]
 
 ### ConvertTo-SastFindings
 

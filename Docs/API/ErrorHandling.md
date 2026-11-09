@@ -1,6 +1,10 @@
 # ErrorHandling
 
-23 function(s). Source: `Modules/ErrorHandling.psm1`
+26 function(s). Source: `Modules/ErrorHandling.psm1`
+
+### Set-NonRetryableOperation
+
+Parameters: State :PSObject, Operation :String, Clear :SwitchParameter
 
 ### Get-ErrorCategoryInfo
 
@@ -8,7 +12,7 @@ Parameters: Category :String
 
 ### Get-ErrorCategory
 
-Parameters: ErrorRecord :Object
+Parameters: ErrorRecord :Object, State :PSObject
 
 ### New-BuildError
 
@@ -17,6 +21,10 @@ Parameters: Message :String, Category :String, Code :String, Suggestion :String,
 ### Invoke-WithRetry
 
 Parameters: Action :ScriptBlock, OperationName :String, MaxRetries :Int32, BaseDelayMs :Int32, MaxDelayMs :Int32, TotalTimeoutSec :Int32, State :PSObject
+
+### Invoke-HistoryWriteWithRetry
+
+Parameters: Action :ScriptBlock, OperationName :String, MaxAttempts :Int32, BaseDelayMs :Int32
 
 ### Initialize-CircuitBreaker
 
@@ -64,11 +72,13 @@ Parameters: State :PSObject
 
 ### Save-BuildState
 
-Parameters: State :PSObject, Path :String
+Parameters: State :PSObject, Path :String, Completed :Boolean
 
 ### Restore-BuildState
 
 Parameters: Path :String, State :PSObject
+
+### Get-RestoredStateInfo
 
 ### Get-ErrorSummary
 

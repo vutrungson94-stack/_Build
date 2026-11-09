@@ -1,6 +1,8 @@
 # Loader
 
-22 function(s). Source: `Modules/Loader.psm1`
+23 function(s). Source: `Modules/Loader.psm1`
+
+### Get-DispatchManifestFiles
 
 ### Register
 
@@ -10,15 +12,11 @@
 
 ### Clear
 
-### Count
-
-### Invoke-PluginCommand
-
-Parameters: ScriptBlock :ScriptBlock, State :PSObject, ProjectDir :String, Label :String, WorkingDir :String, ArgumentList :Object[], Quiet :SwitchParameter
-
 ### Test-PluginInterface
 
 Parameters: ModuleName :String, State :PSObject
+
+### Get-ExternalPluginRoots
 
 ### Register-Plugins
 
@@ -57,6 +55,10 @@ Parameters: Result :Object, State :PSObject, ProjectDir :String
 ### Invoke-PluginBuildFor
 
 Parameters: State :PSObject, Language :String, ProjectDir :String, ProjectFile :String, Configuration :String, Incremental :SwitchParameter, Detailed :SwitchParameter
+
+### Invoke-PluginActionFor
+
+Parameters: State :PSObject, Verb :String, Language :String, ProjectDir :String, ProjectFile :String, Configuration :String, Arguments :String, Incremental :SwitchParameter, WithManifestFiles :SwitchParameter, PassIncremental :SwitchParameter, PassArguments :SwitchParameter, Detailed :SwitchParameter
 
 ### Invoke-PluginTestFor
 

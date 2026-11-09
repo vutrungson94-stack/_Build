@@ -1,10 +1,6 @@
 # Siem
 
-16 function(s). Source: `Modules/Siem.psm1`
-
-### Get-SiemValue
-
-Parameters: Object :Object, Name :String, Default :Object
+15 function(s). Source: `Modules/Siem.psm1`
 
 ### Get-SiemConfig
 
@@ -18,15 +14,15 @@ Parameters: State :PSObject
 
 Parameters: Entry :Hashtable
 
-### Escape-SiemHeader
+### Format-SiemHeader
 
 Parameters: Value :Object
 
-### Escape-SiemExtension
+### Format-SiemExtension
 
 Parameters: Value :Object
 
-### Escape-SiemStructuredValue
+### Format-SiemStructuredValue
 
 Parameters: Value :Object
 

@@ -8,7 +8,9 @@ Parameters: Key :String, Fallback :Object
 
 ### Resolve-LogMessage
 
-Parameters: Key :String, MessageArgs :String[]
+Parameters: Key :String, MessageArgs :String[], Fallback :String
+
+### Get-LogDisplayTimestamp
 
 ### Get-LogLocalized
 
@@ -99,10 +101,6 @@ Parameters: Text :String, Color :String, ShowSeparator :Boolean, State :PSObject
 ### Write-SectionBox
 
 Parameters: Title :String, Color :String, State :PSObject
-
-### Import-ModuleIfExists
-
-Parameters: ModulePath :String, Required :SwitchParameter
 
 ### Set-StateColors
 

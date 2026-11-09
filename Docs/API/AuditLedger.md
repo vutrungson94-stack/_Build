@@ -1,6 +1,6 @@
 # AuditLedger
 
-27 function(s). Source: `Modules/AuditLedger.psm1`
+32 function(s). Source: `Modules/AuditLedger.psm1`
 
 ### Get-AuditLedgerDefault
 
@@ -16,17 +16,21 @@ Parameters: Override :Object
 
 ### Initialize-AuditLedger
 
+Parameters: State :PSObject, Force :SwitchParameter
+
+### Assert-LedgerBackendProvider
+
 Parameters: State :PSObject
 
 ### Get-LedgerField
 
-Parameters: Entry :Object, Name :String
+Parameters: Entry :Object, Name :String, Default :Object
 
 ### ConvertTo-LedgerScalar
 
 Parameters: Value :Object
 
-### Compute-MerkleRoot
+### Get-MerkleRoot
 
 Parameters: LeafHashes :String[]
 
@@ -34,7 +38,7 @@ Parameters: LeafHashes :String[]
 
 Parameters: State :PSObject, Format :String, OutputPath :String, Filter :Hashtable
 
-### Enforce-AuditRetention
+### Update-AuditRetention
 
 Parameters: State :PSObject
 
@@ -46,6 +50,10 @@ Parameters: State :PSObject
 
 Parameters: State :PSObject
 
+### Get-AuditLedgerRoot
+
+Parameters: State :PSObject
+
 ### Get-LedgerPath
 
 Parameters: State :PSObject
@@ -54,7 +62,7 @@ Parameters: State :PSObject
 
 Parameters: Entry :Object, PreviousHash :String, ForSigning :SwitchParameter
 
-### Compute-EntryHash
+### Get-EntryHash
 
 Parameters: Entry :Object, PreviousHash :String
 
@@ -66,11 +74,15 @@ Parameters: Entry :Object, PreviousHash :String
 
 Parameters: Pem :String, Password :String
 
-### Sign-Data
+### Get-LedgerSignaturePrimitive
+
+Parameters: Algorithm :String
+
+### Get-DataSignature
 
 Parameters: Data :String, KeyPath :String, Algorithm :String
 
-### Verify-Signature
+### Test-Signature
 
 Parameters: Data :String, Signature :String, CertPath :String, Algorithm :String
 
@@ -86,19 +98,27 @@ Parameters: Path :String
 
 Parameters: Path :String
 
+### Repair-LedgerTornTail
+
+Parameters: Path :String, State :PSObject
+
 ### Save-AuditLedgerCheckpoint
 
 Parameters: State :PSObject, Sequence :Int32
+
+### Get-AuditLedgerAnchor
+
+Parameters: State :PSObject
 
 ### Write-AuditLedgerEntry
 
 Parameters: State :PSObject, Entry :Hashtable, Force :SwitchParameter
 
-### Verify-AuditLedger
+### Test-AuditLedger
 
 Parameters: State :PSObject, MaxEntries :Int32, FullChain :SwitchParameter
 
-### Verify-AuditLedgerRange
+### Test-AuditLedgerRange
 
 Parameters: State :PSObject, FromSequence :Int32, ToSequence :Int32
 
@@ -108,6 +128,6 @@ Parameters: State :PSObject
 
 ### Set-WormProtection
 
-Parameters: Path :String, Enable :SwitchParameter
+Parameters: Path :String, Enable :SwitchParameter, Disable :SwitchParameter
 
 

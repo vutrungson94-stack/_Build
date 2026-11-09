@@ -1,6 +1,6 @@
 # Policy
 
-14 function(s). Source: `Modules/Policy.psm1`
+15 function(s). Source: `Modules/Policy.psm1`
 
 ### Test-OpaAvailable
 
@@ -23,6 +23,8 @@ Parameters: Rule :Object, Name :String, Default :Object
 ### Test-PolicyPatternValue
 
 Parameters: Value :String, Pattern :String
+
+### Get-PolicyExcludePattern
 
 ### Test-PolicyPathMatch
 

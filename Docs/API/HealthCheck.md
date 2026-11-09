@@ -1,10 +1,6 @@
 # HealthCheck
 
-29 function(s). Source: `Modules/HealthCheck.psm1`
-
-### Get-HealthValue
-
-Parameters: Object :Object, Name :String, Default :Object
+27 function(s). Source: `Modules/HealthCheck.psm1`
 
 ### Get-HealthConfigValue
 
@@ -29,10 +25,6 @@ Parameters: Status :String
 ### New-HealthResult
 
 Parameters: Name :String, Status :String, Message :String, Suggestion :String, Details :String, CheckedPorts :Int32[], InUsePorts :Int32[]
-
-### Get-HealthToolPath
-
-Parameters: Tool :String
 
 ### Test-DotnetSdk
 
@@ -64,7 +56,7 @@ Parameters: Url :String
 
 ### Protect-HealthText
 
-Parameters: Text :Object
+Parameters: Text :Object, State :PSObject
 
 ### Test-NetworkConnectivity
 

@@ -1,6 +1,6 @@
 # ConfigProvider
 
-26 function(s). Source: `Modules/ConfigProvider.psm1`
+27 function(s). Source: `Modules/ConfigProvider.psm1`
 
 ### Test-ConfigProperty
 
@@ -22,7 +22,7 @@ Parameters: Object :Object, Name :String
 
 Parameters: BuildSection :Object, RemoveLegacy :SwitchParameter
 
-### Normalize-ConfigAliases
+### Update-ConfigAliases
 
 Parameters: Config :Object, RemoveLegacy :SwitchParameter
 
@@ -95,6 +95,14 @@ Parameters: Section :Object, Key :String, Default :Object
 ### ConvertTo-TargetType
 
 Parameters: Value :Object, Type :String
+
+### Test-BuildConfigSchemaObject
+
+Parameters: Instance :Object, Schema :Object, Path :String, MaxErrors :Int32
+
+### Test-BuildConfigSchema
+
+Parameters: Instance :Object, Schema :Object, Strict :SwitchParameter
 
 ### Test-ConfigSchema
 

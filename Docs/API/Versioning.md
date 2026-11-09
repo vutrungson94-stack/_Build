@@ -1,6 +1,10 @@
 # Versioning
 
-6 function(s). Source: `Modules/Versioning.psm1`
+7 function(s). Source: `Modules/Versioning.psm1`
+
+### Resolve-VersionSearchRoot
+
+Parameters: State :PSObject
 
 ### Find-VersionCsproj
 

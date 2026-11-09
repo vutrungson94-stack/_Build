@@ -1,10 +1,6 @@
 # EventBus
 
-22 function(s). Source: `Modules/EventBus.psm1`
-
-### Get-EventValue
-
-Parameters: Object :Object, Name :String, Default :Object
+23 function(s). Source: `Modules/EventBus.psm1`
 
 ### Get-EventTenant
 
@@ -25,6 +21,8 @@ Parameters: Data :Object
 ### Subscribe
 
 ### Unsubscribe
+
+### UnsubscribeAll
 
 ### Publish
 
@@ -48,13 +46,13 @@ Parameters: EventName :String, Handler :ScriptBlock, TenantId :String
 
 Parameters: EventName :String, Source :Object, Data :Object, TenantId :String
 
-### Get-BuildEventContract
-
 ### Get-BuildEventErrors
 
 Parameters: TenantId :String
 
 ### Get-BuildEventSubscribers
+
+Parameters: EventName :String, Handler :ScriptBlock, TenantId :String
 
 ### Get-BuildEventHandlers
 
@@ -65,5 +63,13 @@ Parameters: EventName :String, TenantId :String
 Parameters: TenantId :String
 
 ### Get-BuildEventBus
+
+### Get-EventPayloadField
+
+Parameters: Data :Object, Field :String, EventName :String, Default :Object
+
+### Test-BuildEventPayloadContract
+
+Parameters: ModulesRoot :String, ExtraFiles :String[]
 
 
