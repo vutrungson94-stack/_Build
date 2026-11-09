@@ -49,13 +49,22 @@ Every change goes through this loop, in order:
    pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Import-Module './Modules/Documentation.psm1' -Force; Show-GBuildHelp -Modules"
    ```
    `Tests/Documentation.Tests.ps1` fails if `Docs/api-reference.md` or
-   `Docs/API/*.md` drift from the module inventory.
-7. **Build/Sync** — `_Tests` → `_Build` → `_Sync`, in that order:
+   `Docs/API/*.md` drift from the module inventory. If the change reverses an
+   architectural decision, update `Docs/ADRs/` in the same change (new ADR or
+   `Superseded by`, never an in-place edit of a decision).
+7. **Baseline** — `Tests/process-baseline.json` holds MEASURED numbers. When the
+   process changes (a new scope, a new gate, an accepted skip), update the
+   measured values and the `generatedAtUtc`. Never edit a floor
+   (`adoptionFloor.*.minAdoption`, `coverage.floorPercent`,
+   `core.skippedMaxAllowed`) upward to make a red run green — raising a floor is
+   the ratchet and it goes down as the backlog shrinks, never up to pass.
+8. **Build/Sync** — `_Tests` → `_Build` → `_Sync`, in that order:
    ```powershell
-   _Tests/gtest.ps1  -Project . -NonInteractive
-   _Build/gbuild.ps1 -Project . -NonInteractive
+   _Tests/gtest.ps1  -SelfTest                 # harness gates (parse, config, imports, hygiene, validation, suite)
+   pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips
    _Sync/gsync.ps1   -Project . -Yes -NonInteractive
    ```
+   Do not run `_Tests -Project .` against `_Build` itself — see §6.
 
 You are not finished when the code looks right. You are finished when the loop is
 green.
