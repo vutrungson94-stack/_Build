@@ -223,7 +223,7 @@ pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-E2ETest
 
 # External harnesses
 _Tests/gtest.ps1  -SelfTest                 # harness gates (parse, config, imports, hygiene, validation, suite)
-_Build/gbuild.ps1 -Project . -NonInteractive # the project's own suite (authoritative for _Build)
+pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips
 _Sync/gsync.ps1   -Project . -Yes -NonInteractive
 ```
 
