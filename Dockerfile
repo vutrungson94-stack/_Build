@@ -25,12 +25,21 @@ ENV DOTNET_NOLOGO=true \
     DOTNET_CLI_TELEMETRY_OPTOUT=true \
     DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        ca-certificates \
-        curl \
-        git \
-    && rm -rf /var/lib/apt/lists/*
+# apt metadata and package files on Ubuntu security mirrors can be briefly
+# out of sync, which makes apt exit 100 with 404 Not Found on a valid version.
+# Retry the update+install pair together so a transient mirror gap does not
+# fail the multi-arch build.
+RUN for attempt in 1 2 3; do \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            git \
+        && rm -rf /var/lib/apt/lists/* \
+        && break; \
+        echo "apt update/install failed (attempt $attempt/3), retrying in 5s" >&2; \
+        sleep 5; \
+    done
 
 # Multi-arch Node install. Resolves the architecture from TARGETARCH and picks
 # the matching verified checksum; an unsupported architecture fails loudly here
