@@ -201,3 +201,23 @@ Describe 'PathUtils - project root resolution' {
         } finally { Remove-Item $late -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
+
+Describe 'PathUtils - TrimEnd coercion guard (regression)' {
+    It 'TrimEnd calls use single-character backslash arguments (no multi-char coercion throw)' {
+        $roots = @((Join-Path $global:GBuildModuleRoot '..' 'Modules'), (Join-Path $global:GBuildModuleRoot '..' 'Steps'))
+        $files = foreach ($r in $roots) { Get-ChildItem -Path $r -Recurse -Include '*.ps1','*.psm1' -ErrorAction SilentlyContinue }
+        $bad = @()
+        foreach ($f in $files) {
+            $content = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+            if (-not $content) { continue }
+            $pattern = "TrimEnd\(\s*'([^']*)'"
+            foreach ($m in [regex]::Matches($content, $pattern)) {
+                $arg = $m.Groups[1].Value
+                if ($arg.Contains([char]92) -and $arg.Length -ne 1) {
+                    $bad += "$($f.Name): TrimEnd('$arg', ...)"
+                }
+            }
+        }
+        $bad | Should -BeNullOrEmpty -Because ("multi-char backslash TrimEnd args throw at runtime: " + ($bad -join '; '))
+    }
+}

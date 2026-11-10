@@ -139,6 +139,14 @@ runs on the platform that exposed them.
   - Windows PowerShell 5.1 has no `$IsWindows` / `$IsLinux` / `$IsMacOS`.
     Import `Tests/Helpers/PlatformShim.ps1` in tests that branch on them.
   - `-Encoding UTF8` on every file read/write.
+  - `String.TrimEnd` (and any `params char[]` method) must be called with
+    SINGLE-CHARACTER string arguments only. A multi-character string such
+    as `'\'` (two backslashes) cannot be coerced to `System.Char` and
+    throws at runtime; inside a `try { ... } catch { return $false }`
+    that throw is swallowed and turns a valid path into a rejection
+    (this is how the macOS `/var` alias branch failed). Use one
+    backslash (`''`) or a `[char]` literal. Pinned by
+    `PathUtils.Tests.ps1` 'TrimEnd coercion guard'.
 
 ### 4.3 Module architecture
 
