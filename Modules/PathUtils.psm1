@@ -769,7 +769,7 @@ function Test-NoReparsePointInPath {
                     # Without this, Steps / CacheProvider / Deploy / Distributed
                     # fail on macOS with "Archive path escaped output directory".
                     if ($isPosixHost) {
-                        $norm = $current.TrimEnd('\\', '/')
+                        $norm = $current.TrimEnd('\', '/')
                         if ($norm -eq '/var' -or $norm -eq '/tmp' -or $norm -eq '/private/var' -or $norm -eq '/private/tmp') { break }
                     }
                     return $false
