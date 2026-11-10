@@ -321,7 +321,7 @@ function New-ModuleDocumentation {
                 }
                 $pagePath = Join-Path $PerModuleDir "$moduleName.md"
                 # Replace the whole file so a removed function cannot linger.
-                [System.IO.File]::WriteAllText($pagePath, ($page.ToString() + [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
+                [System.IO.File]::WriteAllText($pagePath, ($page.ToString() + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
                 [void]$writtenPages.Add("$moduleName.md")
             } catch {
                 if (Get-Command Write-Log -ErrorAction SilentlyContinue) { Write-Log (Resolve-LogMessage -Key 'log.docs.pageWriteFailed' -MessageArgs @([string]$moduleName, [string]$_) -Fallback '[DOCS] Could not write {0} page: {1}') 'Warn' $null }
@@ -354,7 +354,7 @@ function New-ModuleDocumentation {
         if ($parent -and -not (Test-Path -LiteralPath $parent -PathType Container)) {
             $null = New-Item -ItemType Directory -Path $parent -Force -EA Stop
         }
-        [System.IO.File]::WriteAllText($OutputPath, ($sb.ToString() + [Environment]::NewLine), (New-Object System.Text.UTF8Encoding($false)))
+        [System.IO.File]::WriteAllText($OutputPath, ($sb.ToString() + "`r`n"), (New-Object System.Text.UTF8Encoding($false)))
         return $OutputPath
     } catch {
         return $null
