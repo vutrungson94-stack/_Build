@@ -145,7 +145,7 @@ runs on the platform that exposed them.
     throws at runtime; inside a `try { ... } catch { return $false }`
     that throw is swallowed and turns a valid path into a rejection
     (this is how the macOS `/var` alias branch failed). Use one
-    backslash (`''`) or a `[char]` literal. Pinned by
+    backslash (`'\'`) or a `[char]` literal. Pinned by
     `PathUtils.Tests.ps1` 'TrimEnd coercion guard'.
 
 ### 4.3 Module architecture
