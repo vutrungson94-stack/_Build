@@ -77,7 +77,10 @@ Describe "Documentation" {
             (Test-Path -LiteralPath $committedPages -PathType Container) | Should -BeTrue
             $normalize = {
                 param([string]$Path)
-                (@(Get-Content -LiteralPath $Path -Encoding UTF8) -join [Environment]::NewLine)
+                # Normalize line endings so the gate is platform-independent:
+                # committed docs are LF in git (text=eol=lf) while the generator
+                # may emit CRLF on Windows. Compare content, not line endings.
+                ((@(Get-Content -LiteralPath $Path -Encoding UTF8) -join [Environment]::NewLine) -replace "`r", '')
             }
             $generatedText = & $normalize $generatedIndex
             $committedText = & $normalize $committedIndex
