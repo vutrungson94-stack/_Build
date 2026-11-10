@@ -360,7 +360,9 @@ jobs:
     name: Code coverage
     runs-on: ubuntu-24.04
     needs: test
-    if: github.event_name == 'pull_request'
+    # Run on both push and pull_request: a push-only skip made the gate
+    # invisible, so a coverage regression could ship without any red job.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -388,19 +390,18 @@ jobs:
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          Import-Module Pester -Force
-          $config = [PesterConfiguration]::Default
-          $config.Run.Path = (Join-Path $root 'Tests')
-          $config.Run.Exit = $true
-          $config.CodeCoverage.Enabled = $true
-          $config.CodeCoverage.OutputPath = Join-Path $root 'coverage.xml'
+          # Use the scope-isolated runner, not a raw Invoke-Pester over Tests/.
+          # A single-session run of every *.Tests.ps1 leaks module-global state
+          # between state-sensitive scopes and produces ~16 false failures
+          # (see AGENTS.md section 6). The runner also merges per-scope
+          # coverage and enforces the ratchet below.
           # RATCHET, not an aspiration. The gate used to demand 85% while the
           # same run measured 57.05% of 44,589 commands across 80 files (run
           # 2026-10-27), so the job was red on every push for a number no test
           # had ever reached - and a permanently red gate hides real
           # regressions. 55 is the measured floor minus a small margin: raise
           # it whenever new tests move the number, never lower it to go green.
-          $config.CodeCoverage.CoveragePercentTarget = 55
-          $config.CodeCoverage.Path = @((Join-Path $root 'Modules'))
-          $config.CodeCoverage.RecursePaths = $true
-          Invoke-Pester -Configuration $config
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
+            -Scope All -StrictSkips -Coverage -MinCoveragePct 55
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -256,6 +256,18 @@ pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-CoreTes
 _Sync/gsync.ps1   -Project . -Yes -NonInteractive
 ```
 
+The CI `coverage` job runs on BOTH push and pull_request and uses the
+scope-isolated runner with the ratchet:
+
+```powershell
+pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips -Coverage -MinCoveragePct 55
+```
+
+Do NOT replace that with a raw `Invoke-Pester` over `Tests/`: a single-session
+run leaks module-global state between state-sensitive scopes and produces ~16
+false failures (see section 6). The ratchet (55%) is a measured floor, not an
+aspiration - raise it as coverage grows, never lower it to go green.
+
 `-SelfTest` must exit 0 before any project test run. A self-test that collects
 failures but falls through to project tests is a defect: the self-test branch
 must `exit` with its own verdict.
