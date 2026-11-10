@@ -98,3 +98,25 @@ Describe "Documentation" {
         }
     }
 }
+
+Describe 'Documentation - generated paths are platform-independent' {
+    BeforeAll {
+        $script:DocModRoot = Join-Path (Split-Path -Parent $global:GBuildModuleRoot) 'Modules'
+    }
+
+    It 'generated source paths use forward slashes on every platform' {
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("gbuild-docpath-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        try {
+            $out = Join-Path $tmp 'api-reference.md'
+            $pages = Join-Path $tmp 'API'
+            $null = New-ModuleDocumentation -ModulesDir $script:DocModRoot -OutputPath $out -PerModuleDir $pages
+            $bad = @()
+            foreach ($page in Get-ChildItem -LiteralPath $pages -Filter '*.md' -File) {
+                $content = Get-Content -LiteralPath $page.FullName -Raw -Encoding UTF8
+                if ($content.Contains([char]92)) { $bad += $page.Name }
+            }
+            $bad | Should -BeNullOrEmpty -Because 'page source paths must not contain backslashes (platform separator leak)'
+        } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}

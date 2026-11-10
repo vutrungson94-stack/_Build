@@ -1,6 +1,6 @@
 # Docker
 
-4 function(s). Source: `Modules/Plugins\Docker.psm1`
+4 function(s). Source: `Modules/Plugins/Docker.psm1`
 
 ### Get-DockerBuildConfig
 

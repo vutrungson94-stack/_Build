@@ -1,6 +1,6 @@
 # Cpp
 
-4 function(s). Source: `Modules/Plugins\Cpp.psm1`
+4 function(s). Source: `Modules/Plugins/Cpp.psm1`
 
 ### Get-CppConfig
 

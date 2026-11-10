@@ -1,6 +1,6 @@
 # BuildStrategyProvider
 
-10 function(s). Source: `Modules/Providers\BuildStrategyProvider.psm1`
+10 function(s). Source: `Modules/Providers/BuildStrategyProvider.psm1`
 
 ### Resolve-DefaultConfiguration
 

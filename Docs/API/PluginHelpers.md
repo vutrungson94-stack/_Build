@@ -1,6 +1,6 @@
 # PluginHelpers
 
-27 function(s). Source: `Modules/Plugins\helpers\PluginHelpers.psm1`
+27 function(s). Source: `Modules/Plugins/helpers/PluginHelpers.psm1`
 
 ### Resolve-PluginManifest
 

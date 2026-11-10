@@ -1,6 +1,6 @@
 # PHP
 
-1 function(s). Source: `Modules/Plugins\PHP.psm1`
+1 function(s). Source: `Modules/Plugins/PHP.psm1`
 
 ### Get-VendorBinary
 

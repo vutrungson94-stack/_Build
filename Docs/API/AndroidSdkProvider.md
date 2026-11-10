@@ -1,6 +1,6 @@
 # AndroidSdkProvider
 
-8 function(s). Source: `Modules/Providers\AndroidSdkProvider.psm1`
+8 function(s). Source: `Modules/Providers/AndroidSdkProvider.psm1`
 
 ### Get-AndroidDefault
 

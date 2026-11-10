@@ -1,6 +1,6 @@
 # Java
 
-2 function(s). Source: `Modules/Plugins\Java.psm1`
+2 function(s). Source: `Modules/Plugins/Java.psm1`
 
 ### Resolve-JavaBuildTool
 

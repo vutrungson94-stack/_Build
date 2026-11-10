@@ -139,6 +139,12 @@ runs on the platform that exposed them.
   - Windows PowerShell 5.1 has no `$IsWindows` / `$IsLinux` / `$IsMacOS`.
     Import `Tests/Helpers/PlatformShim.ps1` in tests that branch on them.
   - `-Encoding UTF8` on every file read/write.
+  - Generated file content must be platform-independent: never embed a
+    raw filesystem path separator (`\` vs `/`) in generated text. The
+    docs generator used to write `Modules/Plugins\Foo.psm1` on Windows and
+    `Modules/Plugins/Foo.psm1` on POSIX, which made the committed-docs sync
+    gate fail on Linux. Normalize separators before writing. Pinned by
+    `Documentation.Tests.ps1` 'generated paths are platform-independent'.
   - `String.TrimEnd` (and any `params char[]` method) must be called with
     SINGLE-CHARACTER string arguments only. A multi-character string such
     as `'\'` (two backslashes) cannot be coerced to `System.Char` and

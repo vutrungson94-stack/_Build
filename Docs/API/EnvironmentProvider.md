@@ -1,6 +1,6 @@
 # EnvironmentProvider
 
-7 function(s). Source: `Modules/Providers\EnvironmentProvider.psm1`
+7 function(s). Source: `Modules/Providers/EnvironmentProvider.psm1`
 
 ### GetConfig
 

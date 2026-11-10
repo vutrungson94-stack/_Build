@@ -1,6 +1,6 @@
 # Python
 
-2 function(s). Source: `Modules/Plugins\Python.psm1`
+2 function(s). Source: `Modules/Plugins/Python.psm1`
 
 ### Get-PythonBuildConfig
 

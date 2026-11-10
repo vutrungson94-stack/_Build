@@ -1,6 +1,6 @@
 # Elixir
 
-1 function(s). Source: `Modules/Plugins\Elixir.psm1`
+1 function(s). Source: `Modules/Plugins/Elixir.psm1`
 
 ### Invoke-ElixirDepsCheck
 

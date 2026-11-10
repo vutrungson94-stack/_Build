@@ -1,6 +1,6 @@
 # DotnetHelpers
 
-7 function(s). Source: `Modules/Plugins\helpers\DotnetHelpers.psm1`
+7 function(s). Source: `Modules/Plugins/helpers/DotnetHelpers.psm1`
 
 ### Resolve-DotnetCommand
 

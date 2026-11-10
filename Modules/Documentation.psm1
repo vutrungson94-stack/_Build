@@ -295,7 +295,7 @@ function New-ModuleDocumentation {
         $page = [System.Text.StringBuilder]::new()
         [void]$page.AppendLine("# $moduleName")
         [void]$page.AppendLine('')
-        [void]$page.AppendLine("$($funcs.Count) function(s). Source: ``Modules/$($f.FullName.Substring($ModulesDir.Length).TrimStart('\','/'))``")
+        [void]$page.AppendLine("$($funcs.Count) function(s). Source: ``Modules/$($f.FullName.Substring($ModulesDir.Length).TrimStart('\','/').Replace('\','/'))``")
         [void]$page.AppendLine('')
         foreach ($fn in $funcs) {
             [void]$sb.AppendLine("### $($fn.Name)")
