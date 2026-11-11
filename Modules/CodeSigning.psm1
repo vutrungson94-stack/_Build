@@ -274,12 +274,33 @@ function Invoke-ExternalCodeSigning {
 
     $argList = @()
     if (-not [string]::IsNullOrWhiteSpace($Arguments)) {
-        foreach ($token in ($Arguments -split '\s+')) {
-            if ([string]::IsNullOrWhiteSpace($token)) { continue }
-            $argList += ($token -replace '\{file\}', $Path)
+        # Quote-aware split: the Azure Artifact Signing command line carries
+        # paths with spaces ("C:\Program Files\...\dlib\Azure.CodeSigning.Dlib.dll"),
+        # and a naive split on whitespace would break those arguments.
+        $current = ''
+        $inQuote = $false
+        foreach ($ch in $Arguments.ToCharArray()) {
+            if ($ch -eq '"') { $inQuote = -not $inQuote; continue }
+            if (-not $inQuote -and [char]::IsWhiteSpace($ch)) {
+                if ($current.Length -gt 0) { $argList += ($current -replace '\{file\}', $Path); $current = '' }
+                continue
+            }
+            $current += $ch
         }
+        if ($current.Length -gt 0) { $argList += ($current -replace '\{file\}', $Path) }
     }
     if ($argList.Count -eq 0) { $argList = @($Path) }
+
+    # A token that contains a space has to reach the native command as ONE
+    # quoted argument. Windows PowerShell's legacy argument binder does not
+    # re-quote for us, and the Azure signing command line is full of paths
+    # like "C:\Program Files\...\Azure.CodeSigning.Dlib.dll".
+    $quoted = @()
+    foreach ($a in $argList) {
+        if ($a -match '\s' -and $a -notmatch '^".*"$') { $quoted += ('"' + ($a -replace '"', '\"') + '"') }
+        else { $quoted += $a }
+    }
+    $argList = $quoted
 
     $output = ''
     try {

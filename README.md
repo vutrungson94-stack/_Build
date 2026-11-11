@@ -226,6 +226,35 @@ file: it comes from the environment variable named by `certificatePasswordEnv`.
 `security.artifactSign` stays the owner of **container / OCI** signing (cosign,
 notation); the two sections never overlap.
 
+### Signing with a real CA (Azure Artifact Signing)
+
+A self-signed certificate does **not** satisfy SmartScreen: the "Windows protected your
+PC" prompt is the Application Reputation service, not the certificate chain, and a
+self-signed certificate has no reputation with Microsoft. For a downloadable artifact the
+signature has to come from a CA in the Trusted Root Program. Azure Artifact Signing is the
+cheapest fully automatic option (the client machines install nothing):
+
+```json
+{
+  "security": {
+    "peSign": {
+      "enabled": true,
+      "tool": "external",
+      "externalCommand": "C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\signtool.exe",
+      "externalArguments": "sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib \"C:\\Program Files (x86)\\Microsoft Artifact Signing Client\\x64\\Azure.CodeSigning.Dlib.dll\" /dmdf \"C:\\signing\\metadata.json\" {file}",
+      "artifacts": ["*.exe"],
+      "verify": "valid",
+      "failOnError": true
+    }
+  }
+}
+```
+
+The argument template is split quote-aware and re-quoted for the native command, so a
+path with spaces stays one argument. `metadata.json` carries the Artifact Signing
+endpoint, account and certificate profile; the signing itself happens in Microsoft's
+cloud, so no private key ever reaches the build agent.
+
 ## Pipelines (Config-Driven)
 
 The build pipeline is a sequence of named steps. By default gbuild supplies a
