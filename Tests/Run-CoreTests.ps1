@@ -184,6 +184,7 @@ $scopeMap = @{
     'ConfigProvider'          = 'ConfigProvider.Tests.ps1'
     'ConfigValueNativePath' = 'ConfigValue.NativePath.Tests.ps1'
     'CodeSigning'             = 'CodeSigning.Tests.ps1'
+    'Release'                 = 'Release.Tests.ps1'
     'Container'               = 'Container.Tests.ps1'
     'Core'                    = 'Core.Tests.ps1'
     'Cpp'                     = 'Cpp.Tests.ps1'

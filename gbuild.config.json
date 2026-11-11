@@ -905,7 +905,14 @@
             "externalCommand": "",
             "externalArguments": "{file}",
             "verify": "valid",
-            "failOnError": true
+            "failOnError": true,
+            "autoProvisionSelfSigned": false
+        },
+        "release": {
+            "enabled": true,
+            "outputDir": "",
+            "includeChecksum": true,
+            "excludePatterns": []
         },
         "containerScan": {
             "enabled": false,

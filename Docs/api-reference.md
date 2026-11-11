@@ -1075,6 +1075,14 @@ Parameters: Namespace :String, Version :String, State :PSObject
 
 ## CodeSigning
 
+### Get-CodeSigningProfilePath
+
+### Get-CodeSigningProfile
+
+### Ensure-SelfSignedCodeSigningCertificate
+
+Parameters: Subject :String, Thumbprint :String, Years :Int32
+
 ### Get-CodeSigningConfig
 
 Parameters: State :Object
@@ -3344,6 +3352,21 @@ Parameters: Kind :String
 Parameters: State :PSObject, Action :String
 
 
+## Release
+
+### Get-ReleaseConfig
+
+Parameters: State :Object
+
+### Get-BuildReleaseVersion
+
+Parameters: ProjectDir :String, ProjectName :String
+
+### New-BuildReleasePackage
+
+Parameters: SourceDir :String, ProjectRoot :String, ProjectName :String, OutputDir :String, DestinationDir :String, ExcludePattern :String[]
+
+
 ## Report
 
 ### Get-ReportConfigValue
@@ -4396,7 +4419,7 @@ Parameters: Document :Object, State :PSObject
 | [Chaos](API/Chaos.md) | 4 |
 | [Clean](API/Clean.md) | 9 |
 | [ClusterOrchestrator](API/ClusterOrchestrator.md) | 25 |
-| [CodeSigning](API/CodeSigning.md) | 8 |
+| [CodeSigning](API/CodeSigning.md) | 11 |
 | [ConfigProvider](API/ConfigProvider.md) | 27 |
 | [Container](API/Container.md) | 6 |
 | [CredentialVault](API/CredentialVault.md) | 21 |
@@ -4443,6 +4466,7 @@ Parameters: Document :Object, State :PSObject
 | [BuildStrategyProvider](API/BuildStrategyProvider.md) | 10 |
 | [EnvironmentProvider](API/EnvironmentProvider.md) | 7 |
 | [RBAC](API/RBAC.md) | 26 |
+| [Release](API/Release.md) | 3 |
 | [Report](API/Report.md) | 18 |
 | [RootCause](API/RootCause.md) | 16 |
 | [Sast](API/Sast.md) | 17 |
@@ -4455,5 +4479,5 @@ Parameters: Document :Object, State :PSObject
 | [Versioning](API/Versioning.md) | 7 |
 | [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 73 module(s), 1097 function(s).
+Total: 74 module(s), 1103 function(s).
 

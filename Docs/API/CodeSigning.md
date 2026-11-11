@@ -1,6 +1,14 @@
 # CodeSigning
 
-8 function(s). Source: `Modules/CodeSigning.psm1`
+11 function(s). Source: `Modules/CodeSigning.psm1`
+
+### Get-CodeSigningProfilePath
+
+### Get-CodeSigningProfile
+
+### Ensure-SelfSignedCodeSigningCertificate
+
+Parameters: Subject :String, Thumbprint :String, Years :Int32
 
 ### Get-CodeSigningConfig
 

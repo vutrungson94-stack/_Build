@@ -1,7 +1,93 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $PSCommandPath
 $global:GBuildModuleRoot = Join-Path (Split-Path -Parent $here) 'Modules'
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+
+# The machine profile (profiles\signing.json inside the tool) is REAL state on
+# the developer machine and must never decide what these tests expect. Point
+# the lookup at an empty profile for the whole file, and restore it afterwards.
+# A global (not $script:) is used on purpose: Pester runs BeforeAll/AfterAll in
+# its own scope, where a file-level $script: variable is not visible.
+$global:GBuildOriginalSigningProfile = $env:GBUILD_SIGNING_PROFILE
+$global:GBuildEmptySigningProfile = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-empty-profile-' + [guid]::NewGuid().ToString('N') + '.json')
+Set-Content -LiteralPath $global:GBuildEmptySigningProfile -Value '{}' -Encoding UTF8
+$env:GBUILD_SIGNING_PROFILE = $global:GBuildEmptySigningProfile
+
+Describe 'CodeSigning - machine profile' {
+    BeforeAll {
+        Import-Module (Join-Path $global:GBuildModuleRoot 'CodeSigning.psm1') -Force -DisableNameChecking -ErrorAction Stop
+    }
+
+    AfterAll {
+        # The profile stays pointed at the empty file for the WHOLE file: the
+        # other Describes in it must not see the machine's real profile either.
+        # Restoring here would run BEFORE them and re-expose it.
+        # The scope runs in its own child process, so the env var dies with it.
+    }
+
+    It 'Get-CodeSigningProfilePath honours GBUILD_SIGNING_PROFILE' {
+        $file = Join-Path $TestDrive 'signing.json'
+        Set-Content -LiteralPath $file -Value '{}' -Encoding UTF8
+        $old = $env:GBUILD_SIGNING_PROFILE
+        try {
+            $env:GBUILD_SIGNING_PROFILE = $file
+            Get-CodeSigningProfilePath | Should -Be (Resolve-Path -LiteralPath $file).Path
+        }
+        finally { $env:GBUILD_SIGNING_PROFILE = $old }
+    }
+
+    It 'Get-CodeSigningProfile reads the peSign and release sections' {
+        $file = Join-Path $TestDrive 'profile.json'
+        Set-Content -LiteralPath $file -Value '{"peSign":{"enabled":true,"tool":"external"},"release":{"outputDir":"D:\\releases"}}' -Encoding UTF8
+        $old = $env:GBUILD_SIGNING_PROFILE
+        try {
+            $env:GBUILD_SIGNING_PROFILE = $file
+            $p = Get-CodeSigningProfile
+            $p.PeSign['enabled'] | Should -BeTrue
+            $p.PeSign['tool'] | Should -Be 'external'
+            $p.Release['outputDir'] | Should -Be 'D:\releases'
+        }
+        finally { $env:GBUILD_SIGNING_PROFILE = $old }
+    }
+
+    It 'Get-CodeSigningProfile survives a broken file' {
+        $file = Join-Path $TestDrive 'broken.json'
+        Set-Content -LiteralPath $file -Value '{ this is not json' -Encoding UTF8
+        $old = $env:GBUILD_SIGNING_PROFILE
+        try {
+            $env:GBUILD_SIGNING_PROFILE = $file
+            $p = Get-CodeSigningProfile
+            $p.PeSign.Count | Should -Be 0
+        }
+        finally { $env:GBUILD_SIGNING_PROFILE = $old }
+    }
+
+    It 'Get-CodeSigningConfig takes the machine profile and lets the project override it' {
+        # The project layer is the project's OWN gbuild.config.json on disk - the
+        # merged BuildConfig cannot tell "the project said this" from "the tool
+        # shipped this", and the project must win over the machine profile.
+        $projectDir = Join-Path $TestDrive 'proj'
+        New-Item -ItemType Directory -Path $projectDir -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $projectDir 'gbuild.config.json') `
+            -Value '{"security":{"peSign":{"tool":"powershell","verify":"valid"}}}' -Encoding UTF8
+
+        $file = Join-Path $TestDrive 'profile2.json'
+        Set-Content -LiteralPath $file -Value '{"peSign":{"enabled":true,"tool":"external","verify":"signature"}}' -Encoding UTF8
+        $old = $env:GBUILD_SIGNING_PROFILE
+        try {
+            $env:GBUILD_SIGNING_PROFILE = $file
+            $state = [PSCustomObject]@{
+                ProjectRoot = $projectDir
+                BuildConfig = @{ security = @{ peSign = @{ tool = 'powershell'; verify = 'valid' } } }
+            }
+            $cfg = Get-CodeSigningConfig -State $state
+            $cfg.Enabled | Should -BeTrue          # from the profile
+            $cfg.Tool | Should -Be 'powershell'   # the project file wins
+            $cfg.Verify | Should -Be 'valid'       # the project file wins
+        }
+        finally { $env:GBUILD_SIGNING_PROFILE = $old }
+    }
+}
 
 Describe 'CodeSigning - configuration' {
     BeforeAll {

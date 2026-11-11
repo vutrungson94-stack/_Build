@@ -2188,6 +2188,37 @@
             "failOnError": {
               "type": "boolean",
               "default": true
+            },
+            "autoProvisionSelfSigned": {
+              "type": "boolean",
+              "default": false,
+              "description": "When no CA credential is configured, create (once) a machine self-signed code-signing certificate so the artifacts are still signed and shippable. A self-signed certificate cannot satisfy SmartScreen's reputation check - that needs a CA - but it keeps every project signed without a per-project setup."
+            }
+          }
+        },
+        "release": {
+          "type": "object",
+          "description": "Packages the build output into something you can sell: one archive, a .sha256 file the buyer verifies the download with, and a .json manifest (project, version, git commit, signed or not). The destination folder is configured ONCE per machine in the signing profile, so every project publishes itself without a per-project setup.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "outputDir": {
+              "type": "string",
+              "description": "Shared folder the release is copied to. Empty keeps the package in <projectRoot>\\release. The machine profile overrides this."
+            },
+            "includeChecksum": {
+              "type": "boolean",
+              "default": true
+            },
+            "excludePatterns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Extra regex patterns of files that must not ship"
             }
           }
         },

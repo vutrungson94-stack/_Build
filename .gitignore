@@ -103,3 +103,5 @@ secrets.*
 *.pem
 .gsync.state
 sync-outputs/
+# Machine-level signing profile: state of THIS machine, never shipped.
+profiles/

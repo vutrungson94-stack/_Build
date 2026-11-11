@@ -58,6 +58,128 @@ $script:CodeSigningDefaultArtifacts = @('*.exe', '*.dll')
 
 <#
 .SYNOPSIS
+    Resolves the machine-level signing profile.
+.DESCRIPTION
+    One file, set up ONCE per build machine, replaces the per-project signing
+    setup: every project then signs its artifacts with the same credential.
+    The path is taken from, in order:
+
+      1. the GBUILD_SIGNING_PROFILE environment variable
+      2. <tool root>\profiles\signing.json
+
+    The profile lives INSIDE the tool folder, never in a user profile or a
+    temp folder: a build must not leave anything outside the tool folder and
+    the project it builds. The environment variable is the explicit override
+    for the cases where the profile has to live elsewhere (a per-agent file).
+#>
+function Get-CodeSigningProfilePath {
+    $candidates = @()
+    $envPath = [Environment]::GetEnvironmentVariable('GBUILD_SIGNING_PROFILE')
+    if (-not [string]::IsNullOrWhiteSpace($envPath)) { $candidates += $envPath }
+    # <tool root>\profiles\signing.json - inside _Build, travels with the tool.
+    try {
+        $toolRoot = Split-Path -Parent $PSScriptRoot
+        $candidates += (Join-Path (Join-Path $toolRoot 'profiles') 'signing.json')
+    }
+    catch { }
+
+    foreach ($c in $candidates) {
+        try { if (Test-Path -LiteralPath $c -PathType Leaf) { return (Resolve-Path -LiteralPath $c).Path } } catch { }
+    }
+    return ''
+}
+
+<#
+.SYNOPSIS
+    Reads the machine-level signing profile into a hashtable.
+.DESCRIPTION
+    Returns @{ Path = ''; PeSign = @{}; Release = @{} }. A missing or unreadable
+    profile is NOT an error: signing simply stays unconfigured.
+#>
+function Get-CodeSigningProfile {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param()
+
+    $profile = @{ Path = ''; PeSign = @{}; Release = @{} }
+    $path = Get-CodeSigningProfilePath
+    if (-not $path) { return $profile }
+
+    $profile.Path = $path
+    try {
+        $doc = Get-Content -LiteralPath $path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if ($doc.PSObject.Properties.Name -contains 'peSign' -and $doc.peSign) {
+            foreach ($p in $doc.peSign.PSObject.Properties) { $profile.PeSign[$p.Name] = $p.Value }
+        }
+        if ($doc.PSObject.Properties.Name -contains 'release' -and $doc.release) {
+            foreach ($p in $doc.release.PSObject.Properties) { $profile.Release[$p.Name] = $p.Value }
+        }
+    }
+    catch {
+        # A broken profile must not take the build down.
+        $profile.PeSign = @{}
+        $profile.Release = @{}
+    }
+    return $profile
+}
+
+<#
+.SYNOPSIS
+    Creates (once) a machine self-signed code-signing certificate.
+.DESCRIPTION
+    The fallback that keeps every project RELEASABLE even without a CA
+    account: the machine signs with its own certificate, so the artifact always
+    carries a signature and always shows a publisher name. It cannot satisfy
+    SmartScreen's reputation check - that needs a CA - but it is what "signed
+    and shippable" means without a paid certificate.
+.PARAMETER Subject
+    Subject of the certificate (defaults to the machine name).
+.PARAMETER Thumbprint
+    Reuse an existing certificate with this thumbprint instead of creating one.
+#>
+function Ensure-SelfSignedCodeSigningCertificate {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [string]$Subject = '',
+        [string]$Thumbprint = '',
+        [int]$Years = 5
+    )
+
+    $result = @{ Thumbprint = ''; Created = $false; Subject = ''; Message = '' }
+
+    try {
+        if (-not [string]::IsNullOrWhiteSpace($Thumbprint)) {
+            $want = ($Thumbprint -replace '[^0-9A-Fa-f]', '').ToUpperInvariant()
+            $existing = @(Get-ChildItem -Path 'Cert:\CurrentUser\My' -ErrorAction SilentlyContinue |
+                Where-Object { $_.Thumbprint -eq $want })
+            if ($existing.Count -gt 0) {
+                $result.Thumbprint = $existing[0].Thumbprint
+                $result.Subject = $existing[0].Subject
+                return $result
+            }
+        }
+
+        if ([string]::IsNullOrWhiteSpace($Subject)) {
+            $Subject = 'CN=' + [Environment]::MachineName + ' (self-signed code signing)'
+        }
+
+        $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $Subject `
+            -CertStoreLocation 'Cert:\CurrentUser\My' -KeyExportPolicy Exportable `
+            -NotAfter (Get-Date).AddYears($Years) -KeyUsage DigitalSignature -ErrorAction Stop
+
+        $result.Thumbprint = $cert.Thumbprint
+        $result.Subject = $cert.Subject
+        $result.Created = $true
+    }
+    catch {
+        $result.Message = $_.Exception.Message
+    }
+    return $result
+}
+
+<#
+.SYNOPSIS
     Reads the security.peSign configuration section into a normalized hashtable.
 .DESCRIPTION
     Every default lives here (single source for the module); the config file
@@ -84,36 +206,98 @@ function Get-CodeSigningConfig {
         ExternalArguments      = '{file}'
         Verify                 = 'valid'
         FailOnError            = $true
+        AutoProvisionSelfSigned = $false
+        ProfilePath            = ''
+        ConfigReadFailed       = $false
     }
 
-    if (-not (Get-Command Get-ConfigValue -ErrorAction SilentlyContinue)) { return $cfg }
+    # Layer 1: the project / tool config.
+    if (Get-Command Get-ConfigValue -ErrorAction SilentlyContinue) {
+        try {
+            $cfg.Enabled = [bool](Get-ConfigValue -Path 'security.peSign.enabled' -State $State -Default $cfg.Enabled -Type bool)
+            $cfg.Tool = [string](Get-ConfigValue -Path 'security.peSign.tool' -State $State -Default $cfg.Tool -Type string)
+            $cfg.Recursive = [bool](Get-ConfigValue -Path 'security.peSign.recursive' -State $State -Default $cfg.Recursive -Type bool)
+            $cfg.CertificatePath = [string](Get-ConfigValue -Path 'security.peSign.certificatePath' -State $State -Default $cfg.CertificatePath -Type string)
+            $cfg.CertificateThumbprint = [string](Get-ConfigValue -Path 'security.peSign.certificateThumbprint' -State $State -Default $cfg.CertificateThumbprint -Type string)
+            $cfg.CertificatePasswordEnv = [string](Get-ConfigValue -Path 'security.peSign.certificatePasswordEnv' -State $State -Default $cfg.CertificatePasswordEnv -Type string)
+            $cfg.TimestampUrl = [string](Get-ConfigValue -Path 'security.peSign.timestampUrl' -State $State -Default $cfg.TimestampUrl -Type string)
+            $cfg.ExternalCommand = [string](Get-ConfigValue -Path 'security.peSign.externalCommand' -State $State -Default $cfg.ExternalCommand -Type string)
+            $cfg.ExternalArguments = [string](Get-ConfigValue -Path 'security.peSign.externalArguments' -State $State -Default $cfg.ExternalArguments -Type string)
+            $cfg.Verify = [string](Get-ConfigValue -Path 'security.peSign.verify' -State $State -Default $cfg.Verify -Type string)
+            $cfg.FailOnError = [bool](Get-ConfigValue -Path 'security.peSign.failOnError' -State $State -Default $cfg.FailOnError -Type bool)
+            $cfg.AutoProvisionSelfSigned = [bool](Get-ConfigValue -Path 'security.peSign.autoProvisionSelfSigned' -State $State -Default $cfg.AutoProvisionSelfSigned -Type bool)
 
-    try {
-        $cfg.Enabled = [bool](Get-ConfigValue -Path 'security.peSign.enabled' -State $State -Default $false -Type bool)
-        $cfg.Tool = [string](Get-ConfigValue -Path 'security.peSign.tool' -State $State -Default 'signtool' -Type string)
-        $cfg.Recursive = [bool](Get-ConfigValue -Path 'security.peSign.recursive' -State $State -Default $true -Type bool)
-        $cfg.CertificatePath = [string](Get-ConfigValue -Path 'security.peSign.certificatePath' -State $State -Default '' -Type string)
-        $cfg.CertificateThumbprint = [string](Get-ConfigValue -Path 'security.peSign.certificateThumbprint' -State $State -Default '' -Type string)
-        $cfg.CertificatePasswordEnv = [string](Get-ConfigValue -Path 'security.peSign.certificatePasswordEnv' -State $State -Default '' -Type string)
-        $cfg.TimestampUrl = [string](Get-ConfigValue -Path 'security.peSign.timestampUrl' -State $State -Default 'http://timestamp.digicert.com' -Type string)
-        $cfg.ExternalCommand = [string](Get-ConfigValue -Path 'security.peSign.externalCommand' -State $State -Default '' -Type string)
-        $cfg.ExternalArguments = [string](Get-ConfigValue -Path 'security.peSign.externalArguments' -State $State -Default '{file}' -Type string)
-        $cfg.Verify = [string](Get-ConfigValue -Path 'security.peSign.verify' -State $State -Default 'valid' -Type string)
-        $cfg.FailOnError = [bool](Get-ConfigValue -Path 'security.peSign.failOnError' -State $State -Default $true -Type bool)
-
-        $patterns = Get-ConfigValue -Path 'security.peSign.artifacts' -State $State -Default $null
-        if ($patterns) {
-            $list = @()
-            foreach ($p in @($patterns)) {
-                if (-not [string]::IsNullOrWhiteSpace([string]$p)) { $list += [string]$p }
+            $patterns = Get-ConfigValue -Path 'security.peSign.artifacts' -State $State -Default $null
+            if ($patterns) {
+                $list = @()
+                foreach ($p in @($patterns)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$p)) { $list += [string]$p }
+                }
+                if ($list.Count -gt 0) { $cfg.Artifacts = $list }
             }
-            if ($list.Count -gt 0) { $cfg.Artifacts = $list }
+        }
+        catch {
+            # A broken config section must not take the build down - but the
+            # caller has to be able to tell "not configured" from "could not be
+            # read", because the posture report must never assert a control is
+            # OFF when it may be ON.
+            $cfg.ConfigReadFailed = $true
         }
     }
-    catch {
-        # A broken config section must not take the build down: fall back to the
-        # module defaults (signing disabled).
-        $cfg.Enabled = $false
+
+    # Layer 2: the MACHINE profile. It fills in what the project does NOT
+    # define: the project layer (its own gbuild.config.json) always wins, and
+    # the tool's shipped defaults lose. The profile is the machine admin's
+    # decision - "this machine signs everything" - and a project can still opt
+    # out by putting security.peSign in its own config file.
+    $projectPeSign = $null
+    try {
+        if ($State -and ($State.PSObject.Properties.Name -contains 'ProjectRoot') -and $State.ProjectRoot) {
+            $projectConfig = Join-Path (Join-Path ([string]$State.ProjectRoot) '') 'gbuild.config.json'
+            if (Test-Path -LiteralPath $projectConfig -PathType Leaf) {
+                $doc = Get-Content -LiteralPath $projectConfig -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+                if ($doc.PSObject.Properties.Name -contains 'security' -and $doc.security -and
+                    ($doc.security.PSObject.Properties.Name -contains 'peSign') -and $doc.security.peSign) {
+                    $projectPeSign = $doc.security.peSign
+                }
+            }
+        }
+    }
+    catch { $projectPeSign = $null }
+
+    $profile = Get-CodeSigningProfile
+    $cfg.ProfilePath = [string]$profile.Path
+    if ($profile.PeSign.Count -gt 0) {
+        $p = $profile.PeSign
+        $projectKeys = @()
+        if ($projectPeSign) { $projectKeys = @($projectPeSign.PSObject.Properties.Name) }
+
+        $apply = {
+            param([string]$Key, [object]$Value)
+            # A key the project sets in its own config file wins over the profile.
+            if ($projectKeys -contains $Key) { return }
+            switch ($Key) {
+                'enabled' { $cfg.Enabled = [bool]$Value }
+                'tool' { $cfg.Tool = [string]$Value }
+                'recursive' { $cfg.Recursive = [bool]$Value }
+                'certificatePath' { $cfg.CertificatePath = [string]$Value }
+                'certificateThumbprint' { $cfg.CertificateThumbprint = [string]$Value }
+                'certificatePasswordEnv' { $cfg.CertificatePasswordEnv = [string]$Value }
+                'timestampUrl' { $cfg.TimestampUrl = [string]$Value }
+                'externalCommand' { $cfg.ExternalCommand = [string]$Value }
+                'externalArguments' { $cfg.ExternalArguments = [string]$Value }
+                'verify' { $cfg.Verify = [string]$Value }
+                'failOnError' { $cfg.FailOnError = [bool]$Value }
+                'autoProvisionSelfSigned' { $cfg.AutoProvisionSelfSigned = [bool]$Value }
+                'artifacts' {
+                    $list = @()
+                    foreach ($x in @($Value)) { if (-not [string]::IsNullOrWhiteSpace([string]$x)) { $list += [string]$x } }
+                    if ($list.Count -gt 0) { $cfg.Artifacts = $list }
+                }
+            }
+        }
+
+        foreach ($k in $p.Keys) { & $apply $k $p[$k] }
     }
 
     # Normalize the verification mode: valid (default) | signature | none
@@ -123,15 +307,6 @@ function Get-CodeSigningConfig {
 
     return $cfg
 }
-
-<#
-.SYNOPSIS
-    Lists the artifact files under a directory that match the configured patterns.
-.DESCRIPTION
-    Returns a sorted array of full paths. A missing directory yields an empty
-    array rather than an error, so a project without a publish output is a
-    no-op instead of a failed build.
-#>
 function Get-CodeSigningArtifact {
     [CmdletBinding()]
     [OutputType([string[]])]
@@ -452,7 +627,7 @@ function Invoke-CodeSigning {
         [string]$InputPath = ''
     )
 
-    $result = @{ Status = 'Skipped'; Signed = 0; Failed = 0; Skipped = 0; Message = '' }
+    $result = @{ Status = 'Skipped'; Signed = 0; Failed = 0; Skipped = 0; Message = ''; Note = '' }
 
     $cfg = Get-CodeSigningConfig -State $State
     if (-not $cfg.Enabled) {
@@ -470,6 +645,21 @@ function Invoke-CodeSigning {
         $result.Status = 'Skipped'
         $result.Message = "signing tool is not available on this machine: $($cfg.Tool)"
         return $result
+    }
+
+    # No CA credential on this machine? Fall back to the machine's own
+    # self-signed certificate (created once) so the artifact is STILL signed and
+    # still shippable - a CA only upgrades the SmartScreen reputation.
+    if ($cfg.Tool -eq 'powershell' -and [string]::IsNullOrWhiteSpace($cfg.CertificatePath) -and [string]::IsNullOrWhiteSpace($cfg.CertificateThumbprint)) {
+        if ($cfg.AutoProvisionSelfSigned) {
+            $cert = Ensure-SelfSignedCodeSigningCertificate
+            if ($cert.Thumbprint) {
+                $cfg.CertificateThumbprint = $cert.Thumbprint
+                if ($cert.Created) {
+                    $result.Note = "self-signed certificate created: $($cert.Thumbprint)"
+                }
+            }
+        }
     }
 
     $artifacts = @(Get-CodeSigningArtifact -Path $InputPath -Pattern $cfg.Artifacts -Recursive $cfg.Recursive)
@@ -534,11 +724,18 @@ function Invoke-CodeSigning {
         $result.Message = ("{0} artifact(s) signed" -f $signed)
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($result.Note)) {
+        $result.Message = $result.Message + ' (' + $result.Note + ')'
+    }
+
     return $result
 }
 
 Export-ModuleMember -Function @(
     'Get-CodeSigningConfig',
+    'Get-CodeSigningProfilePath',
+    'Get-CodeSigningProfile',
+    'Ensure-SelfSignedCodeSigningCertificate',
     'Get-CodeSigningArtifact',
     'Test-CodeSigningToolAvailable',
     'Invoke-SignToolCodeSigning',

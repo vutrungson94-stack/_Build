@@ -117,6 +117,31 @@ jobs:
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
+      - name: Report the failing assertions (always)
+        # A red suite that only says "2 failed" is not actionable: the failing
+        # test NAMES and the assertion details are what a maintainer needs. The
+        # runner writes the scope list per scope; re-run the failed scopes here
+        # and print the expectation, so the next failure can be diagnosed from
+        # the job log without downloading the artifact.
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $dir = Join-Path $root 'Tests\TestResults'
+          $scopes = @()
+          foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
+            $name = $f.BaseName -replace '^failed-', ''
+            if ($name) { $scopes += $name }
+            Write-Host "===== $($f.Name) ====="
+            Get-Content -LiteralPath $f.FullName -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+          }
+          if ($scopes.Count -eq 0) { Write-Host 'no failed scope to re-run'; exit 0 }
+          foreach ($s in $scopes) {
+            Write-Host "===== re-running scope $s ====="
+            & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope $s -StrictSkips 2>&1 |
+              Select-String -Pattern 'Expected|But was|at C:|Tests Passed' | ForEach-Object { Write-Host $_.Line }
+          }
+          exit 0
+
       - name: Upload test results
         if: failure()
         # v7 runs on Node 24. v4/v5 declare node20, so the runner forces them

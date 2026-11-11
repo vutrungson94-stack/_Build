@@ -6,6 +6,14 @@ $global:GBuildModuleRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PS
 $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildImport.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
 $null = Import-Module (Join-Path (Split-Path -Parent $PSCommandPath) (Join-Path 'Helpers' 'MockHelpers.psm1')) -Force -DisableNameChecking -ErrorAction Stop
 
+# The machine profile (profiles\signing.json inside the tool) is REAL state on the
+# developer machine. The posture report reads it, so these tests must not depend
+# on it: point the lookup at an empty profile and restore it afterwards.
+$global:GBuildOriginalSigningProfile = $env:GBUILD_SIGNING_PROFILE
+$global:GBuildEmptySigningProfile = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-empty-profile-' + [guid]::NewGuid().ToString('N') + '.json')
+Set-Content -LiteralPath $global:GBuildEmptySigningProfile -Value '{}' -Encoding UTF8
+$env:GBUILD_SIGNING_PROFILE = $global:GBuildEmptySigningProfile
+
 Describe "Security - Credential Sanitization" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Logging.psm1') -Force -DisableNameChecking -ErrorAction Stop
@@ -504,3 +512,8 @@ Describe 'Security - Code Signing Status' {
         ($s.Details -join '; ') | Should -Not -Match 'disabled'
     }
 }
+
+# Restore the machine's profile env after the file's tests.
+if ($null -eq $global:GBuildOriginalSigningProfile) { Remove-Item Env:GBUILD_SIGNING_PROFILE -ErrorAction SilentlyContinue }
+else { $env:GBUILD_SIGNING_PROFILE = $global:GBuildOriginalSigningProfile }
+Remove-Item -LiteralPath $global:GBuildEmptySigningProfile -Force -ErrorAction SilentlyContinue

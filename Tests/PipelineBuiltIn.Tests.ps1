@@ -31,7 +31,7 @@ BeforeAll {
 }
 
 Describe 'the built-in pipeline shape' {
-    It 'exposes the 14 shipped steps in order' {
+    It 'exposes the 15 shipped steps in order' {
         $steps = Get-BuiltInPipelineSteps -State (New-TestState)
         $names = @($steps | ForEach-Object { $_.Name })
         $names | Should -Be @(
@@ -39,7 +39,8 @@ Describe 'the built-in pipeline shape' {
             # SignArtifacts sits directly after Build: the artifacts exist only
             # after the build, and they have to be signed BEFORE PublishArtifact
             # packages/uploads them.
-            'Build', 'SignArtifacts', 'SecurityScan', 'AutoTune', 'SupplyChain',
+            'Build', 'SignArtifacts', 'ReleaseArtifact', 'SecurityScan',
+            'AutoTune', 'SupplyChain',
             'SastScan', 'PolicyCheck', 'SiemExport', 'StandaloneBundle',
             'PublishArtifact'
         )

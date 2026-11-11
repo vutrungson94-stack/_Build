@@ -1,8 +1,8 @@
 ﻿# ============================================================================
-# Orchestrator.Pipeline.ps1 - pipeline helpers extracted from Orchestrator.psm1
-# Dot-sourced by Orchestrator.psm1; shares module scope.
-# ============================================================================
-
+            # every build to the shared release folder.
+            Import-ModuleOnDemand -ModuleNames @('Release')
+            Import-ModuleOnDemand -ModuleNames @('CodeSigning')
+            $relCfg = $null
 function Get-BuiltInPipelineSteps {
     [CmdletBinding()]
     [OutputType([array])]
@@ -385,12 +385,19 @@ function Get-BuiltInPipelineSteps {
             # produced. Sits directly after Build so the files are signed
             # BEFORE they are packaged/uploaded by PublishArtifact.
             #
-            # The gate is security.peSign.enabled (ships FALSE): an existing
-            # project keeps its exact behaviour until it opts in, and a project
-            # that opts in but has no signer on the machine gets a clear skip
-            # message instead of a hard failure (unless failOnError is set).
-            if (-not (Test-StepEnabled -State $State -Context $ctx -StepLabel 'SIGN' -Reason 'security.peSign.enabled=false' -EnablePaths @('security.peSign.enabled'))) { return }
+            # The gate reads the RESOLVED config (the machine profile merged with
+            # the project config), not the raw config path: the tool ships
+            # security.peSign.enabled = false, and a project that forgot to
+            # enable it must not silently opt the machine out of signing. A
+            # project that opts in but has no signer on the machine gets a clear
+            # skip message instead of a hard failure (unless failOnError is set).
             Import-ModuleOnDemand -ModuleNames @('CodeSigning')
+            $peCfg = $null
+            try { if (Get-Command Get-CodeSigningConfig -ErrorAction SilentlyContinue) { $peCfg = Get-CodeSigningConfig -State $State } } catch { }
+            if ($null -eq $peCfg -or -not $peCfg.Enabled) {
+                Write-Log (Get-LocaleMessage -Key 'log.codesign.disabled' -Fallback '[SIGN] Code signing is not enabled for this build - skipping.') 'Gray' $State
+                return
+            }
             if (-not (Get-Command Invoke-CodeSigning -ErrorAction SilentlyContinue)) {
                 Write-Log (Get-LocaleMessage -Key 'log.codesign.moduleUnavailable' -Fallback '[SIGN] Code signing module unavailable - skipping.') 'Gray' $State
                 return
@@ -403,7 +410,7 @@ function Get-BuiltInPipelineSteps {
                     $pubName = 'publish-output'
                     if (Get-Command Resolve-PublishOutputDir -ErrorAction SilentlyContinue) { $pubName = [string](Resolve-PublishOutputDir -State $State) }
                     $anchor = ''
-                    if ($ctx.PSObject.Properties.Name -contains 'projectDir' -and $ctx.projectDir) { $anchor = [string]$ctx.projectDir }
+                    if ($ctx.projectDir) { $anchor = [string]$ctx.projectDir }
                     elseif ($State.PSObject.Properties.Name -contains 'ProjectRoot' -and $State.ProjectRoot) { $anchor = [string]$State.ProjectRoot }
                     if ($anchor) {
                         $target = if ([System.IO.Path]::IsPathRooted($pubName)) { $pubName } else { Join-Path $anchor $pubName }
@@ -442,6 +449,120 @@ function Get-BuiltInPipelineSteps {
                     if (Get-Command Set-GBuildExitCode -ErrorAction SilentlyContinue) { Set-GBuildExitCode -Code 2 -Reason 'code-signing' }
                     throw (Get-LocaleMessage -Key 'log.codesign.failed' -MessageArgs @($detail) -Fallback ('[SIGN] Code signing failed: ' + $detail))
                 }
+            }
+        }
+    },
+    @{
+        Name = 'ReleaseArtifact'
+        Script = {
+            param($ctx)
+            # Turns the build output into something you can SELL: one archive,
+            # a .sha256 the buyer verifies the download with, and a .json
+            # manifest (version, commit, signed or not).
+            #
+            # It runs right AFTER SignArtifacts, so the binaries inside the
+            # archive are already signed. The destination is configured ONCE
+            # per machine (the signing profile), so no project has to be set up
+            # by hand: every project that builds publishes itself.
+            # The gate reads the RESOLVED config (machine profile merged with
+            # the project config) - the machine profile owns the decision to
+            # publish every build to the shared release folder.
+            Import-ModuleOnDemand -ModuleNames @('Release')
+            Import-ModuleOnDemand -ModuleNames @('CodeSigning')
+            $relCfg = $null
+            try { if (Get-Command Get-ReleaseConfig -ErrorAction SilentlyContinue) { $relCfg = Get-ReleaseConfig -State $State } } catch { }
+            if ($null -eq $relCfg -or -not $relCfg.Enabled) {
+                Write-Log (Get-LocaleMessage -Key 'log.release.disabled' -Fallback '[RELEASE] Releasing is not enabled for this build - skipping.') 'Gray' $State
+                return
+            }
+            if (-not (Get-Command New-BuildReleasePackage -ErrorAction SilentlyContinue)) {
+                Write-Log (Get-LocaleMessage -Key 'log.release.moduleUnavailable' -Fallback '[RELEASE] Release module unavailable - skipping.') 'Gray' $State
+                return
+            }
+            $source = ''
+            try { $source = [string]$ctx.publishOutput } catch { $source = '' }
+            if ([string]::IsNullOrWhiteSpace($source)) {
+                try {
+                    $pubName = 'publish-output'
+                    if (Get-Command Resolve-PublishOutputDir -ErrorAction SilentlyContinue) { $pubName = [string](Resolve-PublishOutputDir -State $State) }
+                    $anchor = ''
+                    if ($ctx.projectDir) { $anchor = [string]$ctx.projectDir }
+                    elseif ($State.PSObject.Properties.Name -contains 'ProjectRoot' -and $State.ProjectRoot) { $anchor = [string]$State.ProjectRoot }
+                    if ($anchor) {
+                        $source = if ([System.IO.Path]::IsPathRooted($pubName)) { $pubName } else { Join-Path $anchor $pubName }
+                    }
+                } catch { $source = '' }
+            }
+            if ([string]::IsNullOrWhiteSpace($source) -or -not (Test-Path -LiteralPath $source -PathType Container)) {
+                Write-Log (Get-LocaleMessage -Key 'log.release.noOutput' -Fallback '[RELEASE] No publish output to package - skipping.') 'Gray' $State
+                return
+            }
+
+            $projectName = ''
+            $projectDir = ''
+            # $ctx is a hashtable: read its entries DIRECTLY. Asking
+            # $ctx.PSObject.Properties.Name would list the hashtable's own
+            # members (Count, Keys, ...), never the context keys, and every
+            # lookup below would silently miss.
+            try { $csprojObj = $ctx.csproj } catch { $csprojObj = $null }
+            if ($csprojObj) {
+                $projectName = [IO.Path]::GetFileNameWithoutExtension([string]$csprojObj.FullName)
+                $projectDir = [string]$csprojObj.DirectoryName
+            }
+            if ([string]::IsNullOrWhiteSpace($projectName)) {
+                try {
+                    $projPathValue = [string]$ctx.projPath
+                    if ($projPathValue) {
+                        $projectName = [IO.Path]::GetFileNameWithoutExtension($projPathValue)
+                        $projectDir = [IO.Path]::GetDirectoryName($projPathValue)
+                    }
+                } catch { }
+            }
+            if ([string]::IsNullOrWhiteSpace($projectName)) {
+                try {
+                    $dirValue = [string]$ctx.projectDir
+                    if ($dirValue) {
+                        $proj = Get-ChildItem -LiteralPath $dirValue -Filter '*.csproj' -File -ErrorAction SilentlyContinue |
+                            Select-Object -First 1
+                        if ($proj) { $projectName = $proj.BaseName; $projectDir = $proj.DirectoryName }
+                        else { $projectName = (Split-Path -Leaf $dirValue); $projectDir = $dirValue }
+                    }
+                } catch { }
+            }
+            if ([string]::IsNullOrWhiteSpace($projectName)) { $projectName = 'build' }
+            if ([string]::IsNullOrWhiteSpace($projectDir)) { $projectDir = [string]$ctx.projectDir }
+
+            # The shared release folder comes from the MACHINE profile first
+            # (one setup for every project), then from the project config.
+            $destination = ''
+            try {
+                if (Get-Command Get-ConfigValue -ErrorAction SilentlyContinue) {
+                    $destination = [string](Get-ConfigValue -Path 'security.release.outputDir' -State $State -Default '' -Type string)
+                }
+            } catch { $destination = '' }
+            try {
+                if (Get-Command Get-CodeSigningProfile -ErrorAction SilentlyContinue) {
+                    $profile = Get-CodeSigningProfile
+                    if ($profile.Release -and $profile.Release.ContainsKey('outputDir') -and -not [string]::IsNullOrWhiteSpace([string]$profile.Release['outputDir'])) {
+                        $destination = [string]$profile.Release['outputDir']
+                    }
+                }
+            } catch { }
+
+            $result = New-BuildReleasePackage -SourceDir $source -ProjectRoot ([string]$ctx.projectDir) `
+                -ProjectName $projectName -DestinationDir $destination
+            $status = [string]$result.Status
+            if ($status -eq 'Succeeded') {
+                Write-Log (Get-LocaleMessage -Key 'log.release.published' -MessageArgs @([string]$result.Archive, [string]$result.SizeBytes)) 'Succ' $State
+                if ($result.Copied) {
+                    Write-Log (Get-LocaleMessage -Key 'log.release.copied' -MessageArgs @([string]$result.Copied)) 'Info' $State
+                }
+            }
+            elseif ($status -eq 'Failed') {
+                Write-Log (Get-LocaleMessage -Key 'log.release.failed' -MessageArgs @([string]$result.Message)) 'Warn' $State
+            }
+            else {
+                Write-Log (Get-LocaleMessage -Key 'log.release.skipped' -MessageArgs @([string]$result.Message)) 'Gray' $State
             }
         }
     },
@@ -1521,4 +1642,4 @@ function Invoke-PluginTestAndLintGate {
 # NOTE: Register-BuildEventSubscribers / Unregister-BuildEventSubscribers /
 # Register-BuildServices are now in Orchestrator.Pipeline.Events.ps1 so the
 # event-wiring surface is explicit and discoverable. Orchestrator.psm1 dot-sources
-# that file after this one.
+            # The gate reads the RESOLVED config (machine profile merged with the

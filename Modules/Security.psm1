@@ -197,17 +197,46 @@ function Get-CodeSigningStatus {
     # build produces, so the posture report used to claim "artifacts will be
     # unsigned (SmartScreen may warn)" even when security.peSign had just
     # signed every binary. Report the PE mechanism on its own line.
-    $peCfg = $null
-    $peReadOk = $true
-    try { $peCfg = Get-ConfigValue -Path 'security.peSign' -State $State -Default $null } catch { $peReadOk = $false }
+    #
+    # The resolved config comes from the CodeSigning module, which merges the
+    # MACHINE profile with the project config - reading only the config here
+    # would report "disabled" on a machine where every project is signed.
     $peEnabled = $false
-    if ($peCfg) { $peEnabled = [bool](Get-SectionValue -Section $peCfg -Key 'enabled' -Default $false) }
+    $peTool = ''
+    $peUnknown = $false
+    try {
+        if (-not (Get-Command Get-CodeSigningConfig -ErrorAction SilentlyContinue)) {
+            if (Get-Command Import-ModuleOnDemand -ErrorAction SilentlyContinue) {
+                Import-ModuleOnDemand -ModuleNames @('CodeSigning')
+            }
+        }
+        if (Get-Command Get-CodeSigningConfig -ErrorAction SilentlyContinue) {
+            $peCfg = Get-CodeSigningConfig -State $State
+            $peEnabled = [bool]$peCfg.Enabled
+            $peTool = [string]$peCfg.Tool
+            # A config read that FAILED is not the same as a config that says
+            # "off": report the posture as unverified instead of asserting it.
+            if ($peCfg.PSObject.Properties.Name -contains 'ConfigReadFailed' -and $peCfg.ConfigReadFailed) {
+                $peUnknown = $true
+                $peEnabled = $false
+            }
+        }
+    }
+    catch { $peUnknown = $true }
+    if (-not $peEnabled -and -not $peUnknown) {
+        # Fallback for a host where the CodeSigning module cannot be loaded.
+        $peCfg = $null
+        try { $peCfg = Get-ConfigValue -Path 'security.peSign' -State $State -Default $null } catch { $peUnknown = $true }
+        if ($peCfg) {
+            $peEnabled = [bool](Get-SectionValue -Section $peCfg -Key 'enabled' -Default $false)
+            $peTool = [string](Get-SectionValue -Section $peCfg -Key 'tool' -Default 'signtool')
+        }
+    }
     if ($peEnabled) {
-        $peTool = [string](Get-SectionValue -Section $peCfg -Key 'tool' -Default 'signtool')
         $mechanisms.Add('peSign') | Out-Null
         $details.Add("peSign: active (${peTool})")
     }
-    elseif (-not $peReadOk) {
+    elseif ($peUnknown) {
         $details.Add('peSign: unknown (config read failed - posture unverified)')
     }
     else {
@@ -260,7 +289,7 @@ function Get-CodeSigningStatus {
         $details.Add('auditLedger: disabled')
     }
 
-    $postureUnknown = (-not $signReadOk) -or (-not $peReadOk) -or (-not $gpgReadOk) -or (-not $ledgerReadOk)
+    $postureUnknown = (-not $signReadOk) -or $peUnknown -or (-not $gpgReadOk) -or (-not $ledgerReadOk)
     return @{
         Status     = if ($mechanisms.Count -gt 0) { 'Signed' } elseif ($postureUnknown) { 'Unknown' } else { 'NotSigned' }
         Mechanisms = @($mechanisms)
