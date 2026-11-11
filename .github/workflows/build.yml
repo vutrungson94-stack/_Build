@@ -24,6 +24,9 @@ jobs:
   syntax:
     name: Parse + PSScriptAnalyzer
     runs-on: ubuntu-24.04
+    # Bounded: the default 6 h would let a wedged step burn the whole budget
+    # before anybody looked at the run.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -85,6 +88,10 @@ jobs:
     name: Core test suite (Ubuntu)
     runs-on: ubuntu-24.04
     needs: syntax
+    # The job takes ~10 min. The default timeout is 6 h, so a wedged run
+    # would burn the whole budget before anybody noticed; a runaway suite
+    # must fail fast instead.
+    timeout-minutes: 45
     env:
       # The state-sensitive scopes keep their own child process (that is the
       # isolation guarantee) but they now run CONCURRENTLY, and the fast
@@ -141,7 +148,14 @@ jobs:
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          $dir = Join-Path $root 'Tests\TestResults'
+          $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
+          # Where the time went: the same table the artifact carries, printed
+          # into the log, so a slow-but-green run is diagnosable too.
+          $timings = Join-Path $dir 'scope-timings.csv'
+          if (Test-Path -LiteralPath $timings -PathType Leaf) {
+            Write-Host '===== slowest scopes (scope,seconds,status,passed,skipped,total) ====='
+            Get-Content -LiteralPath $timings -TotalCount 11 | ForEach-Object { Write-Host $_ }
+          }
           $scopes = @()
           foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
             $name = $f.BaseName -replace '^failed-', ''
@@ -191,6 +205,7 @@ jobs:
     name: gbuild end-to-end flow
     runs-on: ubuntu-24.04
     needs: syntax
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -225,6 +240,7 @@ jobs:
     name: Windows PowerShell 5.1 smoke
     runs-on: windows-latest
     needs: syntax
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -248,6 +264,7 @@ jobs:
     name: POSIX launcher + smoke suite
     runs-on: ubuntu-24.04
     needs: syntax
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
@@ -303,6 +320,7 @@ jobs:
     name: macOS (Apple Silicon) self-test + smoke suite
     runs-on: macos-15
     needs: syntax
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:
@@ -364,6 +382,7 @@ jobs:
     name: Multi-architecture container build
     runs-on: ubuntu-24.04
     needs: syntax
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
@@ -387,6 +406,7 @@ jobs:
     name: Native arm64 build
     runs-on: ubuntu-24.04-arm
     needs: syntax
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -406,6 +426,18 @@ jobs:
     # Run on both push and pull_request: a push-only skip made the gate
     # invisible, so a coverage regression could ship without any red job.
     if: github.event_name == 'pull_request' || github.event_name == 'push'
+    # Pester coverage is breakpoint-based and roughly an order of magnitude
+    # slower than the plain run; the sequential 114-scope run was documented
+    # at ~2 h and the parallel path brings it to well under an hour. The
+    # default timeout is 6 h, which is long enough to hide a wedged run -
+    # this one fails fast instead.
+    timeout-minutes: 120
+    env:
+      # Every scope is its own child process under -Coverage, so the degree
+      # is the only lever on the wall clock. Four children on a four-core
+      # runner is the sweet spot: more children only add contention, because
+      # every child is single-threaded.
+      GBUILD_SCOPE_PARALLELISM: 4
     steps:
       - uses: actions/checkout@v7
         with:
@@ -448,3 +480,58 @@ jobs:
             -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
             -Scope All -StrictSkips -Coverage -MinCoveragePct 55
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Report the failing assertions
+        # MUST run even when the run failed - GitHub skips every step after
+        # the first failure without it, and this job is where the coverage
+        # gate turns red. A red coverage run that only says "2 failed" is not
+        # actionable: the failing test NAMES and the assertion details are
+        # what a maintainer needs.
+        if: always()
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
+          # The merged coverage baseline the ratchet measured, and where the
+          # time went.
+          $baseline = Join-Path $dir 'coverage-baseline.json'
+          if (Test-Path -LiteralPath $baseline -PathType Leaf) {
+            Write-Host '===== merged coverage baseline ====='
+            $b = Get-Content -LiteralPath $baseline -Raw -Encoding UTF8 | ConvertFrom-Json
+            Write-Host ("coverage {0}% of {1} lines ({2} covered / {3} missed) across {4} file(s)" -f $b.coveragePercent, $b.linesTotal, $b.linesCovered, $b.linesMissed, @($b.perFile).Count)
+          }
+          $timings = Join-Path $dir 'scope-timings.csv'
+          if (Test-Path -LiteralPath $timings -PathType Leaf) {
+            Write-Host '===== slowest scopes (scope,seconds,status,passed,skipped,total) ====='
+            Get-Content -LiteralPath $timings -TotalCount 11 | ForEach-Object { Write-Host $_ }
+          }
+          $scopes = @()
+          foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
+            $name = $f.BaseName -replace '^failed-', ''
+            if ($name) { $scopes += $name }
+            Write-Host "===== $($f.Name) ====="
+            Get-Content -LiteralPath $f.FullName -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+          }
+          if ($scopes.Count -eq 0) { Write-Host 'no failed scope to re-run'; exit 0 }
+          foreach ($s in $scopes) {
+            Write-Host "===== re-running scope $s ====="
+            & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope $s -StrictSkips 2>&1 |
+              Select-String -Pattern 'Expected|But was|at C:|Tests Passed' | ForEach-Object { Write-Host $_.Line }
+          }
+          exit 0
+
+      - name: Upload test results
+        # Always: the coverage baseline and the per-scope timing table are
+        # the artefacts of this job, and a green run is exactly when they are
+        # worth having.
+        if: always()
+        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: gbuild-coverage-results
+          path: |
+            Tests/TestResults/**
+            Tests/suite-progress-*.log
+          retention-days: 3
+          compression-level: 9
+          if-no-files-found: ignore
