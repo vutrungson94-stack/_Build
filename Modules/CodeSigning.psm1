@@ -308,6 +308,12 @@ function Invoke-ExternalCodeSigning {
     Thumbprint of the certificate in CurrentUser\My (or LocalMachine\My).
 #>
 function Invoke-PowerShellCodeSigning {
+    # PSScriptAnalyzer resolves this suppression from the function body: the
+    # attribute has to sit INSIDE the function, before [CmdletBinding()], and the
+    # Justification has to be a SINGLE literal line. A multi-line 'a' + 'b'
+    # concatenation is not evaluated by the analyzer, so the suppression is then
+    # silently ignored and the rule fires again (this cost one CI failure).
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingConvertToSecureStringWithPlainText', '', Justification = 'Import-PfxCertificate requires a SecureString and the PFX password comes from the environment variable named by certificatePasswordEnv - never from the config file and never from disk; the imported certificate is removed from the store again before this function returns.')]
     [CmdletBinding()]
     [OutputType([hashtable])]
     param(
