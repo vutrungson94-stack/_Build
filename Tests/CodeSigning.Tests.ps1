@@ -260,11 +260,20 @@ Describe 'CodeSigning - tool availability' {
     }
 
     It 'Test-CodeSigningToolAvailable is false for an unknown tool name' {
+        # An unknown tool has no signer. The function used to fall through to
+        # the signtool lookup, so a machine WITH the Windows SDK reported
+        # "available" for a tool that does not exist - and the CI runner
+        # (which has a signtool) turned that into a red build.
         Test-CodeSigningToolAvailable -Tool 'not-a-tool' | Should -BeFalse
     }
 
-    It 'Test-CodeSigningToolAvailable reports the powershell signer as available' {
-        Test-CodeSigningToolAvailable -Tool 'powershell' | Should -BeTrue
+    It 'Test-CodeSigningToolAvailable reports the powershell signer exactly where Authenticode exists' {
+        # Authenticode is a WINDOWS technology: Set-AuthenticodeSignature does
+        # not exist on Linux/macOS, so the signer is not available there. The
+        # function must report the platform it runs on - a hardcoded "true"
+        # would send a Linux build down a path that cannot work.
+        $expected = [bool](Get-Command -Name 'Set-AuthenticodeSignature' -ErrorAction SilentlyContinue)
+        Test-CodeSigningToolAvailable -Tool 'powershell' | Should -Be $expected
     }
 }
 

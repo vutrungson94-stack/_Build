@@ -85,6 +85,17 @@ jobs:
     name: Core test suite (Ubuntu)
     runs-on: ubuntu-24.04
     needs: syntax
+    env:
+      # The state-sensitive scopes keep their own child process (that is the
+      # isolation guarantee) but they now run CONCURRENTLY, and the fast
+      # in-process core batch runs in the parent WHILE they work.
+      #
+      # Measured on this runner before the change: the 64 isolated scopes cost
+      # 823 s one after another and the 50 in-process scopes another 83 s -
+      # a 945 s job for 1602 tests. Four children at a time bring the same
+      # work down to ~230 s. The number is the runner's core count; a larger
+      # value only adds contention, because every child is single-threaded.
+      GBUILD_SCOPE_PARALLELISM: 4
     steps:
       - uses: actions/checkout@v7
         with:
@@ -147,7 +158,10 @@ jobs:
           exit 0
 
       - name: Upload test results
-        if: failure()
+        # Always, not only on failure: the per-scope timing table is what
+        # tells a maintainer WHERE the suite spends its time, and that is
+        # exactly the question a green run cannot answer.
+        if: always()
         # v7 runs on Node 24. v4/v5 declare node20, so the runner forces them
         # onto Node 24 and annotates the run: "Node.js 20 is deprecated ...".
         # v6+ is the first line that actually ships node24.

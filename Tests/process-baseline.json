@@ -1,18 +1,18 @@
 {
   "$schema": "./process-baseline.schema.json",
   "description": "Quantitative baseline of the gbuild verification process itself. This file is the L4 artefact: the numbers below are MEASURED, not aspirational. The per-run adoption curve is appended to Tests/TestResults/process-trend.jsonl (gitignored); the Hygiene gate reads the committed floor in this file, so it works on a fresh checkout with no history. Nothing regenerates a per-run process-baseline.json - that claim was removed when the trend file became the per-run artefact. Update this file only when the process itself changes (new scope, new gate, accepted skip) - never to make a red run green.",
-  "generatedAtUtc": "2026-11-09T10:30:00Z",
+  "generatedAtUtc": "2026-11-11T11:00:00Z",
   "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All + Tests/Run-E2ETests.ps1 -Scope All",
   "host": "windows-2025 / pwsh 7.6",
   "core": {
-    "scopes": 112,
-    "testsTotal": 1566,
-    "passed": 1560,
+    "scopes": 115,
+    "testsTotal": 1604,
+    "passed": 1596,
     "failedAllowed": 0,
-    "skipped": 6,
+    "skipped": 8,
     "skippedMaxAllowed": 8,
     "killedByInfraAllowed": 0,
-    "skipEnforcement": "Tests/Run-CoreTests.ps1 -StrictSkips (which every CI job passes) is enforced against THIS budget, not against zero. It previously failed on any skip at all, which cannot hold alongside a baseline that records 6: every run failed for a reason unrelated to the code under test. skippedMaxAllowed is the deliberate, reviewed allowance, so lowering it is the ratchet - never edit it upward to make a red run green."
+    "skipEnforcement": "Tests/Run-CoreTests.ps1 -StrictSkips (which every CI job passes) is enforced against THIS budget, not against zero. It previously failed on any skip at all, which cannot hold alongside a baseline that records 8: every run failed for a reason unrelated to the code under test. skippedMaxAllowed is the deliberate, reviewed allowance, so lowering it is the ratchet - never edit it upward to make a red run green."
   },
   "e2e": {
     "scopes": 5,

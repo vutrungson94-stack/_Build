@@ -539,6 +539,32 @@ Place scripts in `_Build/Hooks/`:
     ./_Build/gbuild -GitHub -Incremental
 ```
 
+### Running the core test suite
+
+```powershell
+# The whole suite, scope-isolated
+pwsh -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips
+
+# One scope, or a few
+pwsh -File 'Tests/Run-CoreTests.ps1' -Scope Cache
+$env:GBUILD_SS_LIST = 'Cache,Deploy'; pwsh -File 'Tests/Run-CoreTests.ps1'
+```
+
+Every scope that mutates module-global state runs in its **own child process**, so
+one scope can never contaminate the next. Those children can also run
+**concurrently** - the process topology stays exactly the same, only the timing
+changes:
+
+```powershell
+# 4 children at a time (the CI job does this with the runner's core count)
+$env:GBUILD_SCOPE_PARALLELISM = 4
+pwsh -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips
+```
+
+The run publishes `Tests/TestResults/scope-timings.csv` (scope, seconds, status,
+counts, slowest first) and prints the ten slowest scopes at the end, so "where
+does the suite spend its time" is a measurement instead of an opinion.
+
 ## Troubleshooting
 
 **PowerShell execution policy blocks `.ps1` on Windows:**

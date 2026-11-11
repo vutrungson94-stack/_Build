@@ -268,6 +268,38 @@ run leaks module-global state between state-sensitive scopes and produces ~16
 false failures (see section 6). The ratchet (55%) is a measured floor, not an
 aspiration - raise it as coverage grows, never lower it to go green.
 
+`-Coverage` implies the **full parallel** path: every scope is scheduled as its own
+isolated child through a bounded pool (`-ParallelScopes N`, default
+`min(ProcessorCount, 8)`, override with `GBUILD_SCOPE_PARALLELISM`). Pester
+coverage is breakpoint-based and ~10x slower, so the sequential 112-scope run
+took ~2 h and could never fit a CI budget. Each child is still a separate
+process, so the state-isolation guarantee above is unchanged - do not
+"optimise" this back into one session.
+
+Without `-Coverage` the runner uses the **hybrid** path: the state-sensitive
+scopes still get their own child process, but the children run CONCURRENTLY
+through the same bounded pool, and the fast in-process core batch runs in the
+parent *while* they work. The process topology is identical to the sequential
+run - only the timing changed - so the isolation guarantee is untouched. It is
+opt-in: `-ParallelScopes N` or `GBUILD_SCOPE_PARALLELISM=N` (the CI `test` job
+sets it to the runner's core count). A plain local run stays sequential: a
+developer wants fast feedback and a quiet machine, not four children.
+
+The suite writes `Tests/TestResults/scope-timings.csv` (scope, seconds, status,
+counts, slowest first) and prints the ten slowest scopes at the end. It is a
+DIAGNOSTIC, not a gate: nothing fails because of it. Use it before guessing
+where the suite's time goes - the answer is usually three scopes, not fifty.
+
+The merged percentage is a UNION over scopes, not a sum: a line covered in any
+scope counts once. Per file, `covered = max over scopes` and
+`total = max over scopes of (covered+missed)`; `missed` is derived as
+`total - covered`. Deriving it any other way mixes one run's covered lines with
+another run's missed lines and inflates the denominator (SDK.psm1 once reported
+375+995 for a 995-line file, deflating the very percentage the ratchet
+enforces). The merge also ignores `coverage-*.xml` files that already existed
+before the run (PIDs are reused, so a stale file would otherwise be counted as
+covered today).
+
 `-SelfTest` must exit 0 before any project test run. A self-test that collects
 failures but falls through to project tests is a defect: the self-test branch
 must `exit` with its own verdict.

@@ -587,18 +587,38 @@ function Test-CodeSigningToolAvailable {
         [string]$ExternalCommand = ''
     )
 
-    if ($Tool -eq 'external') {
-        if ([string]::IsNullOrWhiteSpace($ExternalCommand)) { return $false }
-        $cmd = Get-Command -Name $ExternalCommand -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-        return [bool]$cmd
+    switch ($Tool) {
+        'external' {
+            if ([string]::IsNullOrWhiteSpace($ExternalCommand)) { return $false }
+            $cmd = Get-Command -Name $ExternalCommand -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            return [bool]$cmd
+        }
+        'powershell' {
+            # Authenticode is a WINDOWS technology: Set-AuthenticodeSignature
+            # does not exist on Linux/macOS, so there the signer is NOT
+            # available. The function reports the platform it runs on instead
+            # of a hardcoded answer.
+            return [bool](Get-Command -Name 'Set-AuthenticodeSignature' -ErrorAction SilentlyContinue)
+        }
+        'signtool' {
+            $cmd = Get-Command -Name 'signtool' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            return [bool]$cmd
+        }
+        'auto' {
+            # The detected signer: the account when this machine has one, the
+            # machine's own certificate otherwise. Either way a signer has to
+            # EXIST for the artifact to be signed.
+            return ((Test-CodeSigningToolAvailable -Tool 'powershell') -or (Test-CodeSigningToolAvailable -Tool 'signtool'))
+        }
+        default {
+            # An unknown tool name has NO signer. This used to fall through to
+            # the signtool lookup, so on a machine with the Windows SDK
+            # installed it reported "available" for a tool that does not
+            # exist - and the CI runner (which does have a signtool) turned
+            # that into a red build.
+            return $false
+        }
     }
-
-    if ($Tool -eq 'powershell') {
-        return [bool](Get-Command -Name 'Set-AuthenticodeSignature' -ErrorAction SilentlyContinue)
-    }
-
-    $cmd = Get-Command -Name 'signtool' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-    return [bool]$cmd
 }
 
 <#
