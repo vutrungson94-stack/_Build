@@ -117,7 +117,11 @@ jobs:
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Report the failing assertions (always)
+      - name: Report the failing assertions
+        # MUST run even when the suite failed. Without `if: always()` GitHub
+        # skips every step after the first failure - and these diagnostics are
+        # exactly what a red run needs. The step NAME alone does not do this.
+        if: always()
         # A red suite that only says "2 failed" is not actionable: the failing
         # test NAMES and the assertion details are what a maintainer needs. The
         # runner writes the scope list per scope; re-run the failed scopes here

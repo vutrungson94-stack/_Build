@@ -1254,5 +1254,9 @@
   "log.setupSigning.signerCreated": "[1/3] Da tao chung chi tu ky moi: {0}",
   "log.setupSigning.signerFound": "[1/3] Dung lai chung chi co san: {0}",
   "log.setupSigning.step1": "  1. duoc KY (neu may co chung chi) - buoc SignArtifacts",
-  "log.setupSigning.step2": "  2. duoc DONG GOI thanh zip + .sha256 + .json - buoc ReleaseArtifact"
+  "log.setupSigning.step2": "  2. duoc DONG GOI thanh zip + .sha256 + .json - buoc ReleaseArtifact",
+  "log.setupSigning.accountDetected": "[SIGN] Da phat hien tai khoan Artifact Signing tren may nay: {0}",
+  "log.setupSigning.accountMissing": "[SIGN] Khong co tai khoan Artifact Signing tren may nay ({0}) - dung chung chi tu ky",
+  "log.setupSigning.azureAuto": "[1/3] Ky so: da phat hien tai khoan Artifact Signing (signtool va dlib duoc tim tu dong)",
+  "log.setupSigning.selfSigned": "[1/3] Ky so: chung chi tu ky cua may (tai khoan Artifact Signing se duoc dung tu dong ngay khi co)"
 }

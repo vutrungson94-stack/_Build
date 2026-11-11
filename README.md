@@ -214,6 +214,7 @@ It is **off by default** — a project opts in through its own `gbuild.config.js
 
 | `tool` | Signs with | Needs |
 |---|---|---|
+| `auto` (default) | the Artifact Signing account when this machine has one, otherwise the machine's own self-signed certificate | nothing to configure |
 | `powershell` | `Set-AuthenticodeSignature` | nothing (ships with PowerShell) |
 | `signtool` | Windows SDK `signtool.exe` + a `.pfx` | Windows SDK on PATH |
 | `external` | any command line that signs one file | the command; `{file}` is replaced with the artifact path |
@@ -223,6 +224,19 @@ It is **off by default** — a project opts in through its own `gbuild.config.js
 client machines trust), `none`. The certificate password is never read from the config
 file: it comes from the environment variable named by `certificatePasswordEnv`.
 
+**The signing account is DETECTED, not configured.** `tool: auto` looks for the three
+things that together mean "this machine has a code signing account":
+
+1. `signtool.exe` - Windows SDK (`Windows Kits\10\bin\<version>\x64`) or the Artifact
+   Signing client tools,
+2. `Azure.CodeSigning.Dlib.dll` - the Artifact Signing client tools,
+3. the account metadata - `security.peSign.azureEndpoint` + `azureAccount` +
+   `azureProfile` in the machine profile (the tool writes the metadata file itself),
+   or an `azure-metadata.json` dropped into `<tool>\profiles\`.
+
+When all three are present the artifacts are signed with the account; when they are not,
+the build falls back to the machine's self-signed certificate and says so in the log.
+Nothing has to be re-run when the account appears later: the next build finds it.
 `security.artifactSign` stays the owner of **container / OCI** signing (cosign,
 notation); the two sections never overlap.
 

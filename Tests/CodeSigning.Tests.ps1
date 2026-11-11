@@ -89,6 +89,69 @@ Describe 'CodeSigning - machine profile' {
     }
 }
 
+Describe 'CodeSigning - Artifact Signing auto-detection' {
+    BeforeAll {
+        Import-Module (Join-Path $global:GBuildModuleRoot 'CodeSigning.psm1') -Force -DisableNameChecking -ErrorAction Stop
+    }
+
+    It 'tool auto falls back to the self-signed signer when no account is on this machine' {
+        $state = [PSCustomObject]@{
+            BuildConfig = @{ security = @{ peSign = @{ enabled = $true; tool = 'auto' } } }
+        }
+        $cfg = Get-CodeSigningConfig -State $state
+        # This machine has no Artifact Signing client tools, so the signer falls
+        # back to the self-signed one - a build never stops for a missing account.
+        $cfg.Tool | Should -BeIn @('external', 'powershell')
+        if ($cfg.Tool -eq 'external') {
+            $cfg.ExternalCommand | Should -Not -BeNullOrEmpty
+        }
+        else {
+            $cfg.AzureAvailable | Should -BeFalse
+            $cfg.AzureReason | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'tool auto uses the Artifact Signing account when the metadata is present' {
+        $metadata = Join-Path $TestDrive 'azure-metadata.json'
+        Set-Content -LiteralPath $metadata -Value '{"Endpoint":"https://eus.codesigning.azure.net","CodeSigningAccountName":"acct","CertificateProfileName":"prof"}' -Encoding UTF8
+        $state = [PSCustomObject]@{
+            BuildConfig = @{
+                security = @{
+                    peSign = @{
+                        enabled = $true
+                        tool = 'auto'
+                        azureMetadataPath = $metadata
+                        azureSignToolPath = 'C:\fake\signtool.exe'
+                        azureDlibPath = 'C:\fake\Azure.CodeSigning.Dlib.dll'
+                    }
+                }
+            }
+        }
+        $cfg = Get-CodeSigningConfig -State $state
+        $cfg.Tool | Should -Be 'external'
+        $cfg.ExternalCommand | Should -Be 'C:\fake\signtool.exe'
+        $cfg.ExternalArguments | Should -Match 'Azure\.CodeSigning\.Dlib\.dll'
+        $cfg.ExternalArguments | Should -Match 'dmdf'
+        $cfg.AzureAvailable | Should -BeTrue
+    }
+
+    It 'Find-ArtifactSigningMetadata writes the metadata file from the profile values' {
+        $metadata = Find-ArtifactSigningMetadata -Endpoint 'https://eus.codesigning.azure.net' -Account 'acct' -ProfileName 'prof'
+        $metadata | Should -Not -BeNullOrEmpty
+        Test-Path -LiteralPath $metadata | Should -BeTrue
+        $doc = Get-Content -LiteralPath $metadata -Raw | ConvertFrom-Json
+        $doc.Endpoint | Should -Be 'https://eus.codesigning.azure.net'
+        $doc.CodeSigningAccountName | Should -Be 'acct'
+        $doc.CertificateProfileName | Should -Be 'prof'
+    }
+
+    It 'Resolve-ArtifactSigningCommand reports what is missing' {
+        $r = Resolve-ArtifactSigningCommand -SignToolPath '' -DlibPath '' -MetadataPath '' -Endpoint '' -Account '' -ProfileName ''
+        $r.Available | Should -BeFalse
+        $r.Reason | Should -Not -BeNullOrEmpty
+    }
+}
+
 Describe 'CodeSigning - configuration' {
     BeforeAll {
         Import-Module (Join-Path $global:GBuildModuleRoot 'CodeSigning.psm1') -Force -DisableNameChecking -ErrorAction Stop
@@ -97,10 +160,13 @@ Describe 'CodeSigning - configuration' {
     It 'Get-CodeSigningConfig returns the module defaults when no config is present' {
         $cfg = Get-CodeSigningConfig -State $null
         $cfg.Enabled | Should -BeFalse
-        $cfg.Tool | Should -Be 'signtool'
         $cfg.Artifacts | Should -Contain '*.exe'
         $cfg.Verify | Should -Be 'valid'
         $cfg.FailOnError | Should -BeTrue
+        # The shipped default tool is 'auto': it resolves to the Artifact Signing
+        # account when this machine has one, and to the self-signed signer when
+        # it has not.
+        $cfg.Tool | Should -BeIn @('external', 'powershell')
     }
 
     It 'Get-CodeSigningConfig reads security.peSign from the build config' {

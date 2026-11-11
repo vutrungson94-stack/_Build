@@ -1,10 +1,22 @@
 # CodeSigning
 
-11 function(s). Source: `Modules/CodeSigning.psm1`
+15 function(s). Source: `Modules/CodeSigning.psm1`
 
 ### Get-CodeSigningProfilePath
 
 ### Get-CodeSigningProfile
+
+### Find-CodeSigningSignTool
+
+### Find-ArtifactSigningDlib
+
+### Find-ArtifactSigningMetadata
+
+Parameters: ExplicitPath :String, Endpoint :String, Account :String, ProfileName :String
+
+### Resolve-ArtifactSigningCommand
+
+Parameters: SignToolPath :String, DlibPath :String, MetadataPath :String, Endpoint :String, Account :String, ProfileName :String
 
 ### Ensure-SelfSignedCodeSigningCertificate
 

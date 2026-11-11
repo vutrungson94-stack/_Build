@@ -892,7 +892,7 @@
         },
         "peSign": {
             "enabled": false,
-            "tool": "signtool",
+            "tool": "auto",
             "artifacts": [
                 "*.exe",
                 "*.dll"
@@ -904,6 +904,12 @@
             "timestampUrl": "http://timestamp.digicert.com",
             "externalCommand": "",
             "externalArguments": "{file}",
+            "azureEndpoint": "",
+            "azureAccount": "",
+            "azureProfile": "",
+            "azureMetadataPath": "",
+            "azureSignToolPath": "",
+            "azureDlibPath": "",
             "verify": "valid",
             "failOnError": true,
             "autoProvisionSelfSigned": false

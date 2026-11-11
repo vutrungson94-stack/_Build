@@ -426,6 +426,19 @@ function Get-BuiltInPipelineSteps {
             $status = [string]$result.Status
             $detail = [string]$result.Message
 
+            # Say WHICH signer ran: the Artifact Signing account, or the machine's
+            # own certificate. "Configured" and "signed" are different claims.
+            try {
+                $signerCfg = Get-CodeSigningConfig -State $State
+                if ($signerCfg.AzureAvailable) {
+                    Write-Log (Get-LocaleMessage -Key 'log.setupSigning.accountDetected' -MessageArgs @([string]$signerCfg.ExternalCommand)) 'Info' $State
+                }
+                elseif (-not [string]::IsNullOrWhiteSpace([string]$signerCfg.AzureReason)) {
+                    Write-Log (Get-LocaleMessage -Key 'log.setupSigning.accountMissing' -MessageArgs @([string]$signerCfg.AzureReason)) 'Gray' $State
+                }
+            }
+            catch { }
+
             if ($status -eq 'Succeeded') {
                 Write-Log (Get-LocaleMessage -Key 'log.codesign.signed' -MessageArgs @($detail)) 'Succ' $State
             }

@@ -1079,6 +1079,18 @@ Parameters: Namespace :String, Version :String, State :PSObject
 
 ### Get-CodeSigningProfile
 
+### Find-CodeSigningSignTool
+
+### Find-ArtifactSigningDlib
+
+### Find-ArtifactSigningMetadata
+
+Parameters: ExplicitPath :String, Endpoint :String, Account :String, ProfileName :String
+
+### Resolve-ArtifactSigningCommand
+
+Parameters: SignToolPath :String, DlibPath :String, MetadataPath :String, Endpoint :String, Account :String, ProfileName :String
+
 ### Ensure-SelfSignedCodeSigningCertificate
 
 Parameters: Subject :String, Thumbprint :String, Years :Int32
@@ -4419,7 +4431,7 @@ Parameters: Document :Object, State :PSObject
 | [Chaos](API/Chaos.md) | 4 |
 | [Clean](API/Clean.md) | 9 |
 | [ClusterOrchestrator](API/ClusterOrchestrator.md) | 25 |
-| [CodeSigning](API/CodeSigning.md) | 11 |
+| [CodeSigning](API/CodeSigning.md) | 15 |
 | [ConfigProvider](API/ConfigProvider.md) | 27 |
 | [Container](API/Container.md) | 6 |
 | [CredentialVault](API/CredentialVault.md) | 21 |
@@ -4479,5 +4491,5 @@ Parameters: Document :Object, State :PSObject
 | [Versioning](API/Versioning.md) | 7 |
 | [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 74 module(s), 1103 function(s).
+Total: 74 module(s), 1107 function(s).
 

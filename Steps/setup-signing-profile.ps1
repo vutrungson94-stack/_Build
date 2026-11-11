@@ -66,46 +66,59 @@ if ($DisableSigning) {
     $profile.peSign = [ordered]@{ enabled = $false }
     Write-SetupMessage -Key 'log.setupSigning.disabled' -Fallback '[1/3] Code signing: DISABLED'
 }
-elseif ($AzureMetadata -and $SignToolPath -and $DlibPath) {
-    $profile.peSign = [ordered]@{
-        enabled           = $true
-        tool              = 'external'
-        externalCommand   = $SignToolPath
-        externalArguments = ('sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "{0}" /dmdf "{1}" {file}' -f $DlibPath, $AzureMetadata)
-        artifacts         = @('*.exe')
-        recursive         = $true
-        verify            = 'valid'
-        failOnError       = $true
-    }
-    Write-SetupMessage -Key 'log.setupSigning.azure' -Fallback '[1/3] Code signing: Azure Artifact Signing (signtool + dlib)'
-}
 else {
-    # Chung chi tu ky cua may: moi project van duoc KY (khong co CA thi SmartScreen
-    # van hoi, nhung file van co chu ky va van mang di ban duoc).
-    $subject = "CN=$Publisher (self-signed code signing)"
-    $cert = Get-ChildItem -Path 'Cert:\CurrentUser\My' -ErrorAction SilentlyContinue |
-        Where-Object { $_.Subject -eq $subject -and $_.NotAfter -gt (Get-Date).AddMonths(6) } |
-        Select-Object -First 1
-    if (-not $cert) {
-        $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $subject `
-            -CertStoreLocation 'Cert:\CurrentUser\My' -KeyExportPolicy Exportable `
-            -NotAfter (Get-Date).AddYears(5) -KeyUsage DigitalSignature
-        Write-SetupMessage -Key 'log.setupSigning.signerCreated' -Fallback ("[1/3] Created a new self-signed certificate: " + $cert.Thumbprint)
-    }
-    else {
-        Write-SetupMessage -Key 'log.setupSigning.signerFound' -Fallback ("[1/3] Reusing the existing certificate: " + $cert.Thumbprint)
-    }
-    $profile.peSign = [ordered]@{
+    # tool = auto: the signer picks the Artifact Signing account up by itself as
+    # soon as this machine has the signtool, the dlib and the account metadata.
+    # Nothing has to be re-run when the account appears later.
+    $pe = [ordered]@{
         enabled                = $true
-        tool                   = 'powershell'
-        certificateThumbprint  = [string]$cert.Thumbprint
-        artifacts              = @('*.exe')
+        tool                   = 'auto'
+        artifacts              = @('*.exe', '*.dll')
         recursive              = $true
         timestampUrl           = 'http://timestamp.digicert.com'
         verify                 = 'signature'
         failOnError            = $false
         autoProvisionSelfSigned = $true
     }
+
+    if ($AzureMetadata -and $SignToolPath -and $DlibPath) {
+        # Explicit paths: use them as they are.
+        $pe['tool'] = 'external'
+        $pe['externalCommand'] = $SignToolPath
+        $pe['externalArguments'] = ('sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "' + $DlibPath + '" /dmdf "' + $AzureMetadata + '" {file}')
+        $pe['azureMetadataPath'] = $AzureMetadata
+        $pe['azureSignToolPath'] = $SignToolPath
+        $pe['azureDlibPath'] = $DlibPath
+        $pe['verify'] = 'valid'
+        Write-SetupMessage -Key 'log.setupSigning.azure' -Fallback '[1/3] Code signing: Azure Artifact Signing (signtool + dlib)'
+    }
+    elseif ($AzureMetadata) {
+        # Only the metadata: the signtool and the dlib are found on this machine.
+        $pe['azureMetadataPath'] = $AzureMetadata
+        $pe['verify'] = 'valid'
+        Write-SetupMessage -Key 'log.setupSigning.azureAuto' -Fallback '[1/3] Code signing: Artifact Signing account detected (the signtool and the dlib are found automatically)'
+    }
+    else {
+        # Chung chi tu ky cua may: moi project van duoc KY (khong co CA thi SmartScreen
+        # van hoi, nhung file van co chu ky va van mang di ban duoc).
+        $subject = "CN=$Publisher (self-signed code signing)"
+        $cert = Get-ChildItem -Path 'Cert:\CurrentUser\My' -ErrorAction SilentlyContinue |
+            Where-Object { $_.Subject -eq $subject -and $_.NotAfter -gt (Get-Date).AddMonths(6) } |
+            Select-Object -First 1
+        if (-not $cert) {
+            $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $subject `
+                -CertStoreLocation 'Cert:\CurrentUser\My' -KeyExportPolicy Exportable `
+                -NotAfter (Get-Date).AddYears(5) -KeyUsage DigitalSignature
+            Write-SetupMessage -Key 'log.setupSigning.signerCreated' -Fallback ("[1/3] Created a new self-signed certificate: " + $cert.Thumbprint)
+        }
+        else {
+            Write-SetupMessage -Key 'log.setupSigning.signerFound' -Fallback ("[1/3] Reusing the existing certificate: " + $cert.Thumbprint)
+        }
+        $pe['certificateThumbprint'] = [string]$cert.Thumbprint
+        Write-SetupMessage -Key 'log.setupSigning.selfSigned' -Fallback '[1/3] Code signing: self-signed certificate of this machine (an Artifact Signing account is used automatically as soon as it is configured)'
+    }
+
+    $profile.peSign = $pe
 }
 
 # --- 3. Thu muc phat hanh --------------------------------------------------------

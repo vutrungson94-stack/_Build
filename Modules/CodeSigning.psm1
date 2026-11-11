@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 # gbuild - PowerShell Build System
 # Copyright (c) 2026 Vu Trung Son (vutrungson94@gmail.com)
 # Licensed under the MIT License. See LICENSE file for details.
@@ -125,6 +125,168 @@ function Get-CodeSigningProfile {
 
 <#
 .SYNOPSIS
+    Finds the Windows SDK signtool.exe on this machine.
+.DESCRIPTION
+    The Artifact Signing client tools ship signtool next to the dlib, and the
+    Windows SDK keeps it under Windows Kits\10\bin\<version>\x64. Both are
+    searched, newest version first.
+#>
+function Find-CodeSigningSignTool {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+
+    $roots = @()
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if ([string]::IsNullOrWhiteSpace($base)) { continue }
+        $roots += (Join-Path (Join-Path $base 'Windows Kits') (Join-Path '10' 'bin'))
+        $roots += (Join-Path (Join-Path $base 'Microsoft Artifact Signing Client') 'bin')
+    }
+
+    $found = @()
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+        foreach ($dir in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending)) {
+            foreach ($arch in @('x64', 'x86')) {
+                $p = Join-Path (Join-Path $dir.FullName $arch) 'signtool.exe'
+                if (Test-Path -LiteralPath $p -PathType Leaf) { $found += $p }
+            }
+        }
+    }
+    if ($found.Count -eq 0) { return '' }
+    return $found[0]
+}
+
+<#
+.SYNOPSIS
+    Finds the Azure Artifact Signing dlib (Azure.CodeSigning.Dlib.dll).
+.DESCRIPTION
+    Installed by the "Microsoft.Azure.ArtifactSigningClientTools" package. The
+    NuGet package Microsoft.ArtifactSigning.Client carries the same file when
+    the MSI is not used, so that location is searched too.
+#>
+function Find-ArtifactSigningDlib {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+
+    $roots = @()
+    foreach ($base in @($env:ProgramFiles, ${env:ProgramFiles(x86)})) {
+        if ([string]::IsNullOrWhiteSpace($base)) { continue }
+        $roots += (Join-Path $base 'Microsoft Artifact Signing Client')
+    }
+    foreach ($r in $roots) {
+        if (-not (Test-Path -LiteralPath $r -PathType Container)) { continue }
+        $hit = Get-ChildItem -LiteralPath $r -Recurse -Filter 'Azure.CodeSigning.Dlib.dll' -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+        if (-not $hit) {
+            $hit = Get-ChildItem -LiteralPath $r -Recurse -Filter 'Azure.CodeSigning.Dlib.dll' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+        if ($hit) { return $hit.FullName }
+    }
+    return ''
+}
+
+<#
+.SYNOPSIS
+    Finds the Azure Artifact Signing metadata file, or writes it from the profile.
+.DESCRIPTION
+    The metadata file names the Artifact Signing account and the certificate
+    profile. It is looked up in the tool's profile folder and in the project's
+    signing folder; when the profile itself carries the endpoint, the account and
+    the profile name, the file is written from them (into the TOOL folder, never
+    outside it).
+#>
+function Find-ArtifactSigningMetadata {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [string]$ExplicitPath = '',
+        [string]$Endpoint = '',
+        [string]$Account = '',
+        [string]$ProfileName = ''
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitPath) -and (Test-Path -LiteralPath $ExplicitPath -PathType Leaf)) {
+        return (Resolve-Path -LiteralPath $ExplicitPath).Path
+    }
+
+    $toolRoot = ''
+    try { $toolRoot = Split-Path -Parent $PSScriptRoot } catch { }
+    $candidates = @()
+    if ($toolRoot) {
+        $profileDir = Join-Path $toolRoot 'profiles'
+        $candidates += (Join-Path $profileDir 'azure-metadata.json')
+        $candidates += (Join-Path $profileDir 'metadata.json')
+    }
+    foreach ($c in $candidates) {
+        if (Test-Path -LiteralPath $c -PathType Leaf) { return (Resolve-Path -LiteralPath $c).Path }
+    }
+
+    # The profile carries the three values -> write the metadata file ourselves.
+    if (-not [string]::IsNullOrWhiteSpace($Endpoint) -and -not [string]::IsNullOrWhiteSpace($Account) -and -not [string]::IsNullOrWhiteSpace($ProfileName)) {
+        try {
+            if (-not $toolRoot) { return '' }
+            $profileDir = Join-Path $toolRoot 'profiles'
+            if (-not (Test-Path -LiteralPath $profileDir)) { New-Item -ItemType Directory -Path $profileDir -Force | Out-Null }
+            $target = Join-Path $profileDir 'azure-metadata.json'
+            [ordered]@{
+                Endpoint              = $Endpoint
+                CodeSigningAccountName = $Account
+                CertificateProfileName = $ProfileName
+            } | ConvertTo-Json | Set-Content -LiteralPath $target -Encoding UTF8
+            return $target
+        }
+        catch { return '' }
+    }
+
+    return ''
+}
+
+<#
+.SYNOPSIS
+    Resolves the Azure Artifact Signing command line when this machine has it.
+.DESCRIPTION
+    Returns a hashtable with Available (bool), Command, Arguments, Metadata and
+    Reason. "Available" means: the signtool, the Artifact Signing dlib AND the
+    metadata (the account) are all present - that is exactly "this machine has
+    a code signing account configured". When they are not, the caller falls
+    back to the self-signed signer so a build never stops.
+#>
+function Resolve-ArtifactSigningCommand {
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param(
+        [string]$SignToolPath = '',
+        [string]$DlibPath = '',
+        [string]$MetadataPath = '',
+        [string]$Endpoint = '',
+        [string]$Account = '',
+        [string]$ProfileName = ''
+    )
+
+    $result = @{ Available = $false; Command = ''; Arguments = ''; Metadata = ''; Reason = '' }
+
+    if (-not $SignToolPath) { $SignToolPath = Find-CodeSigningSignTool }
+    if (-not $DlibPath) { $DlibPath = Find-ArtifactSigningDlib }
+    if (-not $MetadataPath) { $MetadataPath = Find-ArtifactSigningMetadata -ExplicitPath $MetadataPath -Endpoint $Endpoint -Account $Account -ProfileName $ProfileName }
+
+    if (-not $SignToolPath) { $result.Reason = 'signtool.exe was not found on this machine'; return $result }
+    if (-not $DlibPath) { $result.Reason = 'the Azure Artifact Signing dlib was not found on this machine'; return $result }
+    if (-not $MetadataPath) { $result.Reason = 'no Artifact Signing account metadata was found'; return $result }
+
+    $result.Available = $true
+    $result.Command = $SignToolPath
+    $result.Metadata = $MetadataPath
+    # Built by concatenation, NOT with the -f operator: the template contains
+    # the literal placeholder {file}, and -f would try to parse it as a format
+    # item and throw ("Input string was not in a correct format").
+    $result.Arguments = 'sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 /dlib "' + $DlibPath + '" /dmdf "' + $MetadataPath + '" {file}'
+    return $result
+}
+
+<#
+.SYNOPSIS
     Creates (once) a machine self-signed code-signing certificate.
 .DESCRIPTION
     The fallback that keeps every project RELEASABLE even without a CA
@@ -195,7 +357,7 @@ function Get-CodeSigningConfig {
 
     $cfg = @{
         Enabled                = $false
-        Tool                   = 'signtool'
+        Tool                   = 'auto'
         Artifacts              = @($script:CodeSigningDefaultArtifacts)
         Recursive              = $true
         CertificatePath        = ''
@@ -209,6 +371,18 @@ function Get-CodeSigningConfig {
         AutoProvisionSelfSigned = $false
         ProfilePath            = ''
         ConfigReadFailed       = $false
+        # Azure Artifact Signing - the account is DETECTED, not configured:
+        # give the endpoint, the account and the certificate profile in the
+        # profile file (or drop an azure-metadata.json next to it) and the
+        # signer picks the account up on the next build.
+        AzureEndpoint    = ''
+        AzureAccount     = ''
+        AzureProfile     = ''
+        AzureMetadataPath = ''
+        AzureSignToolPath = ''
+        AzureDlibPath     = ''
+        AzureAvailable   = $false
+        AzureReason      = ''
     }
 
     # Layer 1: the project / tool config.
@@ -226,6 +400,12 @@ function Get-CodeSigningConfig {
             $cfg.Verify = [string](Get-ConfigValue -Path 'security.peSign.verify' -State $State -Default $cfg.Verify -Type string)
             $cfg.FailOnError = [bool](Get-ConfigValue -Path 'security.peSign.failOnError' -State $State -Default $cfg.FailOnError -Type bool)
             $cfg.AutoProvisionSelfSigned = [bool](Get-ConfigValue -Path 'security.peSign.autoProvisionSelfSigned' -State $State -Default $cfg.AutoProvisionSelfSigned -Type bool)
+            $cfg.AzureEndpoint = [string](Get-ConfigValue -Path 'security.peSign.azureEndpoint' -State $State -Default $cfg.AzureEndpoint -Type string)
+            $cfg.AzureAccount = [string](Get-ConfigValue -Path 'security.peSign.azureAccount' -State $State -Default $cfg.AzureAccount -Type string)
+            $cfg.AzureProfile = [string](Get-ConfigValue -Path 'security.peSign.azureProfile' -State $State -Default $cfg.AzureProfile -Type string)
+            $cfg.AzureMetadataPath = [string](Get-ConfigValue -Path 'security.peSign.azureMetadataPath' -State $State -Default $cfg.AzureMetadataPath -Type string)
+            $cfg.AzureSignToolPath = [string](Get-ConfigValue -Path 'security.peSign.azureSignToolPath' -State $State -Default $cfg.AzureSignToolPath -Type string)
+            $cfg.AzureDlibPath = [string](Get-ConfigValue -Path 'security.peSign.azureDlibPath' -State $State -Default $cfg.AzureDlibPath -Type string)
 
             $patterns = Get-ConfigValue -Path 'security.peSign.artifacts' -State $State -Default $null
             if ($patterns) {
@@ -289,6 +469,12 @@ function Get-CodeSigningConfig {
                 'verify' { $cfg.Verify = [string]$Value }
                 'failOnError' { $cfg.FailOnError = [bool]$Value }
                 'autoProvisionSelfSigned' { $cfg.AutoProvisionSelfSigned = [bool]$Value }
+                'azureEndpoint' { $cfg.AzureEndpoint = [string]$Value }
+                'azureAccount' { $cfg.AzureAccount = [string]$Value }
+                'azureProfile' { $cfg.AzureProfile = [string]$Value }
+                'azureMetadataPath' { $cfg.AzureMetadataPath = [string]$Value }
+                'azureSignToolPath' { $cfg.AzureSignToolPath = [string]$Value }
+                'azureDlibPath' { $cfg.AzureDlibPath = [string]$Value }
                 'artifacts' {
                     $list = @()
                     foreach ($x in @($Value)) { if (-not [string]::IsNullOrWhiteSpace([string]$x)) { $list += [string]$x } }
@@ -304,6 +490,52 @@ function Get-CodeSigningConfig {
     $verifyMode = ([string]$cfg.Verify).Trim().ToLowerInvariant()
     if ($verifyMode -notin @('valid', 'signature', 'none')) { $verifyMode = 'valid' }
     $cfg.Verify = $verifyMode
+
+    # ---- tool = auto: use the code signing account when this machine has one ---
+    # The ACCOUNT is present when the machine has the signtool, the Artifact
+    # Signing dlib AND the account metadata. Nothing has to be re-run when the
+    # account appears later: the next build finds it.
+    if ([string]$cfg.Tool -eq 'auto') {
+        $azure = Resolve-ArtifactSigningCommand `
+            -SignToolPath $cfg.AzureSignToolPath `
+            -DlibPath $cfg.AzureDlibPath `
+            -MetadataPath $cfg.AzureMetadataPath `
+            -Endpoint $cfg.AzureEndpoint `
+            -Account $cfg.AzureAccount `
+            -ProfileName $cfg.AzureProfile
+        if ($azure.Available) {
+            $cfg.Tool = 'external'
+            $cfg.ExternalCommand = $azure.Command
+            $cfg.ExternalArguments = $azure.Arguments
+            $cfg.AzureAvailable = $true
+        }
+        else {
+            # No account on this machine -> the self-signed signer keeps the
+            # artifacts signed and shippable. A build never stops for this.
+            $cfg.Tool = 'powershell'
+            $cfg.AzureAvailable = $false
+            $cfg.AzureReason = [string]$azure.Reason
+        }
+    }
+    elseif ([string]$cfg.Tool -eq 'external' -and [string]::IsNullOrWhiteSpace($cfg.ExternalCommand)) {
+        # tool = external without an explicit command: find it on this machine.
+        $azure = Resolve-ArtifactSigningCommand `
+            -SignToolPath $cfg.AzureSignToolPath `
+            -DlibPath $cfg.AzureDlibPath `
+            -MetadataPath $cfg.AzureMetadataPath `
+            -Endpoint $cfg.AzureEndpoint `
+            -Account $cfg.AzureAccount `
+            -ProfileName $cfg.AzureProfile
+        if ($azure.Available) {
+            $cfg.ExternalCommand = $azure.Command
+            $cfg.ExternalArguments = $azure.Arguments
+            $cfg.AzureAvailable = $true
+        }
+        else {
+            $cfg.AzureAvailable = $false
+            $cfg.AzureReason = [string]$azure.Reason
+        }
+    }
 
     return $cfg
 }
@@ -733,6 +965,10 @@ function Invoke-CodeSigning {
 
 Export-ModuleMember -Function @(
     'Get-CodeSigningConfig',
+    'Find-CodeSigningSignTool',
+    'Find-ArtifactSigningDlib',
+    'Find-ArtifactSigningMetadata',
+    'Resolve-ArtifactSigningCommand',
     'Get-CodeSigningProfilePath',
     'Get-CodeSigningProfile',
     'Ensure-SelfSignedCodeSigningCertificate',

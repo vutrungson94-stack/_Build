@@ -2134,6 +2134,7 @@
             "tool": {
               "type": "string",
               "enum": [
+                "auto",
                 "signtool",
                 "powershell",
                 "external"
@@ -2174,6 +2175,30 @@
             "externalArguments": {
               "type": "string",
               "description": "Argument template for tool=external; {file} is replaced with the artifact path"
+            },
+            "azureEndpoint": {
+              "type": "string",
+              "description": "Artifact Signing endpoint (https://<region>.codesigning.azure.net). Together with azureAccount and azureProfile it makes the account DETECTED: the signer uses it as soon as the signtool and the Artifact Signing dlib are on the machine."
+            },
+            "azureAccount": {
+              "type": "string",
+              "description": "Artifact Signing account name"
+            },
+            "azureProfile": {
+              "type": "string",
+              "description": "Artifact Signing certificate profile name"
+            },
+            "azureMetadataPath": {
+              "type": "string",
+              "description": "Path to an existing metadata.json; empty means the tool looks for one and writes it from the three values above"
+            },
+            "azureSignToolPath": {
+              "type": "string",
+              "description": "Path to signtool.exe; empty means the tool finds it on this machine"
+            },
+            "azureDlibPath": {
+              "type": "string",
+              "description": "Path to Azure.CodeSigning.Dlib.dll; empty means the tool finds it on this machine"
             },
             "verify": {
               "type": "string",
