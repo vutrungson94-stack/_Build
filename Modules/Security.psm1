@@ -192,6 +192,28 @@ function Get-CodeSigningStatus {
         $details.Add('artifactSign: disabled')
     }
 
+    # --- 1b. Windows PE signing (Modules/CodeSigning.psm1) ---
+    # The container mechanism above says nothing about the .exe/.dll a Windows
+    # build produces, so the posture report used to claim "artifacts will be
+    # unsigned (SmartScreen may warn)" even when security.peSign had just
+    # signed every binary. Report the PE mechanism on its own line.
+    $peCfg = $null
+    $peReadOk = $true
+    try { $peCfg = Get-ConfigValue -Path 'security.peSign' -State $State -Default $null } catch { $peReadOk = $false }
+    $peEnabled = $false
+    if ($peCfg) { $peEnabled = [bool](Get-SectionValue -Section $peCfg -Key 'enabled' -Default $false) }
+    if ($peEnabled) {
+        $peTool = [string](Get-SectionValue -Section $peCfg -Key 'tool' -Default 'signtool')
+        $mechanisms.Add('peSign') | Out-Null
+        $details.Add("peSign: active (${peTool})")
+    }
+    elseif (-not $peReadOk) {
+        $details.Add('peSign: unknown (config read failed - posture unverified)')
+    }
+    else {
+        $details.Add('peSign: disabled')
+    }
+
     # --- 2. GPG signing (Steps/sign-gpg.ps1) ---
     $gpgCfg = $null
     $gpgReadOk = $true
@@ -238,7 +260,7 @@ function Get-CodeSigningStatus {
         $details.Add('auditLedger: disabled')
     }
 
-    $postureUnknown = (-not $signReadOk) -or (-not $gpgReadOk) -or (-not $ledgerReadOk)
+    $postureUnknown = (-not $signReadOk) -or (-not $peReadOk) -or (-not $gpgReadOk) -or (-not $ledgerReadOk)
     return @{
         Status     = if ($mechanisms.Count -gt 0) { 'Signed' } elseif ($postureUnknown) { 'Unknown' } else { 'NotSigned' }
         Mechanisms = @($mechanisms)
@@ -1291,8 +1313,16 @@ function Invoke-SecurityScan {
         $signing = Get-CodeSigningStatus -State $State
         $signingDetail = ($signing.Details -join '; ')
         if ($signing.Status -eq 'Signed') {
+            # "configured" and "signed" are different claims. peSign only says a
+            # mechanism is armed - whether the artifacts of THIS run carry a
+            # signature is what the SignArtifacts step reports. Claiming
+            # "Signed" from a config read alone would assert something the
+            # posture reader cannot know (and would be false whenever the
+            # certificate is missing on the build agent).
+            $nonPe = @(@($signing.Mechanisms) | Where-Object { $_ -ne 'peSign' })
+            $key = if ($nonPe.Count -eq 0) { 'log.security.codeSigningConfigured' } else { 'log.security.codeSigningSigned' }
             if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                Write-Log (Resolve-LogMessage -Key 'log.security.codeSigningSigned' -MessageArgs @([string]($signing.Mechanisms -join ', ')) -Fallback ('[SECURITY] Code signing: Signed ({0})' -f ($signing.Mechanisms -join ', '))) 'Info' $State
+                Write-Log (Resolve-LogMessage -Key $key -MessageArgs @([string]($signing.Mechanisms -join ', ')) -Fallback ('[SECURITY] Code signing: configured ({0}) - the SignArtifacts step reports whether the artifacts were signed' -f ($signing.Mechanisms -join ', '))) 'Info' $State
             }
         } elseif ($signing.Status -eq 'Unknown') {
             # Posture read failed: report unverified, not "not configured".

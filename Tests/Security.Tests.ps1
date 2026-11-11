@@ -490,7 +490,13 @@ Describe 'Security - Code Signing Status' {
         # mechanism, asserting controls were OFF when they may have been ON.
         # Now a failed read reports 'unknown' so the posture is unverified,
         # never affirmatively wrong.
-        Mock -ModuleName Security Get-ConfigValue { throw 'simulated config failure' } -ParameterFilter { $Path -in @('security.artifactSign', 'security.gpgSign', 'security.auditLedger.signing') }
+        # Every SIGNING config has to be part of the simulated failure, not just
+        # the three that existed when this test was written: a read that failed
+        # for one mechanism and succeeded for another would let that mechanism
+        # report 'disabled' - which is exactly the affirmative-wrong the test
+        # exists to prevent. security.peSign (the Windows PE signer) is one of
+        # them now.
+        Mock -ModuleName Security Get-ConfigValue { throw 'simulated config failure' } -ParameterFilter { $Path -in @('security.artifactSign', 'security.peSign', 'security.gpgSign', 'security.auditLedger.signing') }
         $state = [PSCustomObject]@{ BuildConfig = [PSCustomObject]@{} }
         $s = Get-CodeSigningStatus -State $state
         $s.Status | Should -Be 'Unknown'

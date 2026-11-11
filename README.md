@@ -190,6 +190,42 @@ If both exist, project-local config **overrides** portable defaults.
 }
 ```
 
+### Code Signing of Windows Artifacts (`security.peSign`)
+
+The `SignArtifacts` pipeline step signs the Windows PE artifacts (`.exe` / `.dll`) a build
+produced, so a downloaded binary is not flagged as an unknown publisher by SmartScreen.
+It is **off by default** — a project opts in through its own `gbuild.config.json`:
+
+```json
+{
+  "security": {
+    "peSign": {
+      "enabled": true,
+      "tool": "powershell",
+      "certificateThumbprint": "8654BF862AB38906CD548D74431ACF1FA08592C0",
+      "artifacts": ["*.exe", "*.dll"],
+      "timestampUrl": "http://timestamp.digicert.com",
+      "verify": "signature",
+      "failOnError": true
+    }
+  }
+}
+```
+
+| `tool` | Signs with | Needs |
+|---|---|---|
+| `powershell` | `Set-AuthenticodeSignature` | nothing (ships with PowerShell) |
+| `signtool` | Windows SDK `signtool.exe` + a `.pfx` | Windows SDK on PATH |
+| `external` | any command line that signs one file | the command; `{file}` is replaced with the artifact path |
+
+`verify` selects the bar: `valid` (the chain must be trusted — a CA certificate),
+`signature` (the file only has to carry a signature — a self-signed certificate the
+client machines trust), `none`. The certificate password is never read from the config
+file: it comes from the environment variable named by `certificatePasswordEnv`.
+
+`security.artifactSign` stays the owner of **container / OCI** signing (cosign,
+notation); the two sections never overlap.
+
 ## Pipelines (Config-Driven)
 
 The build pipeline is a sequence of named steps. By default gbuild supplies a

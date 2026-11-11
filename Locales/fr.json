@@ -1224,5 +1224,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push : BLOQUÉ - ce push modifie Modules/ sans attestation de révision indépendante.",
   "log.hook.reviewChanged": "[gbuild hook] modifié sous Modules/ :",
   "log.hook.reviewHowTo": "[gbuild hook] marche à suivre : (1) un mainteneur qui n'est PAS l'auteur relit le diff, (2) repousser avec GBUILD_REVIEW_APPROVED=<nom>, ou (3) amender les commits avec un trailer 'Reviewed-by: <nom>', ou (4) GBUILD_REVIEW_OVERRIDE=<motif> pour enregistrer une dispense explicite (jamais une approbation)",
-  "log.hook.reviewCi": "[gbuild hook] la CI s'exécute quand même ; cette barrière existe pour que la révision soit un acte conscient, pas une formalité contournée."
+  "log.hook.reviewCi": "[gbuild hook] la CI s'exécute quand même ; cette barrière existe pour que la révision soit un acte conscient, pas une formalité contournée.",
+  "log.codesign.failed": "[SIGN] Échec de la signature de code : {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] Module de signature de code indisponible - ignoré.",
+  "log.codesign.noOutput": "[SIGN] Aucune sortie publiée à signer - ignoré.",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] Ignoré : {0}",
+  "log.system.buildDone": "[BUILD TERMINE]",
+  "log.system.pipelineDone": "[PIPELINE TERMINEE]",
+  "log.stepName.SignArtifacts": "Signer les artefacts",
+  "log.security.codeSigningConfigured": "[SECURITY] Signature de code : configuree ({0}) - etape SignArtifacts indique si les artefacts ont ete signes"
 }

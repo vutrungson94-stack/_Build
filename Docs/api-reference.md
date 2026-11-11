@@ -1073,6 +1073,41 @@ Parameters: State :PSObject
 Parameters: Namespace :String, Version :String, State :PSObject
 
 
+## CodeSigning
+
+### Get-CodeSigningConfig
+
+Parameters: State :Object
+
+### Get-CodeSigningArtifact
+
+Parameters: Path :String, Pattern :String[], Recursive :Boolean
+
+### Test-CodeSigningToolAvailable
+
+Parameters: Tool :String, ExternalCommand :String
+
+### Invoke-SignToolCodeSigning
+
+Parameters: Path :String, CertificatePath :String, Password :String, TimestampUrl :String
+
+### Invoke-ExternalCodeSigning
+
+Parameters: Path :String, Command :String, Arguments :String
+
+### Invoke-PowerShellCodeSigning
+
+Parameters: Path :String, CertificatePath :String, Password :String, CertificateThumbprint :String, TimestampUrl :String
+
+### Test-CodeSignatureStatus
+
+Parameters: Path :String
+
+### Invoke-CodeSigning
+
+Parameters: State :Object, InputPath :String
+
+
 ## ConfigProvider
 
 ### Test-ConfigProperty
@@ -4361,6 +4396,7 @@ Parameters: Document :Object, State :PSObject
 | [Chaos](API/Chaos.md) | 4 |
 | [Clean](API/Clean.md) | 9 |
 | [ClusterOrchestrator](API/ClusterOrchestrator.md) | 25 |
+| [CodeSigning](API/CodeSigning.md) | 8 |
 | [ConfigProvider](API/ConfigProvider.md) | 27 |
 | [Container](API/Container.md) | 6 |
 | [CredentialVault](API/CredentialVault.md) | 21 |
@@ -4419,5 +4455,5 @@ Parameters: Document :Object, State :PSObject
 | [Versioning](API/Versioning.md) | 7 |
 | [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 72 module(s), 1089 function(s).
+Total: 73 module(s), 1097 function(s).
 

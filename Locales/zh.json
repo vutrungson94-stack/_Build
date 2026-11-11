@@ -1224,5 +1224,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push: 已阻止 - 本次 push 修改了 Modules/，但缺少独立审查确认。",
   "log.hook.reviewChanged": "[gbuild hook] Modules/ 下的变更：",
   "log.hook.reviewHowTo": "[gbuild hook] 处理方式：(1) 由非作者的维护者审查 diff，(2) 使用 GBUILD_REVIEW_APPROVED=<姓名> 重新 push，或 (3) 在提交中添加 'Reviewed-by: <姓名>' trailer，或 (4) GBUILD_REVIEW_OVERRIDE=<原因> 记录显式豁免（绝非批准）",
-  "log.hook.reviewCi": "[gbuild hook] CI 无论如何都会运行；此门禁用于让审查成为有意识的行为，而不是被绕过的形式。"
+  "log.hook.reviewCi": "[gbuild hook] CI 无论如何都会运行；此门禁用于让审查成为有意识的行为，而不是被绕过的形式。",
+  "log.codesign.failed": "[SIGN] 代码签名失败: {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] 代码签名模块不可用 - 跳过。",
+  "log.codesign.noOutput": "[SIGN] 没有可签名的发布输出 - 跳过。",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] 已跳过: {0}",
+  "log.system.buildDone": "[构建完成]",
+  "log.system.pipelineDone": "[流水线完成]",
+  "log.stepName.SignArtifacts": "为产物签名",
+  "log.security.codeSigningConfigured": "[SECURITY] 代码签名：已配置 ({0}) - SignArtifacts 步骤会报告产物是否已签名"
 }

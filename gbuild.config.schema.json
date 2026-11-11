@@ -2122,6 +2122,75 @@
             }
           }
         },
+        "peSign": {
+          "type": "object",
+          "description": "Authenticode signing of the Windows PE artifacts (.exe/.dll) a build produced. This is the PE counterpart of security.artifactSign (which signs containers/OCI blobs with cosign and cannot sign a Windows binary). tool=signtool uses the Windows SDK signtool.exe with a local certificate; tool=external runs any command line that signs one file (placeholder {file} in externalArguments). The certificate password is read from the environment variable named by certificatePasswordEnv - never from this file. Disabled by default so an existing project keeps its exact behaviour; when enabled and the signing tool is missing the step is skipped with a clear message unless failOnError is true.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "tool": {
+              "type": "string",
+              "enum": [
+                "signtool",
+                "powershell",
+                "external"
+              ],
+              "default": "signtool"
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "File patterns of the artifacts to sign"
+            },
+            "recursive": {
+              "type": "boolean",
+              "default": true
+            },
+            "certificatePath": {
+              "type": "string",
+              "description": "Path to the .pfx certificate used by signtool/powershell"
+            },
+            "certificateThumbprint": {
+              "type": "string",
+              "description": "Thumbprint of the certificate in the Windows certificate store, used by the powershell signer"
+            },
+            "certificatePasswordEnv": {
+              "type": "string",
+              "description": "Name of the environment variable that holds the certificate password"
+            },
+            "timestampUrl": {
+              "type": "string",
+              "description": "RFC 3161 timestamp server; empty disables timestamping"
+            },
+            "externalCommand": {
+              "type": "string",
+              "description": "Command line that signs one artifact when tool=external"
+            },
+            "externalArguments": {
+              "type": "string",
+              "description": "Argument template for tool=external; {file} is replaced with the artifact path"
+            },
+            "verify": {
+              "type": "string",
+              "enum": [
+                "valid",
+                "signature",
+                "none"
+              ],
+              "default": "valid",
+              "description": "valid = the signature chain must be trusted (a CA certificate); signature = the file only has to carry a signature (self-signed certificate that the client machines trust); none = do not verify"
+            },
+            "failOnError": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        },
         "containerScan": {
           "type": "object",
           "description": "Container/filesystem vulnerability scanning via trivy. FAIL-CLOSED: when enabled and the trivy CLI is absent the build is blocked, matching security.artifactSign - a gate you enabled must be able to give a verdict. Disabled by default so a machine without trivy is not blocked; enable it once the scanner is installed.",

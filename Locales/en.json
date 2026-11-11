@@ -1225,5 +1225,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push: BLOCKED - this push changes Modules/ without an independent review attestation.",
   "log.hook.reviewChanged": "[gbuild hook] changed under Modules/:",
   "log.hook.reviewHowTo": "[gbuild hook] how to proceed: (1) a maintainer who is NOT the author reviews the diff, (2) re-push with GBUILD_REVIEW_APPROVED=<reviewer-name>, or (3) amend the commits with a 'Reviewed-by: <name>' trailer, or (4) GBUILD_REVIEW_OVERRIDE=<reason> to record an explicit waiver (never an approval)",
-  "log.hook.reviewCi": "[gbuild hook] CI runs regardless; this gate exists so review is a conscious act, not a bypassed formality."
+  "log.hook.reviewCi": "[gbuild hook] CI runs regardless; this gate exists so review is a conscious act, not a bypassed formality.",
+  "log.codesign.failed": "[SIGN] Code signing failed: {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] Code signing module unavailable - skipping.",
+  "log.codesign.noOutput": "[SIGN] No publish output to sign - skipping.",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] Skipped: {0}",
+  "log.system.buildDone": "[BUILD DONE]",
+  "log.system.pipelineDone": "[PIPELINE DONE]",
+  "log.stepName.SignArtifacts": "Sign artifacts",
+  "log.security.codeSigningConfigured": "[SECURITY] Code signing: configured ({0}) - the SignArtifacts step reports whether the artifacts were signed"
 }

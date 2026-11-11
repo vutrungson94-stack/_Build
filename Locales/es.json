@@ -1224,5 +1224,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push: BLOQUEADO - este push cambia Modules/ sin atestación de revisión independiente.",
   "log.hook.reviewChanged": "[gbuild hook] cambios bajo Modules/:",
   "log.hook.reviewHowTo": "[gbuild hook] cómo proceder: (1) un mantenedor que NO es el autor revisa el diff, (2) repushear con GBUILD_REVIEW_APPROVED=<nombre>, o (3) enmendar los commits con trailer 'Reviewed-by: <nombre>', o (4) GBUILD_REVIEW_OVERRIDE=<motivo> para registrar una dispensa explícita (nunca una aprobación)",
-  "log.hook.reviewCi": "[gbuild hook] la CI se ejecuta igualmente; esta puerta existe para que la revisión sea un acto consciente, no una formalidad eludible."
+  "log.hook.reviewCi": "[gbuild hook] la CI se ejecuta igualmente; esta puerta existe para que la revisión sea un acto consciente, no una formalidad eludible.",
+  "log.codesign.failed": "[SIGN] Error en la firma de código: {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] Módulo de firma de código no disponible: se omite.",
+  "log.codesign.noOutput": "[SIGN] No hay salida publicada para firmar: se omite.",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] Omitido: {0}",
+  "log.system.buildDone": "[BUILD FINALIZADO]",
+  "log.system.pipelineDone": "[PIPELINE FINALIZADO]",
+  "log.stepName.SignArtifacts": "Firmar artefactos",
+  "log.security.codeSigningConfigured": "[SECURITY] Firma de codigo: configurada ({0}) - el paso SignArtifacts informa si los artefactos quedaron firmados"
 }

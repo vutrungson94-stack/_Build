@@ -1224,5 +1224,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push: BỊ CHẶN - lần push này thay đổi Modules/ mà không có xác nhận review độc lập.",
   "log.hook.reviewChanged": "[gbuild hook] thay đổi dưới Modules/:",
   "log.hook.reviewHowTo": "[gbuild hook] cách xử lý: (1) một maintainer KHÔNG phải tác giả review diff, (2) push lại với GBUILD_REVIEW_APPROVED=<tên>, hoặc (3) bổ sung trailer 'Reviewed-by: <tên>' vào các commit, hoặc (4) GBUILD_REVIEW_OVERRIDE=<lý-do> để ghi nhận waiver tường minh (không bao giờ là chấp thuận)",
-  "log.hook.reviewCi": "[gbuild hook] CI vẫn chạy bất kể; cổng này tồn tại để review là hành động có ý thức, không phải thủ tục hình thức."
+  "log.hook.reviewCi": "[gbuild hook] CI vẫn chạy bất kể; cổng này tồn tại để review là hành động có ý thức, không phải thủ tục hình thức.",
+  "log.codesign.failed": "[SIGN] Ky so that bai: {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] Khong co module ky so - bo qua.",
+  "log.codesign.noOutput": "[SIGN] Khong co thu muc ket qua de ky - bo qua.",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] Bo qua: {0}",
+  "log.system.buildDone": "[BUILD DONE]",
+  "log.system.pipelineDone": "[PIPELINE DONE]",
+  "log.stepName.SignArtifacts": "Ky so artifact",
+  "log.security.codeSigningConfigured": "[SECURITY] Ky so: da cau hinh ({0}) - buoc SignArtifacts se bao cao ket qua co ky hay khong"
 }

@@ -890,6 +890,23 @@
                 "${env:GBUILD_IMAGE_PREFIX}/*"
             ]
         },
+        "peSign": {
+            "enabled": false,
+            "tool": "signtool",
+            "artifacts": [
+                "*.exe",
+                "*.dll"
+            ],
+            "recursive": true,
+            "certificatePath": "",
+            "certificateThumbprint": "",
+            "certificatePasswordEnv": "GBUILD_PE_SIGN_PASSWORD",
+            "timestampUrl": "http://timestamp.digicert.com",
+            "externalCommand": "",
+            "externalArguments": "{file}",
+            "verify": "valid",
+            "failOnError": true
+        },
         "containerScan": {
             "enabled": false,
             "tool": "trivy",

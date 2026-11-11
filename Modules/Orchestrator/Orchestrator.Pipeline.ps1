@@ -235,7 +235,14 @@ function Get-BuiltInPipelineSteps {
                     if (Test-Path -LiteralPath $poRoot) { Open-Target $poRoot -State $State }
                 }                    $totalSec = [math]::Round(((Get-Date) - $State.StartTime).TotalSeconds, 1)
                 $ctx.totalSec = $totalSec
-                Write-Host "`n"; Write-Sep; _2Col "  [BUILD DONE] $(Get-LocaleMessage -Key 'log.system.completed')" (Get-LocaleMessage -Key 'log.system.total' -MessageArgs @($totalSec)) 'Succ' 'Gray' $State; Write-Sep
+                # The summary LINE is a log message and goes through Write-Log, so it
+                # lands in the log file and the JSONL stream like every other
+                # message. Only the decoration (blank line + separator rules) stays
+                # on Write-Host: Write-Log prefixes each line with a level and
+                # cannot draw the rule, so replacing it there is not possible.
+                Write-Host "`n"; Write-Sep
+                Write-Log ((Get-LocaleMessage -Key 'log.system.buildDone') + ' ' + (Get-LocaleMessage -Key 'log.system.completed') + ' - ' + (Get-LocaleMessage -Key 'log.system.total' -MessageArgs @($totalSec))) 'Succ' $State
+                Write-Sep
                 if (Get-Command Write-BuildMetric -ErrorAction SilentlyContinue) {
                     $metric = Write-BuildMetric -State $State -Status 'Success' -Duration $totalSec -ProjectName (Split-Path $ctx.projectDir -Leaf) -Configuration $resolvedCfg -OutputType $lang
                     $ctx.metric = $metric
@@ -354,7 +361,9 @@ function Get-BuiltInPipelineSteps {
                  if (Get-Command Get-ErrorSummary -ErrorAction SilentlyContinue) { $errSummary = Get-ErrorSummary; if ($errSummary -and $errSummary.Total -gt 0 -and $State.LogLevel -ge 1 -and (Get-Command Show-ErrorReport -ErrorAction SilentlyContinue)) { Show-ErrorReport -State $State } }
                  $totalSec = [math]::Round(((Get-Date) - $State.StartTime).TotalSeconds, 1)
                  $ctx.totalSec = $totalSec
-                 Write-Host "`n"; Write-Sep; _2Col "  [PIPELINE DONE] $(Get-LocaleMessage -Key 'log.system.completed')" (Get-LocaleMessage -Key 'log.system.total' -MessageArgs @($totalSec)) 'Succ' 'Gray' $State; Write-Sep
+                 Write-Host "`n"; Write-Sep
+                 Write-Log ((Get-LocaleMessage -Key 'log.system.pipelineDone') + ' ' + (Get-LocaleMessage -Key 'log.system.completed') + ' - ' + (Get-LocaleMessage -Key 'log.system.total' -MessageArgs @($totalSec))) 'Succ' $State
+                 Write-Sep
                  if (Get-Command Write-BuildMetric -ErrorAction SilentlyContinue) {
                      $metric = Write-BuildMetric -State $State -Status $(if ($buildOk) { 'Success' } else { 'Failure' }) -Duration $totalSec -ProjectName $csproj.BaseName -Configuration $resolvedCfg -TargetFramework $ctx.defaultTfm -OutputType $ctx.projectType
                      $ctx.metric = $metric
@@ -365,6 +374,74 @@ function Get-BuiltInPipelineSteps {
                      if (Get-Command Submit-BuildMetric -ErrorAction SilentlyContinue) { Submit-BuildMetric -State $State -Step $ctx.projectType -DurationMs ($totalSec * 1000) -Success:$buildOk -ProjectName $csproj.BaseName -Configuration $resolvedCfg -TargetFramework $ctx.defaultTfm -OutputType $ctx.projectType | Out-Null }
                  }
 
+            }
+        }
+    },
+    @{
+        Name = 'SignArtifacts'
+        Script = {
+            param($ctx)
+            # Authenticode signing of the Windows PE artifacts the build just
+            # produced. Sits directly after Build so the files are signed
+            # BEFORE they are packaged/uploaded by PublishArtifact.
+            #
+            # The gate is security.peSign.enabled (ships FALSE): an existing
+            # project keeps its exact behaviour until it opts in, and a project
+            # that opts in but has no signer on the machine gets a clear skip
+            # message instead of a hard failure (unless failOnError is set).
+            if (-not (Test-StepEnabled -State $State -Context $ctx -StepLabel 'SIGN' -Reason 'security.peSign.enabled=false' -EnablePaths @('security.peSign.enabled'))) { return }
+            Import-ModuleOnDemand -ModuleNames @('CodeSigning')
+            if (-not (Get-Command Invoke-CodeSigning -ErrorAction SilentlyContinue)) {
+                Write-Log (Get-LocaleMessage -Key 'log.codesign.moduleUnavailable' -Fallback '[SIGN] Code signing module unavailable - skipping.') 'Gray' $State
+                return
+            }
+
+            $target = ''
+            try { $target = [string]$ctx.publishOutput } catch { $target = '' }
+            if ([string]::IsNullOrWhiteSpace($target)) {
+                try {
+                    $pubName = 'publish-output'
+                    if (Get-Command Resolve-PublishOutputDir -ErrorAction SilentlyContinue) { $pubName = [string](Resolve-PublishOutputDir -State $State) }
+                    $anchor = ''
+                    if ($ctx.PSObject.Properties.Name -contains 'projectDir' -and $ctx.projectDir) { $anchor = [string]$ctx.projectDir }
+                    elseif ($State.PSObject.Properties.Name -contains 'ProjectRoot' -and $State.ProjectRoot) { $anchor = [string]$State.ProjectRoot }
+                    if ($anchor) {
+                        $target = if ([System.IO.Path]::IsPathRooted($pubName)) { $pubName } else { Join-Path $anchor $pubName }
+                    }
+                } catch { $target = '' }
+            }
+            if ([string]::IsNullOrWhiteSpace($target)) {
+                Write-Log (Get-LocaleMessage -Key 'log.codesign.noOutput' -Fallback '[SIGN] No publish output to sign - skipping.') 'Gray' $State
+                return
+            }
+
+            $result = Invoke-CodeSigning -State $State -InputPath $target
+            $status = [string]$result.Status
+            $detail = [string]$result.Message
+
+            if ($status -eq 'Succeeded') {
+                Write-Log (Get-LocaleMessage -Key 'log.codesign.signed' -MessageArgs @($detail)) 'Succ' $State
+            }
+            elseif ($status -eq 'Skipped') {
+                Write-Log (Get-LocaleMessage -Key 'log.codesign.skipped' -MessageArgs @($detail)) 'Gray' $State
+            }
+            else {
+                $failOnError = $true
+                try {
+                    if (Get-Command Get-CodeSigningConfig -ErrorAction SilentlyContinue) {
+                        $failOnError = [bool](Get-CodeSigningConfig -State $State).FailOnError
+                    }
+                } catch { $failOnError = $true }
+
+                # A signing failure the project explicitly tolerates (failOnError
+                # false) is a warning, not an error: the build continues on
+                # purpose, so logging it at Err level would cry wolf.
+                $level = if ($failOnError) { 'Err' } else { 'Warn' }
+                Write-Log (Get-LocaleMessage -Key 'log.codesign.failed' -MessageArgs @($detail)) $level $State
+                if ($failOnError) {
+                    if (Get-Command Set-GBuildExitCode -ErrorAction SilentlyContinue) { Set-GBuildExitCode -Code 2 -Reason 'code-signing' }
+                    throw (Get-LocaleMessage -Key 'log.codesign.failed' -MessageArgs @($detail) -Fallback ('[SIGN] Code signing failed: ' + $detail))
+                }
             }
         }
     },

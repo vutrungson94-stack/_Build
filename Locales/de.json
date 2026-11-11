@@ -1224,5 +1224,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push: BLOCKIERT - dieser Push ändert Modules/ ohne unabhängige Review-Bestätigung.",
   "log.hook.reviewChanged": "[gbuild hook] geändert unter Modules/:",
   "log.hook.reviewHowTo": "[gbuild hook] Vorgehen: (1) ein Maintainer, der NICHT der Autor ist, prüft den Diff, (2) erneut pushen mit GBUILD_REVIEW_APPROVED=<name>, oder (3) die Commits mit Trailer 'Reviewed-by: <name>' ergänzen, oder (4) GBUILD_REVIEW_OVERRIDE=<grund> für einen expliziten, protokollierten Waiver (niemals eine Freigabe)",
-  "log.hook.reviewCi": "[gbuild hook] Die CI läuft trotzdem; dieses Gate existiert, damit Review ein bewusster Akt ist und keine umgangene Formalie."
+  "log.hook.reviewCi": "[gbuild hook] Die CI läuft trotzdem; dieses Gate existiert, damit Review ein bewusster Akt ist und keine umgangene Formalie.",
+  "log.codesign.failed": "[SIGN] Code-Signierung fehlgeschlagen: {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] Code-Signierungsmodul nicht verfügbar - wird übersprungen.",
+  "log.codesign.noOutput": "[SIGN] Keine Publish-Ausgabe zum Signieren - wird übersprungen.",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] Übersprungen: {0}",
+  "log.system.buildDone": "[BUILD FERTIG]",
+  "log.system.pipelineDone": "[PIPELINE FERTIG]",
+  "log.stepName.SignArtifacts": "Artefakte signieren",
+  "log.security.codeSigningConfigured": "[SECURITY] Code-Signierung: konfiguriert ({0}) - der Schritt SignArtifacts meldet, ob die Artefakte signiert wurden"
 }

@@ -1224,5 +1224,14 @@
   "log.hook.reviewBlocked": "[gbuild hook] pre-push: ブロック - この push は Modules/ を変更するのに、独立レビューの承認がありません。",
   "log.hook.reviewChanged": "[gbuild hook] Modules/ 配下の変更:",
   "log.hook.reviewHowTo": "[gbuild hook] 対処手順: (1) 作者以外のメンテナーが diff をレビューし、(2) GBUILD_REVIEW_APPROVED=<名前> で再 push、または (3) コミットに 'Reviewed-by: <名前>' トレーラーを付与、または (4) GBUILD_REVIEW_OVERRIDE=<理由> で明示的な免除を記録（承認ではありません）",
-  "log.hook.reviewCi": "[gbuild hook] CI は常に実行されます。このゲートは、レビューを形骸化させず意識的な行為にするためのものです。"
+  "log.hook.reviewCi": "[gbuild hook] CI は常に実行されます。このゲートは、レビューを形骸化させず意識的な行為にするためのものです。",
+  "log.codesign.failed": "[SIGN] コード署名に失敗しました: {0}",
+  "log.codesign.moduleUnavailable": "[SIGN] コード署名モジュールが利用できません - スキップします。",
+  "log.codesign.noOutput": "[SIGN] 署名する publish 出力がありません - スキップします。",
+  "log.codesign.signed": "[SIGN] {0}",
+  "log.codesign.skipped": "[SIGN] スキップ: {0}",
+  "log.system.buildDone": "[ビルド完了]",
+  "log.system.pipelineDone": "[パイプライン完了]",
+  "log.stepName.SignArtifacts": "成果物に署名",
+  "log.security.codeSigningConfigured": "[SECURITY] コード署名: 設定済み ({0}) - SignArtifacts ステップが成果物の署名結果を出力します"
 }
