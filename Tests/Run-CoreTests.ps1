@@ -783,6 +783,18 @@ function Complete-ScopeChildJob {
     } finally {
         if ($proc) { try { $proc.Dispose() } catch { } }
     }
+    # Re-read the stopwatch NOW that the child is done. The wrapper's stopwatch
+    # starts when the child is LAUNCHED, so it covers the whole life of the
+    # scope - but it was read BEFORE the wait, i.e. at the moment the parent
+    # started waiting, so every isolated scope was recorded as ~0 s.
+    #
+    # That number is not cosmetic: the table it feeds is the cost input of the
+    # longest-first scheduler AND of the CI shard balancing. With every
+    # isolated scope reading as free, the shards were balanced on zero for the
+    # scopes that actually cost time - a shard could be handed a single cheap
+    # scope while its sibling ran the whole suite, and the wall clock was set
+    # by the unluckiest shard rather than by the balance.
+    try { $elapsed = [double]$Wrapper.Started.Elapsed.TotalSeconds } catch { $elapsed = 0.0 }
     $lines = @($out -split "`r?`n")
     $verdict = Get-ChildVerdict -Lines $lines
     if ($timedOut) {
