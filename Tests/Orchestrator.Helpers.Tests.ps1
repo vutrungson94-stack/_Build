@@ -105,12 +105,30 @@ Describe 'Orchestrator pipeline event and service helpers' {
             foreach ($n in 'EVT_BUILD_START','EVT_BUILD_COMPLETE','EVT_BUILD_ERROR','EVT_BUILD_WARNING','EVT_STEP_START','EVT_STEP_COMPLETE','EVT_STEP_ERROR','EVT_STEP_SKIPPED','EVT_STEP_PROGRESS','EVT_ON_ERROR','EVT_ON_RETRY','EVT_ON_ROLLBACK','EVT_PLUGIN_LOADED','EVT_PLUGIN_ERROR','EVT_CACHE_HIT','EVT_CACHE_MISS','EVT_TELEMETRY_RECORDED','EVT_DEPLOY_START','EVT_DEPLOY_COMPLETE','EVT_DEPLOY_ERROR') { Set-Variable -Name $n -Value $n -Scope Script -Force }
             Register-BuildEventSubscribers -State $state
             $handlers.Count | Should -BeGreaterThan 10
-            if ($handlers['EVT_BUILD_START']) { & $handlers['EVT_BUILD_START'] $state @{} }
-            if ($handlers['EVT_BUILD_COMPLETE']) { & $handlers['EVT_BUILD_COMPLETE'] $state ([pscustomobject]@{ Success = $true }) }
-            if ($handlers['EVT_BUILD_ERROR']) { & $handlers['EVT_BUILD_ERROR'] $state ([pscustomobject]@{ Message = 'boom' }) }
-            if ($handlers['EVT_ON_ERROR']) { & $handlers['EVT_ON_ERROR'] $state ([pscustomobject]@{ Message = 'err' }) }
-            if ($handlers['EVT_ON_RETRY']) { & $handlers['EVT_ON_RETRY'] $state ([pscustomobject]@{ Operation='op'; Attempt=1; MaxAttempts=3; Message='x' }) }
-            if ($handlers['EVT_DEPLOY_ERROR']) { & $handlers['EVT_DEPLOY_ERROR'] $state ([pscustomobject]@{ Target='t'; Message='d' }) }
+            foreach ($ev in @(
+                @{ n='EVT_BUILD_START'; d=@{} },
+                @{ n='EVT_BUILD_COMPLETE'; d=[pscustomobject]@{ Success=$true } },
+                @{ n='EVT_BUILD_ERROR'; d=[pscustomobject]@{ Message='boom' } },
+                @{ n='EVT_BUILD_WARNING'; d=[pscustomobject]@{ Message='warn' } },
+                @{ n='EVT_STEP_START'; d=[pscustomobject]@{ StepName='s' } },
+                @{ n='EVT_STEP_COMPLETE'; d=[pscustomobject]@{ StepName='s'; Status='ok' } },
+                @{ n='EVT_STEP_ERROR'; d=[pscustomobject]@{ StepName='s'; Error='e' } },
+                @{ n='EVT_STEP_SKIPPED'; d=[pscustomobject]@{ StepName='s'; Reason='r' } },
+                @{ n='EVT_STEP_PROGRESS'; d=[pscustomobject]@{ StepName='s'; ElapsedSec=1 } },
+                @{ n='EVT_ON_ERROR'; d=[pscustomobject]@{ Message='err' } },
+                @{ n='EVT_ON_RETRY'; d=[pscustomobject]@{ Operation='op'; Attempt=1; MaxAttempts=3; Message='x' } },
+                @{ n='EVT_ON_ROLLBACK'; d=[pscustomobject]@{ Message='rb' } },
+                @{ n='EVT_PLUGIN_LOADED'; d=[pscustomobject]@{ PluginName='p'; Version='1' } },
+                @{ n='EVT_PLUGIN_ERROR'; d=[pscustomobject]@{ PluginName='p'; Error='e' } },
+                @{ n='EVT_CACHE_HIT'; d=[pscustomobject]@{ Key='k' } },
+                @{ n='EVT_CACHE_MISS'; d=[pscustomobject]@{ Key='k' } },
+                @{ n='EVT_TELEMETRY_RECORDED'; d=[pscustomobject]@{ MetricName='m'; File='f' } },
+                @{ n='EVT_DEPLOY_START'; d=[pscustomobject]@{ Target='t' } },
+                @{ n='EVT_DEPLOY_COMPLETE'; d=[pscustomobject]@{ Target='t'; Success=$true } },
+                @{ n='EVT_DEPLOY_ERROR'; d=[pscustomobject]@{ Target='t'; Message='d' } }
+            )) {
+                if ($handlers.ContainsKey($ev.n) -and $handlers[$ev.n]) { & $handlers[$ev.n] $state $ev.d }
+            }
         }
     }
 }
