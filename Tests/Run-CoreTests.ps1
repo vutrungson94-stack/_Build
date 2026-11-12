@@ -239,6 +239,7 @@ $scopeMap = @{
 
     'Build'                   = 'Build.Tests.ps1'
     'BuildHelpers'            = 'Build.Helpers.Tests.ps1'
+    'BuildCoverage'           = 'Build.Coverage.Tests.ps1'
     'BuildConstants'          = 'BuildConstants.Tests.ps1'
     'BuildContext'            = 'BuildContext.Tests.ps1'
     'BuildImport'             = 'BuildImport.Tests.ps1'
@@ -366,6 +367,8 @@ $stateSensitive = @(
     'PipelineRunner', 'PipelineE2E', 'Level5Parity', 'Hygiene', 'GateSelfTest', 'ProviderContracts',
     # Imports the Orchestrator module and stubs its commands in module scope.
     'OrchestratorPipelineSteps',
+    # Imports/mocks Build module internals for coverage-focused paths.
+    'BuildCoverage',
     'PluginSDK', 'RBAC', 'AuditLedger',
     # Touches the shared append-only process-trend file, so it must not share a
     # process with the runner step that appends the real sample.
