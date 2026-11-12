@@ -169,4 +169,46 @@ Describe 'Build helper functions' {
             } finally { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
         }
     }
+
+    Context 'Build deploy and AAB helpers' {
+        It 'Invoke-DeviceDebug returns early for invalid or missing project path' {
+            InModuleScope Build {
+                Mock Write-Log { }
+                { Invoke-DeviceDebug -State ([PSCustomObject]@{}) -Project '' -Tfm 'net8.0-android' } | Should -Not -Throw
+                { Invoke-DeviceDebug -State ([PSCustomObject]@{}) -Project (Join-Path ([System.IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())) -Tfm 'net8.0-android' } | Should -Not -Throw
+            }
+        }
+        It 'Invoke-AutoDeploy returns early when adb or apk is unavailable' {
+            InModuleScope Build {
+                Mock Find-AdbPath { $null }
+                Mock Write-Log { }
+                { Invoke-AutoDeploy -State ([PSCustomObject]@{}) -ApkPath 'missing.apk' -AppId 'com.test.app' } | Should -Not -Throw
+            }
+        }
+        It 'Publish-AndroidAab forwards to New-AndroidAab' {
+            InModuleScope Build {
+                $script:called = $false
+                Mock New-AndroidAab { param($State,$ProjectPath,$Tfm,$Keystore,$ProjectType,$Incremental) $script:called = $true }
+                Publish-AndroidAab -State ([PSCustomObject]@{}) -ProjectPath 'p' -Tfm 't' -Keystore 'k' -ProjectType 'MAUI'
+                $script:called | Should -BeTrue
+            }
+        }
+        It 'New-AndroidAab returns early when directory has no csproj or keystore is invalid' {
+            $dir = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-aab-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            try {
+                InModuleScope Build -Parameters @{ dir = $dir } {
+                    Mock Write-Log { }
+                    Mock Get-LocaleMessage { param($Key,$MessageArgs) return $Key }
+                    { New-AndroidAab -State ([PSCustomObject]@{}) -ProjectPath $dir -Tfm 'net8.0-android' -Keystore '' } | Should -Not -Throw
+                }
+            } finally { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+        It 'Get-ProjectTypeActions returns null for unknown or missing config' {
+            $r = InModuleScope Build {
+                Get-ProjectTypeActions -State ([PSCustomObject]@{ BuildConfig = $null }) -ProjectType 'Console'
+            }
+            $r | Should -BeNullOrEmpty
+        }
+    }
 }

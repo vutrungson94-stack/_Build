@@ -2339,6 +2339,9 @@ function ConvertTo-BuildArgument {
         if ($value -notmatch '[\s"]') { return $value }
         return '"' + ($value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
     }
+    # POSIX: leave simple arguments unquoted so callers and tests receive the
+    # literal token when no shell metacharacter requires quoting/escaping.
+    if ($value -match '^[A-Za-z0-9_./:=+,@%-]+$') { return $value }
     return "'" + ($value -replace "'", "'\''") + "'"
 }
 
