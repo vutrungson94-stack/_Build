@@ -101,6 +101,12 @@ Describe 'Hygiene: no dead exported functions' {
             'RootCause::Test-CARAuditPack'           # CAR audit pack verification
         )
         $dead = @()
+        # ONE index for the whole tree. The gate asks "is this name referenced?"
+        # for every exported name; answering it name by name re-scanned every
+        # line of every file for every name (52 s measured, ~315 s under the
+        # coverage instrumentation the CI job turns on). The index answers the
+        # same question from ONE pass, with identical counting semantics.
+        $refIndex = New-GateNameIndex -Paths $script:HygProdPaths -Ignored $script:HygIgnProd
         foreach ($d in @($defs | Where-Object { $_.Exported })) {
             # The defining module is NOT excluded from its own reference scan.
             #
@@ -121,7 +127,7 @@ Describe 'Hygiene: no dead exported functions' {
             # (Orchestrator::Assert-BuildCommandAvailable, 13 call sites) had no
             # test reference either, and was therefore reported DEAD by this
             # very gate. That was the whole class of defect, not a lone name.
-            if ((Get-GateReferenceCount -Name $d.Name -Paths $script:HygProdPaths -Ignored $script:HygIgnProd) -gt 0) { continue }
+            if ((Get-GateReferenceCount -Name $d.Name -Paths $script:HygProdPaths -Ignored $script:HygIgnProd -Index $refIndex) -gt 0) { continue }
             $tag = "$([System.IO.Path]::GetFileNameWithoutExtension($d.File))::$($d.Name)"
             if ($deliberate -contains $tag) { continue }
             $dead += $tag

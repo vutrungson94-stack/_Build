@@ -1,4 +1,4 @@
-﻿# ============================================================================
+# ============================================================================
 # gbuild - PowerShell Build System
 # Copyright (c) 2026 Vu Trung Son (vutrungson94@gmail.com)
 # Licensed under the MIT License. See LICENSE file for details.
@@ -792,5 +792,46 @@ Describe 'Gate self-test: the harness itself is falsifiable' {
         $violating = New-GateFixture -Files @{ 'Bad.psm1' = 'x [System.PlatformID]::Win32NT y' }
         $realDetector = ${function:Find-GateInlineWin32NT}
         @(& $realDetector -Paths $violating).Count | Should -BeGreaterThan 0 -Because 'the real detector distinguishes the two fixtures; that difference is the proof'
+    }
+
+    Describe 'Gate self-test: the tree index replaces a per-name scan' {
+        BeforeAll {
+            $script:GDTreeRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+        }
+
+        It 'counts exactly like the per-name scan it replaced' {
+            # The dead-export gate used to ask "is this name referenced?" by
+            # re-scanning every line of every file for every exported name -
+            # ~650 names over ~220 files, 52 s measured and ~315 s under the
+            # coverage instrumentation the CI job turns on. It now asks ONE
+            # index instead. If the two disagreed, the gate would decide on a
+            # different question than the one it claims to ask, and a false
+            # green would be indistinguishable from a working gate - the exact
+            # failure mode this file exists to prevent.
+            $paths = @(
+                (Join-Path $script:GDTreeRoot 'Modules/SharedUtils.psm1'),
+                (Join-Path $script:GDTreeRoot 'Modules/BuildConstants.psm1'),
+                (Join-Path $script:GDTreeRoot 'Modules/PathUtils.psm1'),
+                (Join-Path $script:GDTreeRoot 'Tests/Hygiene.Tests.ps1')
+            ) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+            $ignored = Get-GateIgnoredReferenceLines -Paths $paths
+            $index = New-GateNameIndex -Paths $paths -Ignored $ignored
+            $names = @('Get-BuildConstant', 'Protect-BuildSecretText', 'Enter-BuildFileLock', 'Get-PathComparison', 'Write-Log', 'Get-LocaleMessage', 'ThisNameDoesNotExistAnywhere')
+            foreach ($n in $names) {
+                $viaIndex = Get-GateReferenceCount -Name $n -Paths $paths -Ignored $ignored -Index $index
+                $viaScan = Get-GateReferenceCount -Name $n -Paths $paths -Ignored $ignored
+                $viaIndex | Should -Be $viaScan -Because "the index must count exactly like the scan it replaced: $n"
+            }
+        }
+
+        It 'reports a name that is nowhere to be found as zero in both paths' {
+            $paths = @((Join-Path $script:GDTreeRoot 'Modules/SharedUtils.psm1'))
+            $ignored = Get-GateIgnoredReferenceLines -Paths $paths
+            $index = New-GateNameIndex -Paths $paths -Ignored $ignored
+            (Get-GateReferenceCount -Name 'Get-DefinitelyNotARealCommand' -Paths $paths -Ignored $ignored -Index $index) |
+                Should -Be 0
+            (Get-GateReferenceCount -Name 'Get-DefinitelyNotARealCommand' -Paths $paths -Ignored $ignored) |
+                Should -Be 0
+        }
     }
 }
