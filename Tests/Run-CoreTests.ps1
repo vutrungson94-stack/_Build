@@ -1346,13 +1346,26 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
                         $src = [string]$c.sourcefilename
                         if ([string]::IsNullOrWhiteSpace($src)) { $src = [string]$c.name }
                         $lineCounter = $null
-                        foreach ($ct in @($c.SelectNodes('./counter[@type="LINE"]'))) { $lineCounter = $ct }
+                        $instrCounter = $null
+                        foreach ($ct in @($c.SelectNodes('./counter'))) {
+                            if ([string]$ct.type -eq 'LINE') { $lineCounter = $ct }
+                            elseif ([string]$ct.type -eq 'INSTRUCTION') { $instrCounter = $ct }
+                        }
                         if (-not $lineCounter) { continue }
                         $m = [int]$lineCounter.missed
                         $e = [int]$lineCounter.covered
                         if ($m -eq 0 -and $e -eq 0) { continue }
+                        # The INSTRUCTION counter is the same run's BYTECODE
+                        # view of the same files. It is collected here so every
+                        # published coverage number comes from ONE artefact set
+                        # with ONE union rule - the repository used to publish a
+                        # line figure from the merged XMLs and a command figure
+                        # from Pester's in-process analysis, which are different
+                        # metrics over different data and cannot be compared.
+                        $im = 0; $ie = 0
+                        if ($instrCounter) { $im = [int]$instrCounter.missed; $ie = [int]$instrCounter.covered }
                         $key = [System.IO.Path]::GetFileName($src)
-                        if (-not $files.ContainsKey($key)) { $files[$key] = [PSCustomObject]@{ File = $key; Executed = 0; Total = 0 } }
+                        if (-not $files.ContainsKey($key)) { $files[$key] = [PSCustomObject]@{ File = $key; Executed = 0; Total = 0; InstrExecuted = 0; InstrTotal = 0 } }
                         if ($e -gt $files[$key].Executed) { $files[$key].Executed = $e }
                         # The denominator is a property of the FILE, not of the
                         # run: a line covered in ANY scope counts once, so the
@@ -1369,12 +1382,24 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
                         # percentage it exists to enforce.
                         $t = $e + $m
                         if ($t -gt $files[$key].Total) { $files[$key].Total = $t }
+                        if ($ie -gt $files[$key].InstrExecuted) { $files[$key].InstrExecuted = $ie }
+                        $it = $ie + $im
+                        if ($it -gt $files[$key].InstrTotal) { $files[$key].InstrTotal = $it }
                     }
                 } catch { }
             }
-            foreach ($v in $files.Values) { $executed += $v.Executed; $missed += ($v.Total - $v.Executed) }
+            $instrExecuted = 0
+            $instrTotal = 0
+            foreach ($v in $files.Values) {
+                $executed += $v.Executed
+                $missed += ($v.Total - $v.Executed)
+                $instrExecuted += $v.InstrExecuted
+                $instrTotal += $v.InstrTotal
+            }
             $totalCmds = $executed + $missed
             $pct = if ($totalCmds -gt 0) { [math]::Round(($executed / $totalCmds) * 100, 2) } else { 0 }
+            $instrTotalCmds = $instrExecuted + ($instrTotal - $instrExecuted)
+            $instrPct = if ($instrTotalCmds -gt 0) { [math]::Round(($instrExecuted / $instrTotalCmds) * 100, 2) } else { 0 }
             $baseline = [ordered]@{
                 generatedAtUtc   = (Get-Date).ToUniversalTime().ToString('o')
                 pesterVersion    = $(if ($MergeOnly) { $pm = Get-Module -ListAvailable -Name Pester | Select-Object -First 1; if ($pm) { $pm.Version.ToString() } else { 'n/a (merge-only)' } } else { (Get-Module -Name Pester | Select-Object -First 1).Version.ToString() })
@@ -1386,9 +1411,16 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
                 linesMissed      = $missed
                 linesTotal       = $totalCmds
                 coveragePercent  = $pct
+                # The same run's BYTECODE view over the same files and the same
+                # union rule. Published for trend only: it is NOT a floor (see
+                # Tests/process-baseline.json .coverage.reconciliation).
+                instructionCoveragePercent = $instrPct
+                instructionsCovered = $instrExecuted
+                instructionsTotal   = $instrTotalCmds
                 scope            = $Scope
                 scopeFiles       = $coverageFiles.Count
-                perFile          = @($files.Values | ForEach-Object { [PSCustomObject]@{ File = $_.File; Executed = $_.Executed; Missed = $_.Total - $_.Executed } } | Sort-Object -Property @{e={$_.Missed};d=$true}, File)
+                partialShard     = [bool]$isPartialShard
+                perFile          = @($files.Values | ForEach-Object { [PSCustomObject]@{ File = $_.File; Executed = $_.Executed; Missed = $_.Total - $_.Executed; InstructionsCovered = $_.InstrExecuted; InstructionsTotal = $_.InstrTotal } } | Sort-Object -Property @{e={$_.Missed};d=$true}, File)
             }
             $summaryDir = Join-Path $testRoot 'TestResults'
             if (-not (Test-Path -LiteralPath $summaryDir -PathType Container)) { New-Item -ItemType Directory -Path $summaryDir -Force | Out-Null }
@@ -1401,6 +1433,7 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
             $baseline | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $baselinePath -Encoding UTF8
             $coverageSummary = $baseline
             Write-ProgressLine ("COVERAGE: {0}% of {1} lines ({2} covered / {3} missed) across {4} file(s) -> {5}" -f $pct, $totalCmds, $executed, $missed, $files.Count, $baselinePath)
+            Write-ProgressLine ("COVERAGE (bytecode view, same reports): {0}% of {1} instructions covered" -f $instrPct, $instrTotalCmds)
             # The merge gate is the LINE-coverage floor from the baseline, NOT
             # $MinCoveragePct. The two are different metrics and
             # Tests/process-baseline.json says so explicitly: the CI job gates

@@ -469,3 +469,29 @@ Describe 'ProcessMetrics - the SLO is derived from a stated objective' {
         [double]$m.MeanAdoption | Should -BeGreaterOrEqual ([double]$b.slo.adoption.minMeanAdoption) -Because 'the adoption target keeps the process classes at parity'
     }
 }
+
+Describe 'ProcessMetrics - one coverage gate over one artefact set' {
+    It 'declares exactly ONE enforced coverage floor and states how the views relate' {
+        $b = Get-Content -LiteralPath (Join-Path $script:ToolRoot 'Tests/process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        # The repository used to publish a line figure from the merged JaCoCo
+        # reports and a command figure from Pester's in-process analysis, and
+        # the baseline carried both numbers without saying how they relate -
+        # the classic "two metrics, no reconciliation" trap.
+        $b.coverage.PSObject.Properties.Name | Should -Contain 'floorPercent'
+        $b.coverage.PSObject.Properties.Name | Should -Contain 'reconciliation' -Because 'the second view must state how it relates to the enforced one'
+        $b.coverage.reconciliation | Should -Not -BeNullOrEmpty
+        $b.coverage.reconciliation | Should -Match 'never be compared'
+        # One gate: the LINE view is the enforced one.
+        $b.coverage.metric | Should -Match 'LINE coverage'
+        # The secondary view is published without a floor of its own.
+        $b.coverage.publishedSecondaryView | Should -Match 'NO floor'
+        $b.coverage.PSObject.Properties.Name | Should -Not -Contain 'commandFloorPercent' -Because 'a second floor over a different metric is the thing this reconciliation removes'
+    }
+
+    It 'records the two views from the same merge so they are comparable with each other' {
+        $b = Get-Content -LiteralPath (Join-Path $script:ToolRoot 'Tests/process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        [double]$b.coverage.measuredMergedLineCoverage | Should -BeGreaterOrEqual ([double]$b.coverage.floorPercent) -Because 'the committed measurement must satisfy the committed floor'
+        [double]$b.coverage.measuredMergedInstructionCoverage | Should -BeGreaterThan 0
+        $b.coverage.measuredInstructionsCovered | Should -BeLessOrEqual $b.coverage.measuredInstructionsTotal
+    }
+}

@@ -62,14 +62,32 @@ single-repo platform that is the expected ceiling.
 2. **Causal analysis is not closed-loop.** `RootCause.psm1` can classify and
    record a defect, and `qpm-ledger.json` records escapes, but nothing
    *automatically* opens a CAR record from a failed gate. The link is manual.
+   **Closed 2026-11-12** - `RootCause.New-VerificationCAR` opens a corrective-
+   action record naming the failing scope, the failing test names and the gate
+   that fired, and the core runner calls it the moment a scope fails
+   (`Tests/Run-CoreTests.ps1`, `Open-VerificationCARs`). The record lands in
+   `Tests/TestResults/car/` and in the CAR ledger, so the analysis is a
+   BYPRODUCT of the failure instead of a task somebody has to remember.
 3. **No defect-rate / escape-rate target tied to business objectives.** The QPM
    gate enforces a change-failure rate window, but there is no SLO for escape
    rate, MTTR target, or adoption target derived from a platform objective.
+   **Closed 2026-11-12** - `Tests/process-baseline.json` now carries an `slo`
+   section: the objective, three target families (escape rate over a 7-day
+   window, mean recovery time, mean adoption) and the derivation of each. The
+   targets are enforced by `gbuild.ps1 -SelfTest` against values MEASURED in
+   the same run (ledger window, QPM MTTR, measured adoption mean), so the
+   process now has ceilings AND goals.
 4. **Coverage is measured on two different metrics that are not reconciled.**
    `Tests/process-baseline.json` records a 55 % line-coverage floor and a 55 %
    command-coverage gate; the file itself warns they must never be compared.
    That is honest, but it is also a sign that the coverage process is not yet
-   unified.
+   unified. **Closed 2026-11-12** - one gate over one artefact set: the merge
+   computes the LINE view and the BYTECODE view from the SAME JaCoCo reports
+   with the same union rule and publishes both; the floor applies to the line
+   view (the only one recomputable from the merged reports alone, since the
+   merge job installs no Pester); Pester's own command-coverage target is
+   documented as a per-process statistic and is NOT a repository gate. A shard
+   publishes its partial figure under its own name and is never gated.
 5. **No ADR / decision record set.** `README.md` advertises "ADRs and API
    docs", but `Docs/` contains only generated API pages. Key decisions (module
    split pattern, governed duplication, scope-isolated test runner) are
@@ -148,4 +166,38 @@ single-repo platform that is the expected ceiling.
 | Hygiene gates | 19 (18 + 1 governed-duplication) | `Tests/Hygiene.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1` |
 | Decision records | 5 ADRs + index | `Docs/ADRs/` |
 
-**Re-verdict after this pass:** still **L4 with several L5 mechanisms operating**. The three L5-shaped capabilities that are genuinely closed are unchanged — the measured process (mutation-tested metric + SPC control limits + ratchet), the escaped-defect ledger, and the improvement loop with a pilot gate. The distance to a full L5 rating is still organisational rather than technical: no published organisation-wide process asset set, no automatic CAR creation from a failed gate, no escape-rate SLO derived from a platform objective, two unreconciled coverage metrics, and one long scope (`ProcessMetrics`) that still sets the coverage wall clock. The new CI sharding removes the *scheduling* limit on verification throughput; it does not change the rating, because the rating is about the process, not about how fast the suite runs.
+**Re-verdict after this pass:** still **L4 with several L5 mechanisms operating**. The three L5-shaped capabilities that are genuinely closed are unchanged - the measured process (mutation-tested metric + SPC control limits + ratchet), the escaped-defect ledger, and the improvement loop with a pilot gate. The distance to a full L5 rating is still organisational rather than technical: no published organisation-wide process asset set, no automatic CAR creation from a failed gate, no escape-rate SLO derived from a platform objective, two unreconciled coverage metrics, and one long scope (`ProcessMetrics`) that still sets the coverage wall clock. The new CI sharding removes the *scheduling* limit on verification throughput; it does not change the rating, because the rating is about the process, not about how fast the suite runs.
+
+## 2026-11-12 update (third pass - three L5 gaps closed)
+
+Three of the five gaps listed above are now closed in the CODE, not in prose.
+
+1. **Causal loop closed.** `RootCause.New-VerificationCAR` (new export, documented
+   and regenerated into `Docs/api-reference.md` / `Docs/API/RootCause.md`) builds
+   a corrective-action record that names the failing scope, the failing test
+   names and the gate that fired. The core runner opens one per failed scope
+   (`Open-VerificationCARs`) and writes it to `Tests/TestResults/car/` and to the
+   CAR ledger. Pinned by `Tests/RootCause.Tests.ps1` (shape + redaction) and by
+   `Tests/Runner.Tests.ps1`, which drives the runner and asserts that a CAR
+   appears for a failed scope.
+2. **Objective-derived SLOs enforced.** `Tests/process-baseline.json` carries an
+   `slo` section - the objective, three target families and the derivation of
+   each - and `gbuild.ps1 -SelfTest` gained an eleventh check that compares the
+   targets with values MEASURED in the same run: escapes inside the 7-day
+   ledger window, the QPM mean recovery time and the measured mean adoption.
+   The self-test now reports 11/11. The seven locale catalogs carry the new
+   messages at key parity (1,263 keys each).
+3. **One coverage gate over one artefact set.** The merge now derives the LINE
+   view and the BYTECODE (JaCoCo INSTRUCTION) view from the SAME reports with
+   the SAME union rule and publishes both in `coverage-baseline.json`
+   (56.42 % of 24,450 lines; 49.44 % of 46,134 instructions, measured on the
+   2026-11-12 local merge). The floor applies to the line view only, because
+   that is the view the merge job can recompute without Pester; Pester's own
+   command-coverage target is documented as a per-process statistic and is not a
+   repository gate. A shard now publishes its partial figure as
+   `coverage-shard-<n>-of-<m>.json` and is never gated (a shard measured 20.67 %
+   of the lines against a 55 % floor and failed a job whose tests all passed).
+
+**Still open:** no organisation-wide process asset set (item 1), and the
+`_Tests` harness runner (item 5, outside `_Build`). The coverage wall clock is
+still bounded by the `ProcessMetrics` scope under instrumentation.

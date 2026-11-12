@@ -23,13 +23,18 @@
     "skippedMaxAllowed": 4
   },
   "coverage": {
-    "metric": "line coverage of Modules/**/*.psm1 (Pester 5 + JaCoCo LINE counters)",
+    "metric": "merged LINE coverage of Modules/**/*.psm1 (Pester 5 JaCoCo reports, union over scopes) - THE single enforced coverage gate",
     "floorPercent": 55,
-    "measuredMergedLineCoverage": 56.27,
-    "measuredLinesCovered": 13744,
-    "measuredLinesTotal": 24425,
+    "measuredMergedLineCoverage": 56.42,
+    "measuredLinesCovered": 13794,
+    "measuredLinesTotal": 24450,
     "measuredSingleScopeOrchestrator": 12.77,
-    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurements 56.08% then 56.27% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build/SharedUtils/Orchestrator/HotReload helpers, deploy/AAB/SDK event-service paths) with LPT scheduling and parallel scope isolation; raise only, never lower. The CI job itself gates a DIFFERENT metric - Pester COMMAND coverage over Modules - at 55% (measured 57.05% of 44,589 commands in 80 files, run 2026-10-27); the two percentages must never be compared with each other, and each is raised only from its own measurement."
+    "publishedSecondaryView": "the same run's BYTECODE view (JaCoCo INSTRUCTION counters) over the same files with the same union rule, published as instructionCoveragePercent in Tests/TestResults/coverage-baseline.json - it carries NO floor and is trend-only",
+    "measuredMergedInstructionCoverage": 49.44,
+    "measuredInstructionsCovered": 22807,
+    "measuredInstructionsTotal": 46134,
+    "reconciliation": "ONE gate, ONE artefact set. The floor is applied to the merged LINE view, because that view is the only one that can be recomputed from the merged JaCoCo reports alone (the merge job installs no Pester, by design). The bytecode view comes from the SAME reports and the SAME union rule and is published next to it for trend only. Pester's own command-coverage percentage (the -MinCoveragePct target) is a THIRD number: it is Pester's in-process statement analysis of a single process, it is NOT reproducible from the merged reports, and it is therefore NOT a repository gate - it is only the per-process target Pester enforces when -MinCoveragePct is given. The three percentages must never be compared with each other; each is published under its own name and denominator.",
+    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurements 56.08% then 56.27% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build/SharedUtils/Orchestrator/HotReload helpers, deploy/AAB/SDK event-service paths) with LPT scheduling and parallel scope isolation; raise only, never lower. The measured line and bytecode figures above come from the SAME merge (the union of the baseline reports plus the targeted helper-scope reports), so they are comparable with each other. A SHARD publishes its own partial figure as coverage-shard-<n>-of-<m>.json and is never gated: a shard measures a slice, and the floor belongs to the merge job that holds every shard's reports."
   },
   "hygiene": {
     "gates": 8,
