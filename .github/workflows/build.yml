@@ -68,6 +68,29 @@ jobs:
           Write-Host "Parsed $($files.Count) file(s), $failed with errors"
           if ($failed -gt 0) { exit 1 }
 
+      - name: Guard against stray type-name artifacts
+        # Regression guard: invoking gbuild with a literal hashtable instead of a
+        # splatted variable (`& cmd @{...}` vs `& cmd @args`) can coerce the
+        # hashtable to "System.Collections.Hashtable" and bind it as a path,
+        # causing gbuild to create a stray artifact directory outside _Build.
+        # Fail early if such artifacts appear in the workspace root.
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $patterns = @('System.Collections.*', 'System.Object', 'System.Management.Automation.*')
+          $hits = [System.Collections.Generic.List[string]]::new()
+          foreach ($p in $patterns) {
+            foreach ($item in @(Get-ChildItem -LiteralPath $root -Force -Filter $p -ErrorAction SilentlyContinue)) {
+              $hits.Add($item.FullName) | Out-Null
+            }
+          }
+          if ($hits.Count -gt 0) {
+            Write-Host 'Stray type-name artifact(s) detected in workspace root (possible hashtable-as-path coercion):'
+            $hits | Sort-Object -Unique | ForEach-Object { Write-Host " - $_" }
+            exit 1
+          }
+          Write-Host 'No stray type-name artifacts detected in workspace root'
+
       - name: PSScriptAnalyzer (Error severity only)
         shell: pwsh
         run: |
