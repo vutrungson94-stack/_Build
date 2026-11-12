@@ -59,6 +59,13 @@ single-repo platform that is the expected ceiling.
 1. **No organisation-wide process asset set.** The standards live in one repo's
    `AGENTS.md` and its own modules. There is no published process reference that
    other projects inherit; each project re-derives its own discipline.
+   **Closed 2026-11-12** - `Docs/Process/verification-process.md` publishes the
+   portable process (objective, roles, the loop, a machine-readable gate
+   inventory, the evidence, the ratchet doctrine, the coverage rules and the
+   inheritance steps), `Docs/Process/README.md` indexes it and states what does
+   NOT transfer, and ADR-0006 records the decision. A gate keeps the published
+   inventory in sync with `AGENTS.md` and every ADR in the index, so the
+   reference cannot drift from the repository it describes.
 2. **Causal analysis is not closed-loop.** `RootCause.psm1` can classify and
    record a defect, and `qpm-ledger.json` records escapes, but nothing
    *automatically* opens a CAR record from a failed gate. The link is manual.
@@ -106,7 +113,7 @@ single-repo platform that is the expected ceiling.
 | 6 | 3 files flagged for backslash path literals by the `_Tests` metric | Low | All false positives: a regex pattern in `BuildConstants.psm1`, a separator-normalisation in `Cache.psm1`, and comments in `ModuleDependencies.psm1`. `_Build`'s own metric (token-based, with pattern-scoped exemptions) reports 218/218 |
 | 7 | `Set-StrictMode` absent from 3 production files | — | Intentional: `ModuleBootstrap.ps1`, `OrchestratorLifecycle.ps1`, `Orchestrator.Pipeline.Events.ps1` are dot-sourced and inherit it from the caller |
 | 8 | `README.md` claims `Docs/` holds ADRs | Low | Open — see recommendation 5 |
-| 9 | `_Tests/gtest.ps1 -Project .` on `_Build` reports ~16 false failures | Medium | Documented in `AGENTS.md`; the harness's PowerShell runner is not scope-isolated. Authoritative path is `Tests/Run-CoreTests.ps1` |
+| 9 | `_Tests/gtest.ps1 -Project .` on `_Build` reports ~16 false failures | Medium | Documented in `AGENTS.md`; the harness's PowerShell runner is not scope-isolated. Authoritative path is `Tests/Run-CoreTests.ps1`. **Fixed 2026-11-12** in the `_Tests` repository: the harness now detects a project runner and delegates to it |
 | 10 | macOS CI failed 12 tests (Steps / CacheProvider / Deploy / Distributed / Sast) with "Archive path escaped output directory" while Windows + Linux were green | High | `PathUtils.Test-NoReparsePointInPath` now stops at the `/var`, `/tmp`, `/private/var`, `/private/tmp` OS aliases instead of rejecting every temp path; regression test added to `Tests/PathUtils.Tests.ps1` |
 
 ## Prioritised remediation
@@ -128,7 +135,10 @@ single-repo platform that is the expected ceiling.
 5. **Fix the `_Tests` PowerShell runner** to detect a project-specific runner
    (`Tests/Run-CoreTests.ps1`, `Run-Tests.ps1`) instead of running every
    `*.Tests.ps1` in one session. Out of `_Build` scope, but it is the reason
-   finding 9 exists.
+   finding 9 exists. **Closed 2026-11-12** - the fix landed in the `_Tests`
+   repository (`_Tests/Modules/TestRunner.psm1`, commit `8471aa6`): the harness
+   now detects a project runner, delegates the run to it and takes its exit
+   code as the verdict, with a regression test of its own.
 
 ## 2026-11-12 update (measured)
 
@@ -198,6 +208,7 @@ Three of the five gaps listed above are now closed in the CODE, not in prose.
    `coverage-shard-<n>-of-<m>.json` and is never gated (a shard measured 20.67 %
    of the lines against a 55 % floor and failed a job whose tests all passed).
 
-**Still open:** no organisation-wide process asset set (item 1), and the
-`_Tests` harness runner (item 5, outside `_Build`). The coverage wall clock is
-still bounded by the `ProcessMetrics` scope under instrumentation.
+**Still open:** the coverage wall clock is still bounded by the `ProcessMetrics`
+scope under instrumentation, and the organisation still has to decide who
+adopts the published process and how often it is reviewed. Every other item in
+the "missing for a full L5 rating" list is now closed in code.

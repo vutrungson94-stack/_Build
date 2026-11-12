@@ -274,4 +274,72 @@ Describe 'Build helper functions' {
             }
         }
     }
+
+    Context 'Build driver branches' {
+        It 'Start-BuildAndShow returns false when the project file is missing' {
+            InModuleScope Build {
+                function Write-Log { param($Message,$Level,$State) }
+                function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                Mock Write-Log { }
+                Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                $missing = Join-Path ([System.IO.Path]::GetTempPath()) ('no-such-' + [guid]::NewGuid().ToString('N') + '.csproj')
+                Start-BuildAndShow -State ([PSCustomObject]@{ Colors = [pscustomobject]@{} }) -Project $missing | Should -BeFalse
+            }
+        }
+
+        It 'Start-BuildAndShow reports the missing project in detailed mode' {
+            InModuleScope Build {
+                function Write-Log { param($Message,$Level,$State) }
+                function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                Mock Write-Log { }
+                Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                $missing = Join-Path ([System.IO.Path]::GetTempPath()) ('no-such-' + [guid]::NewGuid().ToString('N') + '.csproj')
+                $r = Start-BuildAndShow -State ([PSCustomObject]@{ Colors = [pscustomobject]@{} }) -Project $missing -Detailed
+                $r | Should -Not -BeNullOrEmpty
+                $r.Status | Should -Be 'Failed'
+                $r.ReasonCode | Should -Be 'ProjectMissing'
+            }
+        }
+
+        It 'Start-BuildAndShow reports a failed language detection in detailed mode' {
+            InModuleScope Build {
+                function Write-Log { param($Message,$Level,$State) }
+                function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                function Get-PrimaryLanguage { param($SearchRoot,$State) $null }
+                function Set-StateColors { param($State) }
+                Mock Write-Log { }
+                Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                Mock Get-PrimaryLanguage { $null }
+                Mock Set-StateColors { }
+                $proj = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-lang-' + [guid]::NewGuid().ToString('N') + '.csproj')
+                Set-Content -LiteralPath $proj -Value '<Project></Project>' -Encoding UTF8
+                try {
+                    $r = Start-BuildAndShow -State ([PSCustomObject]@{ Colors = [pscustomobject]@{} }) -Project $proj -Detailed
+                    $r.Status | Should -Be 'Failed'
+                    $r.ReasonCode | Should -Be 'LanguageDetectionFailed'
+                } finally { Remove-Item -LiteralPath $proj -Force -ErrorAction SilentlyContinue }
+            }
+        }
+
+        It 'Start-BuildAndShow delegates a non-dotnet project to the plugin runner' {
+            InModuleScope Build {
+                function Write-Log { param($Message,$Level,$State) }
+                function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                function Get-PrimaryLanguage { param($SearchRoot,$State) [pscustomobject]@{ Language = 'Python'; BuildFilePath = 'app.py' } }
+                function Set-StateColors { param($State) }
+                function Invoke-PluginBuildFor { param($State,$Language,$ProjectDir,$ProjectFile,$Configuration,[switch]$Incremental,[switch]$Detailed) $true }
+                Mock Write-Log { }
+                Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                Mock Get-PrimaryLanguage { [pscustomobject]@{ Language = 'Python'; BuildFilePath = 'app.py' } }
+                Mock Set-StateColors { }
+                Mock Invoke-PluginBuildFor { $true }
+                $proj = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-plugin-' + [guid]::NewGuid().ToString('N') + '.csproj')
+                Set-Content -LiteralPath $proj -Value '<Project></Project>' -Encoding UTF8
+                try {
+                    Start-BuildAndShow -State ([PSCustomObject]@{ Colors = [pscustomobject]@{} }) -Project $proj | Should -BeTrue
+                    Should -Invoke -CommandName Invoke-PluginBuildFor -Times 1 -Exactly
+                } finally { Remove-Item -LiteralPath $proj -Force -ErrorAction SilentlyContinue }
+            }
+        }
+    }
 }
