@@ -302,6 +302,10 @@ Describe 'PS51Compat - static 5.1 incompatibility scan' {
         # NOTE: gbuild (bash) and gbuild.bat are DELIBERATELY excluded - a BOM
         # breaks the shebang line and cmd.exe respectively, even with non-ASCII
         # comment bytes in them.
-        $bad | Should -BeNullOrEmpty
+        #
+        # The failure NAMES the files. It used to say only "expected $null", so a
+        # red CI run left the maintainer to guess which of 200 shipped scripts
+        # had lost its BOM - and the answer is one line of text: the path.
+        $bad | Should -BeNullOrEmpty -Because ('these shipped scripts contain non-ASCII bytes but no UTF-8 BOM, so Windows PowerShell 5.1 decodes them with the system ANSI codepage and the parse explodes: ' + ($bad -join '; '))
     }
 }

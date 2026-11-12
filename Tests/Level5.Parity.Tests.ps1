@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 Set-StrictMode -Version 1.0
 
 # Level 5 parity: early-boot mirrors + menu maps must match single source.

@@ -139,6 +139,14 @@ runs on the platform that exposed them.
   - Windows PowerShell 5.1 has no `$IsWindows` / `$IsLinux` / `$IsMacOS`.
     Import `Tests/Helpers/PlatformShim.ps1` in tests that branch on them.
   - `-Encoding UTF8` on every file read/write.
+  - **A shipped script that contains non-ASCII bytes must start with a UTF-8
+    BOM.** Windows PowerShell 5.1 decodes a BOM-less file with the system ANSI
+    codepage, and a UTF-8 em-dash then decodes to bytes that include U+201D -
+    a DOUBLE QUOTE to the PowerShell tokenizer - so a string literal ends
+    early and the parse explodes (`UnexpectedToken` / `Missing closing '}'`).
+    `pwsh 7` defaults to UTF-8 and never trips it, so the guard has to be
+    byte-level: `Tests/PS51Compat.Tests.ps1` checks it and NAMES the file.
+    Any tool that writes a shipped script must preserve the BOM.
   - Generated file content must be platform-independent: never embed a
     raw filesystem path separator (`\` vs `/`) in generated text. The
     docs generator used to write `Modules/Plugins\Foo.psm1` on Windows and
