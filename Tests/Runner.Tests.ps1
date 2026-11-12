@@ -78,6 +78,16 @@ Describe 'Core test runner' {
         # shard 2 of 4 fail (20.67% against a 55% floor) while every test in
         # the shard passed - the job died against the very floor the merge job
         # exists to enforce. The floor belongs to the merge job.
+        #
+        # This test starts its OWN coverage run. Inside a run that is itself
+        # instrumented the instrumentation would multiply, so the check is
+        # skipped there: the coverage CI job exercises the shard path on every
+        # run anyway, and a self-instrumenting test would be the next long pole
+        # of the coverage job.
+        if ($env:GBUILD_COVERAGE_ACTIVE -eq '1') {
+            Set-ItResult -Skipped -Because 'a coverage run inside a coverage run multiplies the instrumentation'
+            return
+        }
         $env:GBUILD_SS_LIST = 'MockHelpers'
         try {
             $out = & $script:psExe -NoProfile -ExecutionPolicy Bypass -File $script:runnerPath -Coverage -Shard 1 -ShardCount 2 -StrictSkips 2>&1 | Out-String
