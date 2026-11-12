@@ -46,13 +46,24 @@ function Format-ElapsedTag {
 
 <#
 .SYNOPSIS
-    Quotes a single argument for a native command line (Windows rules).
+    Quotes a single argument for a native command line.
+.DESCRIPTION
+    Windows: double-quote and escape embedded quotes/backslashes.
+    POSIX: single-quote every argument (including plain tokens) so the
+    resulting token is safe when concatenated into a shell command line.
 #>
 function ConvertTo-ProcessArgument {
     [CmdletBinding()]
     [OutputType([string])]
     param([string]$Value)
-    return (ConvertTo-BuildArgument -Value $Value)
+    if ($null -eq $Value) { return '""' }
+    $value = [string]$Value
+    if ($value -eq '') { return '""' }
+    if (Test-IsWindowsHost) {
+        if ($value -notmatch '[\s"]') { return $value }
+        return '"' + ($value -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+    }
+    return "'" + ($value -replace "'", "'\''") + "'"
 }
 
 <#
