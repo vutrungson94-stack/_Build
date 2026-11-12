@@ -506,10 +506,19 @@ jobs:
           # -Shard/-ShardCount, balanced on the measured cost table downloaded
           # above, and writes one coverage XML per child; each child's file name
           # carries "<shard>-<scope>" so two shards cannot collide on a reused
-          # PID. The merged line-coverage gate is enforced by the
-          # coverage-merge job. No -MinCoveragePct here: a single shard
-          # exercises only a fraction of the suite, so the Pester
-          # command-coverage target would fail on every shard by construction.
+          # PID.
+          #
+          # THE FLOOR IS NOT ENFORCED HERE. A shard measures a SLICE of the
+          # suite, so its percentage is a PARTIAL measurement of the codebase
+          # (shard 2 of 4 measured 20.67% while the whole suite measures 56%)
+          # and comparing it with the global 55% floor is a category error - it
+          # made the shard job fail against the very floor the merge job exists
+          # to enforce. The runner therefore publishes the shard's partial
+          # figure as coverage-shard-<n>-of-<m>.json and leaves the gate to the
+          # coverage-merge job, which holds every shard's reports and enforces
+          # the floor on their union. No -MinCoveragePct here either: Pester's
+          # own command-coverage target is computed per scope and a single
+          # shard cannot meet it by construction.
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
             -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
             -Scope All -StrictSkips -Coverage -Shard ${{ matrix.shard }} -ShardCount 4
@@ -546,7 +555,9 @@ jobs:
 
       - name: Upload coverage shard
         # Always: the raw XMLs are what the merge job measures, and a failed
-        # shard's diagnostics are only visible if they are uploaded.
+        # shard's diagnostics are only visible if they are uploaded. The shard's
+        # own partial summary travels with them, so the shard job's log and its
+        # artefact agree on what was measured.
         if: always()
         uses: actions/upload-artifact@v7
         continue-on-error: true
@@ -554,6 +565,7 @@ jobs:
           name: gbuild-coverage-shard-${{ matrix.shard }}
           path: |
             Tests/TestResults/coverage/*.xml
+            Tests/TestResults/coverage-shard-*.json
             Tests/TestResults/scope-timings.csv
             Tests/TestResults/failed-*.txt
             Tests/suite-progress-*.log

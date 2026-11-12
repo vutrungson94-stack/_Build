@@ -1304,7 +1304,17 @@ try {
 # Merges every per-scope Pester result (including the isolated child processes)
 # and writes a single machine-readable baseline. A measurement nobody consumes
 # is not a control, so -MinCoveragePct turns it into a gate.
+#
+# A SHARD IS NOT A SUITE. A shard measures a slice of the scopes, so its
+# percentage is a PARTIAL measurement of the codebase - comparing it with the
+# global floor is a category error: shard 2 of 4 measured 20.67% of the lines
+# while the whole suite measures 56%, and the shard job failed against the very
+# floor the merge job exists to enforce. The floor is therefore enforced in
+# exactly two places: a whole-suite run (no sharding) and the merge job that
+# holds every shard's reports. A shard publishes its partial figure as a
+# diagnostic and never as the baseline.
 $coverageSummary = $null
+$isPartialShard = ($ShardCount -gt 1 -and $Shard -ge 1 -and -not $MergeOnly)
 if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -LiteralPath $CoverageDir -PathType Container)) {
     try {
         # The "ignore what was already there" filter protects a normal run
@@ -1382,7 +1392,12 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
             }
             $summaryDir = Join-Path $testRoot 'TestResults'
             if (-not (Test-Path -LiteralPath $summaryDir -PathType Container)) { New-Item -ItemType Directory -Path $summaryDir -Force | Out-Null }
-            $baselinePath = Join-Path $summaryDir 'coverage-baseline.json'
+            # A shard writes its PARTIAL figure under its own name. It must not
+            # overwrite coverage-baseline.json: that file is the merged, gated
+            # measurement, and a shard's number would be read as the baseline by
+            # anyone (or anything) that looks at the artefact afterwards.
+            $baselineName = if ($isPartialShard) { "coverage-shard-{0}-of-{1}.json" -f $Shard, $ShardCount } else { 'coverage-baseline.json' }
+            $baselinePath = Join-Path $summaryDir $baselineName
             $baseline | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $baselinePath -Encoding UTF8
             $coverageSummary = $baseline
             Write-ProgressLine ("COVERAGE: {0}% of {1} lines ({2} covered / {3} missed) across {4} file(s) -> {5}" -f $pct, $totalCmds, $executed, $missed, $files.Count, $baselinePath)
@@ -1404,10 +1419,16 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
                     }
                 }
             } catch { }
-            if ($null -ne $lineFloorPct) {
+            if ($isPartialShard) {
+                # A shard measures a SLICE. Its percentage is not comparable with
+                # the global floor, so it is published and NOT gated. The floor
+                # is enforced by the merge job, which holds every shard's
+                # reports and computes the union.
+                Write-ProgressLine ("COVERAGE (shard {0} of {1}): {2}% of {3} lines - PARTIAL measurement, not gated here; the merged floor ({4}%) is enforced by the merge job" -f $Shard, $ShardCount, $pct, $totalCmds, $(if ($null -ne $lineFloorPct) { $lineFloorPct } else { 'n/a' }))
+            } elseif ($null -ne $lineFloorPct) {
                 Write-ProgressLine ("COVERAGE GATE: line floor {0}% (Tests/process-baseline.json coverage.floorPercent); measured {1}%" -f $lineFloorPct, $pct)
             }
-            if ($null -ne $lineFloorPct -and $pct -lt $lineFloorPct) {
+            if ((-not $isPartialShard) -and ($null -ne $lineFloorPct) -and ($pct -lt $lineFloorPct)) {
                 $msg = ("COVERAGE GATE FAILED: line coverage {0}% < baseline floor {1}% ({2} lines measured)" -f $pct, $lineFloorPct, $totalCmds)
                 Write-ProgressLine "RESULT: $msg"
                 Write-SuiteMessage $msg 'Err'

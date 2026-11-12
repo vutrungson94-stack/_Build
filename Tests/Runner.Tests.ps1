@@ -72,6 +72,30 @@ Describe 'Core test runner' {
         [double]$dotEnv[0].seconds | Should -BeGreaterThan 0
     }
 
+    It 'does not apply the global coverage floor to a shard measurement' {
+        # A shard measures a SLICE of the suite, so its percentage is a PARTIAL
+        # measurement of the codebase. Comparing it with the global floor made
+        # shard 2 of 4 fail (20.67% against a 55% floor) while every test in
+        # the shard passed - the job died against the very floor the merge job
+        # exists to enforce. The floor belongs to the merge job.
+        $env:GBUILD_SS_LIST = 'MockHelpers'
+        try {
+            $out = & $script:psExe -NoProfile -ExecutionPolicy Bypass -File $script:runnerPath -Coverage -Shard 1 -ShardCount 2 -StrictSkips 2>&1 | Out-String
+            $code = $LASTEXITCODE
+            $out | Should -Match 'PARTIAL measurement, not gated here' -Because 'a shard must report its partial figure as a diagnostic'
+            $code | Should -Be 0 -Because "a partial shard measurement must not fail the run: $out"
+            # A shard must not publish itself as the merged baseline.
+            $shardReport = Join-Path $script:resultsDir 'coverage-shard-1-of-2.json'
+            if (Test-Path -LiteralPath $shardReport -PathType Leaf) {
+                $report = Get-Content -LiteralPath $shardReport -Raw -Encoding UTF8 | ConvertFrom-Json
+                $report.coveragePercent | Should -BeLessThan 55 -Because 'one slice of the suite cannot reach the global floor'
+            }
+        } finally {
+            Remove-Item Env:GBUILD_SS_LIST -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath (Join-Path $script:resultsDir 'coverage-shard-1-of-2.json') -Force -ErrorAction SilentlyContinue
+        }
+    }
+
     It 'opens a corrective-action record automatically when a scope failed' {
         # The causal loop has to be CLOSED, not merely open: a failed scope must
         # leave a CAR behind without a human remembering to write one. The runner
