@@ -181,3 +181,37 @@ Describe 'RootCause history safety' {
         foreach ($line in $lines) { { $line | ConvertFrom-Json -ErrorAction Stop } | Should -Not -Throw }
     }
 }
+
+Describe 'RootCause verification CAR' {
+    It 'opens a corrective-action record that names the scope and the failing tests' {
+        $record = New-VerificationCAR -Scope 'BuildHelpers' -FailedTests @('Suite.Probe :: fails on purpose', '') -GateThatMissed 'core suite scope verdict' -DetectedBy 'Pester scope BuildHelpers'
+        $record | Should -Not -BeNullOrEmpty
+        $record.Schema | Should -Be 'car.record.v1'
+        $record.Status | Should -Be 'Open'
+        $record.Category | Should -Be 'VerificationGateFailure'
+        $record.Confidence | Should -Be 1.0
+        $record.Verification.Scope | Should -Be 'BuildHelpers'
+        @($record.Verification.FailedTests).Count | Should -Be 1
+        $record.Verification.GateThatMissed | Should -Be 'core suite scope verdict'
+        $record.Verification.DetectedBy | Should -Be 'Pester scope BuildHelpers'
+        $record.Suggestion | Should -Match 'BuildHelpers'
+        $record.Suggestion | Should -Match 'fails on purpose'
+    }
+
+    It 'redacts secret-bearing failure text before the record is written' {
+        $record = New-VerificationCAR -Scope 'X' -FailedTests @('probe :: fails with https://example.test/?token=secret-token')
+        $record.Suggestion | Should -Not -Match 'secret-token'
+        $record.Suggestion | Should -Match 'REDACTED'
+    }
+
+    It 'resolves its config without ConfigProvider or BuildConstants loaded' {
+        # A failing gate is exactly when the CAR must be writable, and the
+        # runner may not have loaded the config modules. A CommandNotFound here
+        # would silently lose the analysis record.
+        $state = [PSCustomObject]@{ WorkingDir = $TestDrive }
+        $cfg = Get-RootCauseConfig -State $state
+        $cfg.enabled | Should -BeTrue
+        $cfg.historyPath | Should -Match 'root-cause\.jsonl$'
+        $cfg.maxHistoryEntries | Should -BeGreaterThan 0
+    }
+}

@@ -71,4 +71,28 @@ Describe 'Core test runner' {
         # answer the question with a lie.
         [double]$dotEnv[0].seconds | Should -BeGreaterThan 0
     }
+
+    It 'opens a corrective-action record automatically when a scope failed' {
+        # The causal loop has to be CLOSED, not merely open: a failed scope must
+        # leave a CAR behind without a human remembering to write one. The runner
+        # is driven the way CI drives it; -MergeOnly executes no scope but still
+        # performs the end-of-run analysis, so the wiring is exercised without
+        # inventing a failing test.
+        $failedFile = Join-Path $script:resultsDir 'failed-CARProbe.txt'
+        $carFile = Join-Path $script:resultsDir 'car/car-CARProbe.json'
+        Set-Content -LiteralPath $failedFile -Value 'Suite.Probe :: fails on purpose' -Encoding UTF8
+        try {
+            $out = & $script:psExe -NoProfile -ExecutionPolicy Bypass -File $script:runnerPath -MergeOnly 2>&1 | Out-String
+            Test-Path -LiteralPath $carFile -PathType Leaf | Should -BeTrue -Because "the runner must open a CAR for a failed scope automatically: $out"
+            $car = Get-Content -LiteralPath $carFile -Raw -Encoding UTF8 | ConvertFrom-Json
+            $car.Schema | Should -Be 'car.record.v1'
+            $car.Status | Should -Be 'Open'
+            $car.Verification.Scope | Should -Be 'CARProbe'
+            @($car.Verification.FailedTests).Count | Should -BeGreaterThan 0
+            $out | Should -Match 'CAR opened for scope CARProbe'
+        } finally {
+            Remove-Item -LiteralPath $failedFile -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $carFile -Force -ErrorAction SilentlyContinue
+        }
+    }
 }

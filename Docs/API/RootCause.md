@@ -1,6 +1,6 @@
 # RootCause
 
-16 function(s). Source: `Modules/RootCause.psm1`
+17 function(s). Source: `Modules/RootCause.psm1`
 
 ### Get-DiagnosticRoot
 
@@ -37,6 +37,10 @@ Parameters: Analysis :Hashtable, State :PSObject
 ### New-CARRecord
 
 Parameters: Category :String, Confidence :Double, Severity :String, Suggestion :String, State :PSObject
+
+### New-VerificationCAR
+
+Parameters: Scope :String, FailedTests :String[], GateThatMissed :String, DetectedBy :String, Severity :String, State :PSObject
 
 ### Resolve-CARPath
 

@@ -1128,6 +1128,59 @@ foreach ($r in $summary) {
     if ($r.Total -le 0) { $zeroTestScopes++ }
 }
 
+# ── L5: CLOSED CAUSAL LOOP ────────────────────────────────────────────────────
+# A failed scope must OPEN a corrective-action record automatically. The causal
+# loop used to be OPEN but not CLOSED: a red gate printed a line, the run
+# ended, and opening the analysis record was a MANUAL step - so a defect could
+# reach a green state with nothing behind it.
+#
+# RootCause.psm1 owns the CAR shape (New-CARRecord / New-VerificationCAR). The
+# runner contributes only the evidence it already has: the failing scope, the
+# failing test names, and the gate that fired. The record is written to the run
+# artefact directory (Tests/TestResults/car) so CI can publish it, and to the
+# CAR ledger next to the other root-cause evidence.
+function Open-VerificationCARs {
+    $resultDir = Join-Path $testRoot 'TestResults'
+    $failedFiles = @(Get-ChildItem -LiteralPath $resultDir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)
+    if ($failedFiles.Count -eq 0) { return 0 }
+    $toolRoot = Split-Path -Parent $testRoot
+    $rcPath = Join-Path $toolRoot 'Modules/RootCause.psm1'
+    if (-not (Get-Command New-VerificationCAR -ErrorAction SilentlyContinue)) {
+        if (Test-Path -LiteralPath $rcPath -PathType Leaf) {
+            try { $null = Import-Module $rcPath -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue } catch { }
+        }
+    }
+    if (-not (Get-Command New-VerificationCAR -ErrorAction SilentlyContinue)) {
+        Write-ProgressLine 'CAR: skipped (RootCause module unavailable - the corrective-action record could not be opened)'
+        return 0
+    }
+    $opened = 0
+    foreach ($f in $failedFiles) {
+        $scopeName = $f.BaseName -replace '^failed-', ''
+        if ([string]::IsNullOrWhiteSpace($scopeName)) { continue }
+        $names = @(Get-Content -LiteralPath $f.FullName -ErrorAction SilentlyContinue |
+            Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+        try {
+            $record = New-VerificationCAR -Scope $scopeName -FailedTests $names `
+                -GateThatMissed 'core suite scope verdict (Tests/Run-CoreTests.ps1)' `
+                -DetectedBy ("Pester scope {0}" -f $scopeName)
+            $carDir = Join-Path $resultDir 'car'
+            if (-not (Test-Path -LiteralPath $carDir -PathType Container)) {
+                New-Item -ItemType Directory -Path $carDir -Force -ErrorAction SilentlyContinue | Out-Null
+            }
+            $record | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $carDir ("car-{0}.json" -f $scopeName)) -Encoding UTF8
+            try {
+                $null = Write-CARRecord -Record $record -State ([PSCustomObject]@{ WorkingDir = $toolRoot })
+            } catch { }
+            Write-ProgressLine ("CAR opened for scope {0}: {1} (Tests/TestResults/car/car-{0}.json)" -f $scopeName, $record.Id)
+            $opened++
+        } catch {
+            Write-ProgressLine ("CAR for scope {0} could not be opened: {1}" -f $scopeName, $_.Exception.Message)
+        }
+    }
+    return $opened
+}
+
 # ── PER-SCOPE TIMING ──────────────────────────────────────────────────────────
 # The suite can say how many tests passed, but until now it could not say
 # WHERE the time went: every speed question was answered by scraping
@@ -1201,6 +1254,17 @@ if ($StrictSkips.IsPresent) {
     Write-ProgressLine ("StrictSkips: {0} skipped, budget {1} ({2}) -> {3}" -f $totSkipped, $(if ($null -eq $skipBudget) { 'n/a' } else { $skipBudget }), $skipBudgetSrc, $(if ($strictSkipFailure) { 'FAIL' } else { 'ok' }))
 }
 Write-ProgressLine "Suite complete: $totPassed passed, $totFailed failed, $totSkipped skipped, $totTotal total, $killedScopes killed-by-infra"
+
+# ── L5: AUTOMATIC CORRECTIVE-ACTION RECORDS ───────────────────────────────────
+# Every failed scope opens a CAR here, BEFORE the verdict is printed, so the
+# analysis record exists even when the run ends in a red exit code (and even in
+# the merge job, where the shard artefacts carry the failed-scope files).
+try {
+    $carsOpened = Open-VerificationCARs
+    if ($carsOpened -gt 0) { Write-ProgressLine "Corrective-action records opened: $carsOpened" }
+} catch {
+    Write-ProgressLine "Corrective-action records could not be opened: $($_.Exception.Message)"
+}
 
 # ── L5: PROCESS ADOPTION CURVE ───────────────────────────────────────────────
 # Every other number in this runner describes the SUITE. This one describes the

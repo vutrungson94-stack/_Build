@@ -50,13 +50,29 @@ function Resolve-RootCausePath {
 function Get-RootCauseConfig {
     [CmdletBinding()]
     param([PSCustomObject]$State)
-    $section = if ($State) { Get-SectionValue -Section (Get-SectionValue -Section $State -Key 'BuildConfig' -Default $null) -Key 'rootCause' -Default $null } else { $null }
+    $section = $null
+    if ($State -and (Get-Command Get-SectionValue -ErrorAction SilentlyContinue)) {
+        try { $section = Get-SectionValue -Section (Get-SectionValue -Section $State -Key 'BuildConfig' -Default $null) -Key 'rootCause' -Default $null } catch { $section = $null }
+    }
     $reportDir = if (Get-Command Get-BuildSetting -ErrorAction SilentlyContinue) { [string](Get-BuildSetting -Key 'ReportOutputDir' -State $State -Fallback 'build-reports') } else { 'build-reports' }
     $get = {
         param([string]$Key, [string]$Property, $Fallback)
-        $value = Get-SectionValue -Section $section -Key $Property -Default $null
-        if ($null -ne $value) { return $value }
-        if (Get-Command Get-BuildSetting -ErrorAction SilentlyContinue) { return Get-BuildSetting -Key $Key -State $State -Fallback $Fallback }
+        # Defensive lookups: this function is called by a tool that may not have
+        # loaded ConfigProvider (Get-SectionValue) or BuildConstants
+        # (Get-BuildSetting). Before the guard, a missing command turned the whole
+        # config resolution into a CommandNotFound, which meant the CAR ledger
+        # could not be written at all - and the CAR is exactly what a failing gate
+        # needs. A missing optional dependency now degrades to the documented
+        # defaults instead of throwing.
+        if ($null -ne $section -and (Get-Command Get-SectionValue -ErrorAction SilentlyContinue)) {
+            try {
+                $value = Get-SectionValue -Section $section -Key $Property -Default $null
+                if ($null -ne $value) { return $value }
+            } catch { }
+        }
+        if (Get-Command Get-BuildSetting -ErrorAction SilentlyContinue) {
+            try { return (Get-BuildSetting -Key $Key -State $State -Fallback $Fallback) } catch { return $Fallback }
+        }
         return $Fallback
     }
     return [PSCustomObject]@{ enabled = [bool](& $get 'RootCauseEnabled' 'enabled' $true); historyPath = [string](& $get 'RootCauseHistoryPath' 'historyPath' (Join-Path $reportDir 'root-cause.jsonl')); maxHistoryEntries = [math]::Max(1, [math]::Min(10000, [int](& $get 'RootCauseMaxHistoryEntries' 'maxHistoryEntries' 500))) }
@@ -277,6 +293,61 @@ function New-CARRecord {
         CorrelationId = [string]$corr
         TenantId    = [string]$tenant
     }
+}
+
+function New-VerificationCAR {
+    <#
+    .SYNOPSIS
+        Opens a corrective-action record for a FAILED VERIFICATION GATE.
+    .DESCRIPTION
+        The CAR shape has ONE owner: New-CARRecord. This function does not
+        invent a second record format - it calls the owner and attaches the
+        verification evidence the owner has no place for.
+
+        Why it exists: the causal loop was OPEN but not CLOSED. A red gate
+        printed a line and the run ended; opening a CAR from it was a manual
+        step, so a defect could reach a green state with no analysis record
+        behind it. The runner now calls this the moment a scope fails, so the
+        analysis record is a BYPRODUCT of the failure instead of a task
+        somebody has to remember.
+    .PARAMETER Scope
+        The verification scope that failed (the unit of the gate).
+    .PARAMETER FailedTests
+        The failing test names, as reported by the gate.
+    .PARAMETER GateThatMissed
+        Which gate detected the failure (the control that fired).
+    .PARAMETER DetectedBy
+        What produced the detection (test framework, CI job, ...).
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory)][string]$Scope,
+        [string[]]$FailedTests = @(),
+        [string]$GateThatMissed = '',
+        [string]$DetectedBy = '',
+        [string]$Severity = 'High',
+        [PSCustomObject]$State = $null
+    )
+    $tests = @($FailedTests | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    $summary = "Verification gate failed in scope '{0}'." -f $Scope
+    if ($tests.Count -gt 0) {
+        $shown = @($tests | Select-Object -First 10)
+        $summary += ' Failing test(s): ' + (($shown) -join '; ')
+        if ($tests.Count -gt $shown.Count) { $summary += (' (+{0} more)' -f ($tests.Count - $shown.Count)) }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($GateThatMissed)) { $summary += (' Gate that fired: {0}.' -f $GateThatMissed) }
+    if (-not [string]::IsNullOrWhiteSpace($DetectedBy)) { $summary += (' Detected by: {0}.' -f $DetectedBy) }
+    $record = New-CARRecord -Category 'VerificationGateFailure' -Confidence 1.0 -Severity $Severity -Suggestion $summary -State $State
+    # The evidence travels with the record: a CAR that cannot name the scope
+    # and the failing tests is a note, not a corrective-action record.
+    $record | Add-Member -MemberType NoteProperty -Name 'Verification' -Value ([PSCustomObject]@{
+        Scope          = [string]$Scope
+        FailedTests    = @($tests)
+        GateThatMissed = [string]$GateThatMissed
+        DetectedBy     = [string]$DetectedBy
+    }) -Force
+    return $record
 }
 
 function Resolve-CARPath {
@@ -525,4 +596,4 @@ function Test-CARAuditPack {
     }
 }
 
-Export-ModuleMember -Function @('Get-RootCauseAnalysis', 'Write-RootCauseHistory', 'Get-RootCauseSummary', 'Get-RootCauseConfig', 'Get-RootCauseClassifiers', 'New-CARRecord', 'Resolve-CARPath', 'Write-CARRecord', 'Confirm-CARClosure', 'Get-TenantUsageSummary', 'Export-CARAuditPack', 'Test-CARAuditPack')
+Export-ModuleMember -Function @('Get-RootCauseAnalysis', 'Write-RootCauseHistory', 'Get-RootCauseSummary', 'Get-RootCauseConfig', 'Get-RootCauseClassifiers', 'New-CARRecord', 'New-VerificationCAR', 'Resolve-CARPath', 'Write-CARRecord', 'Confirm-CARClosure', 'Get-TenantUsageSummary', 'Export-CARAuditPack', 'Test-CARAuditPack')

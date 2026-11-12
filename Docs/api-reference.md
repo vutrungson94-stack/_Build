@@ -3490,6 +3490,10 @@ Parameters: Analysis :Hashtable, State :PSObject
 
 Parameters: Category :String, Confidence :Double, Severity :String, Suggestion :String, State :PSObject
 
+### New-VerificationCAR
+
+Parameters: Scope :String, FailedTests :String[], GateThatMissed :String, DetectedBy :String, Severity :String, State :PSObject
+
 ### Resolve-CARPath
 
 Parameters: State :PSObject
@@ -4480,7 +4484,7 @@ Parameters: Document :Object, State :PSObject
 | [RBAC](API/RBAC.md) | 26 |
 | [Release](API/Release.md) | 3 |
 | [Report](API/Report.md) | 18 |
-| [RootCause](API/RootCause.md) | 16 |
+| [RootCause](API/RootCause.md) | 17 |
 | [Sast](API/Sast.md) | 17 |
 | [SDK](API/SDK.md) | 38 |
 | [Security](API/Security.md) | 28 |
@@ -4491,5 +4495,5 @@ Parameters: Document :Object, State :PSObject
 | [Versioning](API/Versioning.md) | 7 |
 | [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 74 module(s), 1107 function(s).
+Total: 74 module(s), 1108 function(s).
 
