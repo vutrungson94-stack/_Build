@@ -120,3 +120,41 @@ Describe 'Documentation - generated paths are platform-independent' {
         } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
+
+Describe 'Documentation - the process asset is published and in sync' {
+    BeforeAll {
+        $script:DocToolRoot = Split-Path -Parent $global:GBuildTestRoot
+        $script:ProcessDoc = Join-Path $script:DocToolRoot 'Docs/Process/verification-process.md'
+        $script:AdrDir = Join-Path $script:DocToolRoot 'Docs/ADRs'
+    }
+
+    It 'publishes the verification process so another project can inherit it' {
+        Test-Path -LiteralPath $script:ProcessDoc -PathType Leaf | Should -BeTrue -Because 'a process that cannot be inherited is not a process asset'
+        Test-Path -LiteralPath (Join-Path $script:DocToolRoot 'Docs/Process/README.md') -PathType Leaf | Should -BeTrue
+        $text = Get-Content -LiteralPath $script:ProcessDoc -Raw -Encoding UTF8
+        # The objective first: a process without a stated objective cannot be
+        # evaluated, only obeyed.
+        $text | Should -Match 'objective'
+        $text | Should -Match 'gate inventory'
+        $text | Should -Match 'inherit'
+    }
+
+    It 'keeps the published gate inventory in sync with the repository contract' {
+        $text = Get-Content -LiteralPath $script:ProcessDoc -Raw -Encoding UTF8
+        $agents = Get-Content -LiteralPath (Join-Path $script:DocToolRoot 'AGENTS.md') -Raw -Encoding UTF8
+        $m = [regex]::Match($text, '(?s)<!-- GATE INVENTORY -->(.*?)<!-- /GATE INVENTORY -->')
+        $m.Success | Should -BeTrue -Because 'the gate inventory must be machine-readable so it can be checked'
+        $commands = @($m.Groups[1].Value -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not $_.StartsWith('#') })
+        $commands.Count | Should -BeGreaterThan 3 -Because 'the inventory must actually list the gates'
+        foreach ($cmd in $commands) {
+            $agents | Should -Match ([regex]::Escape($cmd)) -Because "the repository contract must declare the same gate as the published process: $cmd"
+        }
+    }
+
+    It 'lists every decision record in the ADR index' {
+        $index = Get-Content -LiteralPath (Join-Path $script:AdrDir 'README.md') -Raw -Encoding UTF8
+        foreach ($adr in @(Get-ChildItem -LiteralPath $script:AdrDir -Filter 'ADR-*.md' -File)) {
+            $index | Should -Match ([regex]::Escape($adr.Name)) -Because "every decision record must be listed in the index: $($adr.Name)"
+        }
+    }
+}
