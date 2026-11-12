@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cache PSGallery modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/powershell/Modules
           key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
@@ -85,23 +85,22 @@ jobs:
           if ($count -gt 0) { exit 1 }
 
   test:
-    name: Core test suite (Ubuntu)
+    name: Core test suite (Ubuntu ${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     needs: syntax
-    # The job takes ~10 min. The default timeout is 6 h, so a wedged run
-    # would burn the whole budget before anybody noticed; a runaway suite
-    # must fail fast instead.
-    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    # Each shard runs a balanced slice of scopes in parallel jobs. Wall clock
+    # is the longest shard instead of the whole suite. The default 6 h would
+    # let a wedged run burn the budget before anybody noticed.
+    timeout-minutes: 30
     env:
-      # The state-sensitive scopes keep their own child process (that is the
-      # isolation guarantee) but they now run CONCURRENTLY, and the fast
-      # in-process core batch runs in the parent WHILE they work.
-      #
-      # Measured on this runner before the change: the 64 isolated scopes cost
-      # 823 s one after another and the 50 in-process scopes another 83 s -
-      # a 945 s job for 1602 tests. Four children at a time bring the same
-      # work down to ~230 s. The number is the runner's core count; a larger
-      # value only adds contention, because every child is single-threaded.
+      # Within each shard, state-sensitive scopes still run in isolated child
+      # processes and the in-process core batch runs concurrently. The runner
+      # auto degree is min(ProcessorCount, 16) for isolated work; on a 4-core
+      # runner that keeps intra-shard parallelism without excess contention.
       GBUILD_SCOPE_PARALLELISM: 4
     steps:
       - uses: actions/checkout@v7
@@ -109,7 +108,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cache PSGallery modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/powershell/Modules
           key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
@@ -126,31 +125,28 @@ jobs:
               Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
           }
 
-      - name: Run the core suite
+      - name: Run the core suite (shard ${{ matrix.shard }}/4)
         # The runner reports the verdict through its EXIT CODE and the scope
         # list is explicit, so a scope that fails to run cannot pass silently.
+        # Shards are balanced on the measured cost table when available; on a
+        # fresh checkout the runner falls back to uniform costs.
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
-          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope All -StrictSkips
-          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
+            -Scope All -StrictSkips -Shard ${{ matrix.shard }} -ShardCount 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Report the failing assertions
         # MUST run even when the suite failed. Without `if: always()` GitHub
         # skips every step after the first failure - and these diagnostics are
-        # exactly what a red run needs. The step NAME alone does not do this.
+        # exactly what a red run needs.
         if: always()
-        # A red suite that only says "2 failed" is not actionable: the failing
-        # test NAMES and the assertion details are what a maintainer needs. The
-        # runner writes the scope list per scope; re-run the failed scopes here
-        # and print the expectation, so the next failure can be diagnosed from
-        # the job log without downloading the artifact.
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
           $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
-          # Where the time went: the same table the artifact carries, printed
-          # into the log, so a slow-but-green run is diagnosable too.
           $timings = Join-Path $dir 'scope-timings.csv'
           if (Test-Path -LiteralPath $timings -PathType Leaf) {
             Write-Host '===== slowest scopes (scope,seconds,status,passed,skipped,total) ====='
@@ -172,17 +168,12 @@ jobs:
           exit 0
 
       - name: Upload test results
-        # Always, not only on failure: the per-scope timing table is what
-        # tells a maintainer WHERE the suite spends its time, and that is
-        # exactly the question a green run cannot answer.
+        # Always: timing tables and diagnostics from every shard are needed.
         if: always()
-        # v7 runs on Node 24. v4/v5 declare node20, so the runner forces them
-        # onto Node 24 and annotates the run: "Node.js 20 is deprecated ...".
-        # v6+ is the first line that actually ships node24.
         uses: actions/upload-artifact@v7
         continue-on-error: true
         with:
-          name: gbuild-testresults
+          name: gbuild-testresults-shard-${{ matrix.shard }}
           path: |
             Tests/TestResults/**
             Tests/suite-progress-*.log
@@ -212,7 +203,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cache PSGallery modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/powershell/Modules
           key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
@@ -271,7 +262,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cache PSGallery modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/powershell/Modules
           key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
@@ -327,7 +318,7 @@ jobs:
           fetch-depth: 0
 
       - name: Cache PSGallery modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/powershell/Modules
           key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
@@ -452,18 +443,19 @@ jobs:
         # checkout Tests/TestResults/ is gitignored, so without this step every
         # scope costs 1 s and the shards degrade to round-robin alphabetical:
         # the long poles can land in the same shard and the wall clock is set by
-        # the unluckiest shard. The `test` job measured the same suite minutes
-        # earlier and uploaded the table; reuse it. A missing table is not fatal
-        # (the runner falls back to cost 1), so a failed download must not fail
-        # the shard.
+        # the unluckiest shard. The `test` shards measured the same suite earlier
+        # and uploaded timing tables; reuse them when available. A missing table
+        # is not fatal (the runner falls back to cost 1), so a failed download
+        # must not fail the shard.
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: gbuild-testresults
+          pattern: gbuild-testresults-shard-*
           path: .
+          merge-multiple: true
 
       - name: Cache PSGallery modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.local/share/powershell/Modules
           key: psgallery-${{ runner.os }}-${{ hashFiles('**/*.psd1', '**/*.psm1') }}
