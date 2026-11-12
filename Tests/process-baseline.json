@@ -56,6 +56,7 @@
       "RootCause::Confirm-CARClosure",
       "RootCause::Export-CARAuditPack",
       "RootCause::Get-TenantUsageSummary",
+      "RootCause::New-VerificationCAR",
       "RootCause::Test-CARAuditPack"
     ],
     "unreferencedConstantsAllowed": 0,

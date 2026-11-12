@@ -97,6 +97,7 @@ Describe 'Hygiene: no dead exported functions' {
             'RootCause::Confirm-CARClosure',         # CAR ledger operator API
             'RootCause::Export-CARAuditPack',        # CAR audit pack export
             'RootCause::Get-TenantUsageSummary',     # tenant usage API
+            'RootCause::New-VerificationCAR',        # opened by the verification process: Tests/Run-CoreTests.ps1 Open-VerificationCARs
             'RootCause::Test-CARAuditPack'           # CAR audit pack verification
         )
         $dead = @()

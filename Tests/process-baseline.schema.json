@@ -18,6 +18,7 @@
         "adoptionFloor",
         "adoptionFloorNote",
         "qpm",
+        "slo",
         "platformPathLiteralExemptions"
     ],
     "properties": {
@@ -102,6 +103,32 @@
                     "description": "Ratchet floor. Raise only, never lower."
                 },
                 "measuredSingleScopeOrchestrator": { "type": "number", "minimum": 0 },
+                "measuredMergedLineCoverage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "The measured merged LINE coverage this baseline records. It must satisfy floorPercent."
+                },
+                "measuredLinesCovered": { "type": "integer", "minimum": 0 },
+                "measuredLinesTotal": { "type": "integer", "minimum": 1 },
+                "measuredMergedInstructionCoverage": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "The measured BYTECODE view of the same merge (JaCoCo INSTRUCTION counters). Published for trend only - it carries no floor."
+                },
+                "measuredInstructionsCovered": { "type": "integer", "minimum": 0 },
+                "measuredInstructionsTotal": { "type": "integer", "minimum": 1 },
+                "publishedSecondaryView": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Names the secondary view and states that it carries no floor, so the two published percentages can never be mistaken for two gates."
+                },
+                "reconciliation": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "How the published coverage views relate to each other and which one the floor applies to. Without it the baseline publishes two percentages and no rule between them."
+                },
                 "note": { "type": "string", "minLength": 1 }
             }
         },
@@ -199,6 +226,51 @@
                 "meanRecoveryTimeSeconds": { "type": "string", "minLength": 1 },
                 "escapedDefects": { "type": "integer", "minimum": 0 },
                 "ledger": { "type": "string", "minLength": 1 },
+                "note": { "type": "string", "minLength": 1 }
+            }
+        },
+        "slo": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["objective", "escapeRate", "mttr", "adoption", "note"],
+            "description": "Objective-derived service levels for the VERIFICATION PROCESS itself. A floor can stop a regression; only a target says the process is good enough, and only a target can be derived from an objective. The targets are enforced by gbuild.ps1 -SelfTest against values measured in the same run.",
+            "properties": {
+                "objective": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "The statement the targets are derived from. Changing a target without changing the objective is a relaxation dressed as a re-derivation."
+                },
+                "escapeRate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["maxNewEscapesPerWindow", "windowDays", "measured", "why"],
+                    "properties": {
+                        "maxNewEscapesPerWindow": { "type": "integer", "minimum": 0 },
+                        "windowDays": { "type": "integer", "minimum": 1 },
+                        "measured": { "type": "string", "minLength": 1 },
+                        "why": { "type": "string", "minLength": 1 }
+                    }
+                },
+                "mttr": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["maxMeanRecoverySeconds", "measured", "why"],
+                    "properties": {
+                        "maxMeanRecoverySeconds": { "type": "integer", "minimum": 1 },
+                        "measured": { "type": "string", "minLength": 1 },
+                        "why": { "type": "string", "minLength": 1 }
+                    }
+                },
+                "adoption": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["minMeanAdoption", "measured", "why"],
+                    "properties": {
+                        "minMeanAdoption": { "type": "number", "minimum": 0, "maximum": 1 },
+                        "measured": { "type": "string", "minLength": 1 },
+                        "why": { "type": "string", "minLength": 1 }
+                    }
+                },
                 "note": { "type": "string", "minLength": 1 }
             }
         },
