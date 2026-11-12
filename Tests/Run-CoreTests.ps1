@@ -308,8 +308,11 @@ $scopeMap = @{
     'PipelineBuiltIn'          = 'PipelineBuiltIn.Tests.ps1'
     'PipelineRunner'          = 'PipelineRunner.Tests.ps1'
     'PipelineE2E'             = 'Pipeline.E2E.Tests.ps1'
-    'ProcessMetrics'          = 'ProcessMetrics.Tests.ps1'
+    'ProcessMetricsControl'  = 'ProcessMetrics.Control.Tests.ps1'
+    'ProcessMetricsEngine'   = 'ProcessMetrics.Engine.Tests.ps1'
     'ProcessMetricsMutation'  = 'ProcessMetrics.Mutation.Tests.ps1'
+    'ProcessMetricsRatchet'  = 'ProcessMetrics.Ratchet.Tests.ps1'
+    'ProcessMetricsTrend'    = 'ProcessMetrics.Trend.Tests.ps1'
     'Level5Parity'            = 'Level5.Parity.Tests.ps1'
     'L5Minimal'               = 'L5Minimal.Tests.ps1'
     'YamlPipeline'            = 'YamlPipeline.Tests.ps1'
@@ -362,7 +365,14 @@ $stateSensitive = @(
     'PluginSDK', 'RBAC', 'AuditLedger',
     # Touches the shared append-only process-trend file, so it must not share a
     # process with the runner step that appends the real sample.
-    'ProcessMetrics',
+    #
+    # The measurement engine was ONE scope and it was the long pole of the
+    # whole coverage run. A single scope cannot be spread across the CI shards
+    # by the cost balancer, so the shard that received it ran twice as long as
+    # its siblings. It is now four scopes split by WHAT they measure - the
+    # measurement itself is unchanged, but the work can be scheduled.
+    'ProcessMetricsControl', 'ProcessMetricsEngine',
+    'ProcessMetricsRatchet', 'ProcessMetricsTrend',
     # Builds synthetic tool trees in TEMP and mutates nothing in the repo, but it
     # imports ProcessMetrics -Global and reads Tests/process-trend-history.json,
     # so it is isolated for the same reason as its sibling.
@@ -575,11 +585,18 @@ function Invoke-ScopeInProcess {
     }
     # Persist failed test names so CI can upload them as an artifact even when
     # the console log is truncated.
+    #
+    # A scope that PASSES removes its stale record. The files are what the CI
+    # diagnosis step reads to find out WHICH scope failed, so a leftover from an
+    # earlier run would send a maintainer to a scope that is green today - and
+    # the artifact would claim a failure that no longer exists.
     if ($res -and $res.Failed) {
         $failedDir = Join-Path $testRoot 'TestResults'
         if (-not (Test-Path -LiteralPath $failedDir)) { New-Item -ItemType Directory -Path $failedDir -Force | Out-Null }
         $failedFile = Join-Path $failedDir "failed-$ScopeName.txt"
         @($res.Failed | ForEach-Object { "$($_.ExpandedPath) :: $($_.Name)" }) | Set-Content -LiteralPath $failedFile -Encoding UTF8
+    } else {
+        try { Remove-Item -LiteralPath (Join-Path $testRoot "TestResults/failed-$ScopeName.txt") -Force -ErrorAction SilentlyContinue } catch { }
     }
     Write-ProgressLine ("[$ScopeName] $($result.Status) ($passed passed, $failed failed, $skipped skipped, $total total, {0:N1}s)" -f $elapsed)
     return $result
@@ -1196,11 +1213,46 @@ try {
         New-Item -ItemType Directory -Path $timingDir -Force | Out-Null
     }
     $byCost = @($summary | Sort-Object -Property @{ Expression = { $_.Seconds }; Descending = $true })
-    $lines = @('scope,seconds,status,passed,skipped,total')
-    foreach ($r in $byCost) {
-        $lines += ('{0},{1},{2},{3},{4},{5}' -f $r.Scope, $r.Seconds, $r.Status, $r.Passed, $r.Skipped, $r.Total)
+    # MERGE with the table that is already there. A partial run (one scope, the
+    # way a developer reproduces a failure) used to REPLACE the table with its
+    # own single row - and the table is the cost input of the longest-first
+    # scheduler, so the next full run fell back to "every scope costs 1 s" and
+    # started the long pole last. The rows of the scopes this run did NOT
+    # execute keep their last measurement; the rows it did execute are
+    # replaced by the fresh measurement.
+    $timingPath = Join-Path $timingDir 'scope-timings.csv'
+    $timings = [ordered]@{}
+    try {
+        if (Test-Path -LiteralPath $timingPath -PathType Leaf) {
+            foreach ($row in @(Import-Csv -LiteralPath $timingPath -ErrorAction SilentlyContinue)) {
+                $name = [string]$row.scope
+                if ([string]::IsNullOrWhiteSpace($name)) { continue }
+                $timings[$name] = [PSCustomObject]@{
+                    Scope = $name
+                    Seconds = [double]$row.seconds
+                    Status = [string]$row.status
+                    Passed = [int]$row.passed
+                    Skipped = [int]$row.skipped
+                    Total = [int]$row.total
+                }
+            }
+        }
+    } catch { }
+    foreach ($r in $summary) {
+        $timings[$r.Scope] = [PSCustomObject]@{
+            Scope = $r.Scope
+            Seconds = [double]$r.Seconds
+            Status = [string]$r.Status
+            Passed = [int]$r.Passed
+            Skipped = [int]$r.Skipped
+            Total = [int]$r.Total
+        }
     }
-    $lines | Set-Content -LiteralPath (Join-Path $timingDir 'scope-timings.csv') -Encoding UTF8
+    $lines = @('scope,seconds,status,passed,skipped,total')
+    foreach ($row in @($timings.Values | Sort-Object -Property @{ Expression = { $_.Seconds }; Descending = $true })) {
+        $lines += ('{0},{1},{2},{3},{4},{5}' -f $row.Scope, $row.Seconds, $row.Status, $row.Passed, $row.Skipped, $row.Total)
+    }
+    $lines | Set-Content -LiteralPath $timingPath -Encoding UTF8
     $slow = @($byCost | Select-Object -First 10)
     if ($slow.Count -gt 0) {
         Write-ProgressLine ("Slowest scopes: " + (($slow | ForEach-Object { "{0} {1:N1}s" -f $_.Scope, $_.Seconds }) -join ', '))
@@ -1208,6 +1260,7 @@ try {
     $wallTotal = 0.0
     foreach ($r in $summary) { $wallTotal += [double]$r.Seconds }
     Write-ProgressLine ("Scope timing: {0:N1}s of scope work over {1:N1}s of wall clock (degree {2})" -f $wallTotal, $swSuite.Elapsed.TotalSeconds, $parallelDegree)
+    Write-ProgressLine ("Scope cost table: {0} scope(s) known ({1} measured by this run)" -f $timings.Count, $summary.Count)
 }
 catch {
     Write-ProgressLine "Scope timing: not written ($($_.Exception.Message))"

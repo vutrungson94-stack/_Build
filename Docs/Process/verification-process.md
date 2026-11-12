@@ -139,6 +139,29 @@ What deliberately does **not** transfer: the module layout, the specific gate
 implementations, the accepted-skip budget, and the thresholds. Those are
 measurements of *this* repository and must be re-measured, never copied.
 
+### 8.1 Boundaries: tools that take part in the same verification stay independent
+
+A verification process usually involves several tools - a test harness, a
+builder, a synchroniser. They are **independent systems** that borrow each
+other, and the difference decides who owns a concept and who fixes a defect:
+
+- **Borrowing is allowed**: a tool invokes another as a process, with its own
+  arguments, and takes its exit code as the verdict. A borrowed tool keeps its
+  own gates, its own scope isolation and its own ownership of every concept it
+  implements.
+- **Containment is not**: no tool lives inside another, no vendored copy of a
+  sibling's modules, no sibling's files inside another's tree.
+- **No code-level dependency**: production code must not import or read a
+  module out of a sibling's tree.
+- **Concepts are owned once**: when two tools need the same concept, each owns
+  its own copy on purpose and the duplication is governed - neither reaches
+  into the other for it.
+- **The boundary is checked, not remembered**: a gate asserts that no
+  production file references a sibling tool and that no sibling tool is
+  contained here.
+
+A project that inherits this process inherits the PROCESS, not a tool tree.
+
 ## 9. Drift control
 
 The published reference and the repository contract are checked against each

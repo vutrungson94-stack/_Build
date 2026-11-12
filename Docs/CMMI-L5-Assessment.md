@@ -212,3 +212,46 @@ Three of the five gaps listed above are now closed in the CODE, not in prose.
 scope under instrumentation, and the organisation still has to decide who
 adopts the published process and how often it is reviewed. Every other item in
 the "missing for a full L5 rating" list is now closed in code.
+
+## 2026-11-12 update (fourth pass - the tools stay independent, and the coverage shards get shorter)
+
+**The three tools are independent systems.** `_Tests`, `_Build` and `_Sync` borrow
+each other (a gate invoked as a process, its exit code read as the verdict) and
+must never contain or depend on each other. ADR-0007 records the decision and
+`Tests/Level5.Parity.Tests.ps1` now pins it: no production file references a
+sibling tool's path, and no sibling tool's directory is contained here. The
+published process inherits the same boundary - a project adopts the PROCESS,
+not a tool tree. The same rule fixed the `_Tests` harness in the `_Tests`
+repository: it detects a project runner and delegates to it instead of
+flattening every `*.Tests.ps1` into one Pester session.
+
+**Measured coverage cost, and what the shards cost.** A full coverage run
+(2026-11-12, 118 scopes, degree 16) produced **12,848 s of scope work** and
+**56.56 %** merged line coverage. The slowest scopes were `ProcessMetrics`
+(566 s), `Hygiene` (474 s), `Runner` (272 s) and `Standalone` (201 s). A shard's
+wall clock is its slice of that work divided by the parallelism INSIDE the
+shard, with the longest single scope as a floor - so four shards meant ~3,212 s
+of work each, and every shard ran long. Two changes followed:
+
+- **The measurement engine was split into four scopes**
+  (`ProcessMetricsEngine`, `ProcessMetricsTrend`, `ProcessMetricsRatchet`,
+  `ProcessMetricsControl`), and the read-only assertions now share ONE
+  measurement instead of re-scanning the whole tree per test. The 566 s pole is
+  gone; the floor is now the ~474 s `Hygiene` family. Splitting a scope keeps
+  the isolation guarantee - each part still runs in its own child - and changes
+  nothing about what is measured.
+- **The coverage matrix runs 8 shards instead of 4**, halving the slice.
+
+**Diagnostics that survive a red run.** A scope that passes now removes its own
+stale `failed-<scope>.txt`; a leftover from an earlier run used to make a
+green scope look red in the CI diagnosis. The hard-coded "Diagnose
+Environment" step became a generic "Diagnose the failing scope" step in the
+core-suite and portability jobs, the coverage shard job gained the same
+diagnosis plus its own partial coverage figure, and the macOS job now also
+prints the POSIX alias resolution (`/var` vs `/private/var`) that caused a
+historic 12-test failure there.
+
+**One self-inflicted regression, caught by the platform itself.** Splitting the
+engine dropped the UTF-8 BOM from a shipped script that contains non-ASCII
+bytes; the `PS51Compat` gate failed it in the very run that measured the
+coverage. The BOM is restored, and the gate did its job.

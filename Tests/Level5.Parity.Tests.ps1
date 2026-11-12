@@ -231,4 +231,54 @@ Describe 'Level 5 parity - single source of truth' {
             ($owners | Sort-Object) -join ',' | Should -Be 'Logging.psm1,SharedUtils.psm1'
         }
     }
+
+Describe 'Level 5 parity - the platform tools stay independent' {
+    BeforeAll {
+        $buildRoot = Split-Path -Parent $PSScriptRoot
+    }
+
+    It 'no production code reaches into a sibling tool' {
+        # _Tests, _Build and _Sync are INDEPENDENT systems. They borrow each
+        # other - a gate invoked as a process, its exit code read as the verdict
+        # - and they must never contain or depend on each other. A production
+        # file that READS or IMPORTS a sibling tool's tree is a code-level
+        # dependency and breaks the boundary (ADR-0007): the two trees then
+        # have to be released together, and the fix for a defect stops having
+        # one owner.
+        #
+        # Naming a sibling tool is NOT a dependency. The exclusion lists (the
+        # gitignore patterns, the tool-folder names, the syntax-check exclude
+        # dirs) mention the sibling folders on purpose - to keep them OUT. Only
+        # a line that ACCESSES a path of a sibling counts, so the gate does not
+        # punish the very lines that enforce the boundary.
+        $accessPattern = '(?i)\b(?:Import-Module|Import-ModuleOnDemand|Import-ModuleIfExists|Import-ModuleIfMissing|Get-Content|Get-ChildItem|Get-Item|Test-Path|Join-Path|Resolve-Path|Copy-Item|Move-Item|Remove-Item)\b'
+        $siblingPattern = '(?i)(?:^|[\s''"(=/\\])_(?:Tests|Sync)(?:[\\/''"]|\b)'
+        $roots = @('Modules', 'Steps', 'Hooks')
+        $offenders = @()
+        foreach ($r in $roots) {
+            $dir = Join-Path $buildRoot $r
+            if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+            foreach ($f in @(Get-ChildItem -LiteralPath $dir -Recurse -Include '*.ps1', '*.psm1' -File -ErrorAction SilentlyContinue)) {
+                foreach ($line in @(Get-Content -LiteralPath $f.FullName -Encoding UTF8 -ErrorAction SilentlyContinue)) {
+                    # Comments are prose, not dependencies: strip them first.
+                    $code = ($line -replace '\s+#(?![{]).*$', '').Trim()
+                    if ([string]::IsNullOrWhiteSpace($code)) { continue }
+                    if (($code -match $accessPattern) -and ($code -match $siblingPattern)) {
+                        $offenders += ('{0}: {1}' -f $f.Name, $code)
+                    }
+                }
+            }
+        }
+        $offenders | Should -BeNullOrEmpty -Because ('production code must not read or import a sibling tool: ' + ($offenders -join ' | '))
+    }
+
+    It 'no sibling tool is contained in this repository' {
+        # Containment is the other half of the same rule: a tool that lives
+        # inside another tool's tree is a vendored copy that drifts.
+        foreach ($name in @('_Tests', '_Sync')) {
+            Test-Path -LiteralPath (Join-Path $buildRoot $name) |
+                Should -BeFalse -Because "a tool inside another breaks the boundary (ADR-0007): $name"
+        }
+    }
+}
 }

@@ -278,9 +278,26 @@ process, so the state-isolation guarantee above is unchanged - do not
 
 The coverage queue is ordered **longest-processing-time-first (LPT)** using the
 measured per-scope costs in `Tests/TestResults/scope-timings.csv`, so the long
-poles (e.g. `ProcessMetrics`) start immediately and the wall clock tracks the
-longest scope instead of the unluckiest tail. Sharded CI runs balance shards by
-the same cost table and restore it from the prior `test` artifact when available.
+poles (e.g. the `Hygiene` gate family) start immediately and the wall clock
+tracks the longest scope instead of the unluckiest tail. Sharded CI runs balance
+shards by the same cost table and restore it from the prior `test` artifact
+when available.
+
+A shard's wall clock is its slice of the measured scope work divided by the
+parallelism **inside** the shard, with the longest single scope as a floor that
+no shard count can lift. Measured 2026-11-12: 12,848 s of scope work over 118
+scopes under coverage instrumentation, so four shards put ~3,212 s of work in
+each. The coverage matrix therefore runs **8 shards**, and the measurement
+engine was split into four scopes (`ProcessMetricsEngine`, `ProcessMetricsTrend`,
+`ProcessMetricsRatchet`, `ProcessMetricsControl`) so its 566 s pole could be
+spread. A scope that is too slow to schedule is a scope that should be SPLIT -
+splitting a scope keeps the isolation guarantee (each part still runs in its own
+child) and changes nothing about what is measured.
+
+**A shard never applies the global coverage floor.** A shard measures a slice,
+so its percentage is a PARTIAL measurement and is published as
+`coverage-shard-<n>-of-<m>.json`; the floor is enforced by the merge job,
+which holds every shard's reports.
 
 Child coverage XMLs are named `coverage-<pid>-<tag>.xml`; sharded runs pass
 `-CoverageTag <shard>-<scope>` so reports from different machines cannot collide

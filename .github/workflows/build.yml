@@ -204,16 +204,41 @@ jobs:
           compression-level: 9
           if-no-files-found: ignore
 
-      - name: Diagnose Environment (on failure)
+      - name: Diagnose the failing scope (on failure)
+        # MUST run when the job failed. The scope's own console log is where
+        # the real assertion output lives; without this step it stays on the
+        # runner and is lost with it, and the job says only "2 failed".
+        #
+        # The failing scopes are read from the runner's own failed-scope files,
+        # so this works for ANY scope instead of one hard-coded name, and the
+        # same dump covers a scope that was killed before it wrote a log.
         if: failure()
-        shell: bash
+        shell: pwsh
         run: |
-          echo "=== Environment child logs ==="
-          ls -la /tmp/gbuild-scope-Environment-*.log 2>/dev/null || echo "no files"
-          for f in /tmp/gbuild-scope-Environment-*.log; do echo "----- $f -----"; cat "$f" 2>/dev/null; done
-          echo "=== re-run Environment ==="
-          root="$GITHUB_WORKSPACE"
-          pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$root/Tests/Run-CoreTests.ps1" -Scope Environment -StrictSkips
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
+          $failed = @()
+          foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
+            $failed += ($f.BaseName -replace '^failed-', '')
+          }
+          if ($failed.Count -eq 0) {
+            Write-Host 'no failed scope recorded - the failure happened outside a scope (gate, setup or timeout)'
+            exit 0
+          }
+          $temp = [System.IO.Path]::GetTempPath()
+          foreach ($scope in $failed) {
+            Write-Host "===== scope $scope ====="
+            $logs = @(Get-ChildItem -Path $temp -Filter "gbuild-scope-$scope-*.log" -File -ErrorAction SilentlyContinue)
+            if ($logs.Count -eq 0) { Write-Host '(no child log found - the scope may have been killed before it wrote one)' }
+            foreach ($log in $logs) {
+              Write-Host "----- $($log.FullName) -----"
+              Get-Content -LiteralPath $log.FullName -ErrorAction SilentlyContinue | Select-Object -Last 200 | ForEach-Object { Write-Host $_ }
+            }
+            Write-Host "===== re-running scope $scope ====="
+            & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope $scope -StrictSkips 2>&1 |
+              Select-String -Pattern 'Expected|But was|at C:|Tests Passed' | ForEach-Object { Write-Host $_.Line }
+          }
+          exit 0
 
   gbuild-flow:
     name: gbuild end-to-end flow
@@ -319,16 +344,41 @@ jobs:
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -StrictSkips
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
-      - name: Diagnose Environment (on failure)
+      - name: Diagnose the failing scope (on failure)
+        # MUST run when the job failed. The scope's own console log is where
+        # the real assertion output lives; without this step it stays on the
+        # runner and is lost with it, and the job says only "2 failed".
+        #
+        # The failing scopes are read from the runner's own failed-scope files,
+        # so this works for ANY scope instead of one hard-coded name, and the
+        # same dump covers a scope that was killed before it wrote a log.
         if: failure()
-        shell: bash
+        shell: pwsh
         run: |
-          echo "=== Environment child logs ==="
-          ls -la /tmp/gbuild-scope-Environment-*.log 2>/dev/null || echo "no files"
-          for f in /tmp/gbuild-scope-Environment-*.log; do echo "----- $f -----"; cat "$f" 2>/dev/null; done
-          echo "=== re-run Environment ==="
-          root="$GITHUB_WORKSPACE"
-          pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$root/Tests/Run-CoreTests.ps1" -Scope Environment -StrictSkips
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
+          $failed = @()
+          foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
+            $failed += ($f.BaseName -replace '^failed-', '')
+          }
+          if ($failed.Count -eq 0) {
+            Write-Host 'no failed scope recorded - the failure happened outside a scope (gate, setup or timeout)'
+            exit 0
+          }
+          $temp = [System.IO.Path]::GetTempPath()
+          foreach ($scope in $failed) {
+            Write-Host "===== scope $scope ====="
+            $logs = @(Get-ChildItem -Path $temp -Filter "gbuild-scope-$scope-*.log" -File -ErrorAction SilentlyContinue)
+            if ($logs.Count -eq 0) { Write-Host '(no child log found - the scope may have been killed before it wrote one)' }
+            foreach ($log in $logs) {
+              Write-Host "----- $($log.FullName) -----"
+              Get-Content -LiteralPath $log.FullName -ErrorAction SilentlyContinue | Select-Object -Last 200 | ForEach-Object { Write-Host $_ }
+            }
+            Write-Host "===== re-running scope $scope ====="
+            & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope $scope -StrictSkips 2>&1 |
+              Select-String -Pattern 'Expected|But was|at C:|Tests Passed' | ForEach-Object { Write-Host $_.Line }
+          }
+          exit 0
 
   macos:
     name: macOS (Apple Silicon) self-test + smoke suite
@@ -385,6 +435,21 @@ jobs:
           Write-Host "TMPDIR: $env:TMPDIR"
           Write-Host "TEMP: $env:TEMP"
           Write-Host "TMP: $env:TMP"
+          # The /var alias is the historical macOS trap: Resolve-Path does NOT
+          # resolve it, so a containment walk that flags every reparse point
+          # rejects EVERY temp path on this platform. Print what each alias
+          # actually resolves to, so the next failure can be read from the log.
+          Write-Host "=== POSIX alias resolution ==="
+          foreach ($p in @('/var', '/tmp', '/private/var', '/private/tmp')) {
+            try { Write-Host ("{0} -> {1}" -f $p, (Get-Item -LiteralPath $p -ErrorAction Stop).FullName) }
+            catch { Write-Host ("{0} -> <unresolved>" -f $p) }
+          }
+          Write-Host "=== Failing scopes and tests ==="
+          $resultDir = Join-Path (Join-Path (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName 'Tests') 'TestResults'
+          foreach ($f in @(Get-ChildItem -LiteralPath $resultDir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
+            Write-Host "----- $($f.Name) -----"
+            Get-Content -LiteralPath $f.FullName -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+          }
           Write-Host "=== Isolated scope logs ==="
           $logDir = [System.IO.Path]::GetTempPath()
           Get-ChildItem -Path $logDir -Filter 'gbuild-scope-*.log' -ErrorAction SilentlyContinue | ForEach-Object {
@@ -434,7 +499,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   coverage:
-    name: Code coverage (${{ matrix.shard }}/4)
+    name: Code coverage (${{ matrix.shard }}/8)
     runs-on: ubuntu-24.04
     needs: test
     # Run on both push and pull_request: a push-only skip made the gate
@@ -443,7 +508,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        # Eight shards, because the shard wall clock is the shard's slice of
+        # the MEASURED scope work divided by the parallelism INSIDE the shard,
+        # with the longest single scope as a floor that no shard count can
+        # lift. Measured 2026-11-12 on a full coverage run: 12,848 s of scope
+        # work over 118 scopes under coverage instrumentation. Four shards put
+        # ~3,212 s of work in each - over 50 minutes on that host - so every
+        # shard ran long. Eight shards halve the slice, and the measurement
+        # engine was split into four scopes (ProcessMetricsEngine / Trend /
+        # Ratchet / Control), which removed the 566 s pole; the floor is now
+        # the ~474 s Hygiene scope.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     # Pester coverage is breakpoint-based and roughly an order of magnitude
     # slower than the plain run. The suite is sharded across four jobs that
     # run in parallel, so the wall clock is the longest shard, not the sum of
@@ -495,7 +570,7 @@ jobs:
               Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
           }
 
-      - name: Run the suite with code coverage (shard ${{ matrix.shard }}/4)
+      - name: Run the suite with code coverage (shard ${{ matrix.shard }}/8)
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
@@ -521,7 +596,7 @@ jobs:
           # shard cannot meet it by construction.
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
             -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
-            -Scope All -StrictSkips -Coverage -Shard ${{ matrix.shard }} -ShardCount 4
+            -Scope All -StrictSkips -Coverage -Shard ${{ matrix.shard }} -ShardCount 8
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Report the failing assertions
@@ -553,6 +628,39 @@ jobs:
           }
           exit 0
 
+      - name: Diagnose the failing scope (on failure)
+        # Same diagnosis as the core-suite job: the failing scopes are read
+        # from the runner's own failed-scope files, so any scope is covered.
+        if: failure()
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
+          $failed = @()
+          foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'failed-*.txt' -File -ErrorAction SilentlyContinue)) {
+            $failed += ($f.BaseName -replace '^failed-', '')
+          }
+          if ($failed.Count -eq 0) {
+            Write-Host 'no failed scope recorded - the failure happened outside a scope (gate, setup or timeout)'
+          }
+          $temp = [System.IO.Path]::GetTempPath()
+          foreach ($scope in $failed) {
+            Write-Host "===== scope $scope ====="
+            foreach ($log in @(Get-ChildItem -Path $temp -Filter "gbuild-scope-$scope-*.log" -File -ErrorAction SilentlyContinue)) {
+              Write-Host "----- $($log.FullName) -----"
+              Get-Content -LiteralPath $log.FullName -ErrorAction SilentlyContinue | Select-Object -Last 200 | ForEach-Object { Write-Host $_ }
+            }
+            Write-Host "===== re-running scope $scope ====="
+            & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -Scope $scope -StrictSkips 2>&1 |
+              Select-String -Pattern 'Expected|But was|at C:|Tests Passed' | ForEach-Object { Write-Host $_.Line }
+          }
+          # A shard measures a SLICE: publish its own figure so a reader can
+          # see what was measured and never mistake it for the merged result.
+          foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'coverage-shard-*.json' -File -ErrorAction SilentlyContinue)) {
+            $b = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+            Write-Host ("shard coverage (PARTIAL, not gated here): {0}% of {1} lines across {2} file(s)" -f $b.coveragePercent, $b.linesTotal, @($b.perFile).Count)
+          }
+          exit 0
       - name: Upload coverage shard
         # Always: the raw XMLs are what the merge job measures, and a failed
         # shard's diagnostics are only visible if they are uploaded. The shard's

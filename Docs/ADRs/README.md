@@ -13,6 +13,7 @@ that shape and not another.
 | [0004](ADR-0004-committed-generated-docs.md) | Generated API docs are committed and gated against the module inventory | Accepted |
 | [0005](ADR-0005-single-source-of-truth.md) | Defaults, config, paths and locale messages each have exactly one owner | Accepted |
 | [0006](ADR-0006-published-process-reference.md) | The verification process is published as an inheritable asset | Accepted |
+| [0007](ADR-0007-independent-platform-tools.md) | The three platform tools stay independent: borrowing is allowed, containment is not | Accepted |
 
 ## How to add an ADR
 
