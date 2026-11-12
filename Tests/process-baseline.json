@@ -87,31 +87,31 @@
     },
     "sharedUtilsImportOwner": {
       "minAdoption": 1.0,
-      "measured": "18/18",
+      "measured": "23/23",
       "metric": "inline Join-Path $PSScriptRoot SharedUtils.psm1 sites outside the exempt bootstrap root",
-      "why": "The lazy SharedUtils import has one owner in ModuleBootstrap.ps1. Logging.psm1 is registered exempt because it is the root of the bootstrap chain and cannot dot-source ModuleBootstrap without a cycle. The denominator shrank as RootCause, AnomalyDetector and Locale resolved the redaction / device-id owner through Initialize-BuildSharedUtils instead of carrying their own import; the 18 figure is what Get-BuildProcessMetrics measures today (the earlier 24/24 entry here was a stale snapshot - the floor is minAdoption, the measured line is documentation and must match the engine)."
+      "why": "The lazy SharedUtils import has one owner in ModuleBootstrap.ps1. Logging.psm1 is registered exempt because it is the root of the bootstrap chain and cannot dot-source ModuleBootstrap without a cycle. The denominator shrank as RootCause, AnomalyDetector and Locale resolved the redaction / device-id owner through Initialize-BuildSharedUtils instead of carrying their own import; the 23 figure is what Get-BuildProcessMetrics measures today (the earlier 24/24 entry here was a stale snapshot - the floor is minAdoption, the measured line is documentation and must match the engine)."
     },
     "stringHashDelegation": {
       "minAdoption": 1.0,
-      "measured": "27/27",
+      "measured": "40/40",
       "metric": "production files that build a string hash inline: UTF8.GetBytes -> assigned variable -> ComputeHash(that variable) -> hex",
-      "why": "UTF8->SHA256->lowercase hex over a STRING goes through Get-BuildStringHash. Byte-stream file digests are a different question (the owner takes a string, not bytes) and are NOT counted; AuditLedger's base64 digest with a configurable algorithm is registered exempt for the same reason. The earlier coarser fingerprint conflated all three shapes, which made the class unsatisfiable and hid the real backlog. A SECOND fingerprint then required UTF8.GetBytes to sit textually inside the ComputeHash call on one line, which is not how any site in this codebase is written: every one assigns $bytes first. That version reported 21/21 = 100% while PluginHelpers.Get-CanonicalPathHash and Locale.Get-DeviceId both carried an inline SHA256 copy - a ratchet that cannot fail. The fingerprint now follows the DATA FLOW (which variable UTF8.GetBytes produced, and whether that same variable is what ComputeHash consumes) so Cache's combined file-content stream and the [byte[]]/FileStream/ReadAllBytes digests stay unflagged while real string hashes are caught. Migrating those two sites moved them into the delegated count: 27/27."
+      "why": "UTF8->SHA256->lowercase hex over a STRING goes through Get-BuildStringHash. Byte-stream file digests are a different question (the owner takes a string, not bytes) and are NOT counted; AuditLedger's base64 digest with a configurable algorithm is registered exempt for the same reason. The earlier coarser fingerprint conflated all three shapes, which made the class unsatisfiable and hid the real backlog. A SECOND fingerprint then required UTF8.GetBytes to sit textually inside the ComputeHash call on one line, which is not how any site in this codebase is written: every one assigns $bytes first. That version reported 21/21 = 100% while PluginHelpers.Get-CanonicalPathHash and Locale.Get-DeviceId both carried an inline SHA256 copy - a ratchet that cannot fail. The fingerprint now follows the DATA FLOW (which variable UTF8.GetBytes produced, and whether that same variable is what ComputeHash consumes) so Cache's combined file-content stream and the [byte[]]/FileStream/ReadAllBytes digests stay unflagged while real string hashes are caught. Migrating those two sites moved them into the delegated count: 40/40."
     },
     "platformPathLiterals": {
       "minAdoption": 1.0,
-      "measured": "208/208",
+      "measured": "230/230",
       "metric": "files constructing a repository path with a backslash separator (production Modules/Steps/Hooks AND the test suite)",
       "why": "No shipped file hardcodes a Windows path separator, so a path built here resolves on POSIX too. SCOPE CORRECTED in the 2026-10 pass, and the mutation test is what proved the old scope wrong: the loop only ever considered Kind -eq 'test', so the class advertised platform-neutral path literals while inspecting nothing but the test suite - the one place a backslash is least likely to be load-bearing. Production Modules/ was never scanned, and the class reported a confident 104/104. Extending the scope to production .psm1/.ps1 raised the denominator to 191 and immediately found a real offender (the mutation test's own planted fixture, now assembled at runtime so the fixture is not itself a violation). The pattern still targets a QUOTED windows path segment after a path constructor, which is the shape that actually breaks on POSIX; regex character classes like '[\\\\/]' and explicit separator normalisation are not that shape and are not charged. Tests/process-baseline.json's platformPathLiteralExemptions stay PATTERN-scoped with a stated reason, and the metric and the hygiene gate read the same list so they cannot disagree."
     },
     "localeKeyWiring": {
       "minAdoption": 1.0,
-      "measured": "1032/1032",
+      "measured": "1263/1263",
       "metric": "unreferenced locale keys",
       "why": "Every shipped locale key is reachable from raw production text (including keys consumed by emitted templates). The set grew from 714 to 829 in the 2026-10 i18n remediation, which routed 128 hardcoded English emit sites through Resolve-LogMessage, and has since reached 1006 as more emit sites were migrated; 1006 is what the engine reports today, and localeKeyWiring is at parity 1006/1006. See the i18nProseCoverage note for why that class could not see them before."
     },
     "i18nProseCoverage": {
       "minAdoption": 1.0,
-      "measured": "1049/1049",
+      "measured": "1091/1091",
       "metric": "log emit sites whose message argument carries translatable English but no locale resolver",
       "why": "User-facing log PROSE routes through a locale resolver. The current denominator is HONEST about scope: it includes Write-Host/Write-Warning/throw, mid-line occurrences, and the production entry scripts at the tool root, and it excludes here-string templates (data, not emits) via the shared code-text stripper. Prior snapshots (717/717) were taken when the pattern was line-anchored and omitted throw/root scripts, so they were not measuring the same surface. This floor is a NEW, larger denominator seeded from the now-visible tree; future migrating work should raise it. RAISED 0.7105 -> 0.8277 after the emit migration: Standalone.psm1 (39 sites), CredentialVault.psm1 (31) and Orchestrator.psm1 (31 of 32) now route through Get-LocaleMessage, taking the class from 764/1039 to 850/1027. The remaining 177 are concentrated in gbuild.ps1 (36), ClusterOrchestrator (19), Install-GBuild (15), Policy (14), AuditLedger (12), SupplyChain (11) and the small modules; each batch raises this floor again. The 32 throws still unmeasured inside Standalone's bundle-emission here-string are deliberately OUT of scope: a here-string is data, and the emitted bundle embeds Locales/*.json so its own text is localizable at the bundle level rather than here."
     }

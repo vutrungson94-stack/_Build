@@ -60,7 +60,35 @@ foreach ($__gbuildStepBootstrapSentinel in $Sentinels) {
     }
 }
 
-if ($__gbuildStepBootstrapNeed) {
+# One probe command per BASE module.
+#
+# The sentinel set above is a per-Script probe and it does NOT cover every base
+# module: a session that has Logging, SharedUtils, ConfigProvider and
+# BuildConstants loaded but no PathUtils looks bootstrapped - every sentinel is
+# present - so the bootstrap was skipped, and the Step then called
+# Get-PathComparison / Test-ReparsePointItem into a CommandNotFoundException.
+# That is exactly the session the Steps test suite runs in, and it turned seven
+# green tests red for a reason that had nothing to do with the code under test.
+#
+# The probe below is per MODULE: a missing base module is always restored, and
+# a module that is already there is never re-imported (a -Force import would
+# replace the live instance in a running build).
+$__gbuildStepBootstrapProbe = @{
+    'Logging'        = 'Write-Log'
+    'SharedUtils'    = 'Resolve-BuildState'
+    'ConfigProvider' = 'Resolve-ConfigValue'
+    'Locale'         = 'Get-LocaleMessage'
+    'PathUtils'      = 'Get-PathComparison'
+}
+$__gbuildStepBootstrapMissing = @()
+foreach ($__gbuildStepBootstrapModule in $__gbuildStepBootstrapBase) {
+    $__gbuildStepBootstrapProbeCommand = $__gbuildStepBootstrapProbe[$__gbuildStepBootstrapModule]
+    if (-not $__gbuildStepBootstrapProbeCommand) { continue }
+    if (Get-Command $__gbuildStepBootstrapProbeCommand -ErrorAction SilentlyContinue) { continue }
+    $__gbuildStepBootstrapMissing += $__gbuildStepBootstrapModule
+}
+
+if ($__gbuildStepBootstrapNeed -or $__gbuildStepBootstrapMissing.Count -gt 0) {
     # Walk up from this script to the _Build root, marked by the Modules/
     # directory. The bounded loop is what makes it safe when the caller is a
     # bare copy with no _Build root anywhere above it.
@@ -72,7 +100,11 @@ if ($__gbuildStepBootstrapNeed) {
         $__gbuildStepBootstrapDepth++
     }
     if ($__gbuildStepBootstrapRoot) {
-        foreach ($__gbuildStepBootstrapModule in $__gbuildStepBootstrapAll) {
+        # A session that looks bootstrapped gets ONLY the modules that are
+        # actually missing; a session that is not bootstrapped at all gets the
+        # whole set, exactly as before.
+        $__gbuildStepBootstrapToImport = if ($__gbuildStepBootstrapNeed) { $__gbuildStepBootstrapAll } else { @($__gbuildStepBootstrapMissing) }
+        foreach ($__gbuildStepBootstrapModule in $__gbuildStepBootstrapToImport) {
             $__gbuildStepBootstrapPath = Join-Path (Join-Path $__gbuildStepBootstrapRoot 'Modules') "$__gbuildStepBootstrapModule.psm1"
             if (Test-Path -LiteralPath $__gbuildStepBootstrapPath -PathType Leaf) {
                 # -Global: a Step dot-sources this file, so the modules must land
@@ -92,4 +124,5 @@ if ($__gbuildStepBootstrapNeed) {
 # copy of the bootstrap state.
 Remove-Variable -Name __gbuildStepBootstrapBase, __gbuildStepBootstrapAll, __gbuildStepBootstrapNeed, `
     __gbuildStepBootstrapSentinel, __gbuildStepBootstrapRoot, __gbuildStepBootstrapDepth, `
-    __gbuildStepBootstrapModule, __gbuildStepBootstrapPath -ErrorAction SilentlyContinue
+    __gbuildStepBootstrapModule, __gbuildStepBootstrapPath, __gbuildStepBootstrapProbe, `
+    __gbuildStepBootstrapProbeCommand, __gbuildStepBootstrapMissing, __gbuildStepBootstrapToImport -ErrorAction SilentlyContinue

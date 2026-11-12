@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 # PS 5.1 compatibility shim for $IsWindows/$IsLinux/$IsMacOS
@@ -221,5 +221,52 @@ Describe "Steps and Hooks scripts" {
         }
         $walks[1] | Should -Be $walks[0] -Because 'pre-push walk must stay byte-identical to pre-commit'
         $walks[2] | Should -Be $walks[0] -Because 'post-commit walk must stay byte-identical to pre-commit'
+    }
+
+    Context 'the Step bootstrap restores what a Step actually needs' {
+        It 'restores a missing base module even when the session looks bootstrapped' {
+            # The sentinel set is a per-Script probe: a session with Logging,
+            # SharedUtils, ConfigProvider and BuildConstants loaded but no
+            # PathUtils looks bootstrapped, the bootstrap was skipped, and the
+            # Step then called Get-PathComparison / Test-ReparsePointItem into
+            # a CommandNotFoundException. Seven green tests went red for a
+            # reason that had nothing to do with the code under test.
+            $bootstrap = Join-Path $global:GBuildModuleRoot 'StepBootstrap.ps1'
+            Test-Path -LiteralPath $bootstrap -PathType Leaf | Should -BeTrue
+            Remove-Module -Name PathUtils -Force -ErrorAction SilentlyContinue
+            Get-Command Get-PathComparison -ErrorAction SilentlyContinue | Should -BeNullOrEmpty -Because 'the test needs PathUtils to be ABSENT for the probe to mean anything'
+            try {
+                . $bootstrap -Sentinels @('Write-Log', 'Resolve-BuildState', 'Resolve-ConfigValue', 'Get-BuildConstant') -Modules @()
+                Get-Command Get-PathComparison -ErrorAction SilentlyContinue |
+                    Should -Not -BeNullOrEmpty -Because 'the bootstrap must restore a missing base module even when every sentinel is present'
+                Get-Command Test-ReparsePointItem -ErrorAction SilentlyContinue |
+                    Should -Not -BeNullOrEmpty -Because 'the whole module must come back, not one command'
+            } finally {
+                # Leave the session as it was found.
+                $null = Import-Module (Join-Path $global:GBuildModuleRoot 'PathUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+            }
+        }
+
+        It 'every Step and Hook that calls a PathUtils helper declares the PathUtils sentinel' {
+            # The dependency belongs in the file that has it, where it is
+            # visible: the bootstrap's own rule is that anything a Step needs
+            # beyond the base set is a per-Step decision.
+            $probes = @('Get-PathComparison', 'Test-ReparsePointItem', 'Test-PathUnderRoots', 'Test-NoReparsePointInPath', 'Get-SafePath', 'Get-ExcludeDirPattern')
+            $missed = @()
+            foreach ($f in @(Get-ChildItem -Path $global:GBuildStepsDir, $global:GBuildHooksDir -Recurse -Filter '*.ps1' -File -ErrorAction SilentlyContinue)) {
+                $script = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8
+                $uses = @($probes | Where-Object { $script -match ('\b' + [regex]::Escape($_) + '\b') })
+                if ($uses.Count -eq 0) { continue }
+                $declared = @()
+                $m = [regex]::Match($script, '-Sentinels\s+@\((?<list>[^)]*)\)')
+                if ($m.Success) {
+                    $declared = @([regex]::Matches($m.Groups['list'].Value, "'([A-Za-z0-9\-]+)'") | ForEach-Object { $_.Groups[1].Value })
+                }
+                if (-not (@($declared | Where-Object { $_ -in $probes }))) {
+                    $missed += ('{0} (calls {1})' -f $f.Name, ($uses -join ', '))
+                }
+            }
+            $missed | Should -BeNullOrEmpty -Because ('a Step that calls a PathUtils helper must declare the PathUtils sentinel, or the call throws CommandNotFound: ' + ($missed -join ' | '))
+        }
     }
 }

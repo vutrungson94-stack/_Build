@@ -191,8 +191,17 @@ function Get-ProcessCodeText {
     [OutputType([hashtable])]
     param([Parameter(Mandatory)][object[]]$Files)
     $map = @{}
+    # The RAW text of every file, read in the SAME pass. The measurement needs
+    # both views: the stripped text for the prose/emit ratios, and the raw text
+    # for localeKeyWiring (a key can be consumed inside an emitted template
+    # script, which the stripper blanks as data). It used to read every
+    # production file a SECOND time for the raw view - a full re-read and
+    # re-decode of the whole tree on every measurement, and the measurement runs
+    # several times per suite. One read, two views.
+    $rawMap = @{}
     foreach ($f in $Files) {
         $raw = try { [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8) } catch { '' }
+        $rawMap[$f.FullName] = $raw
         if ([string]::IsNullOrEmpty($raw)) { $map[$f.FullName] = ''; continue }
         $out = [System.Collections.Generic.List[string]]::new()
         $inBlock = $false
@@ -240,7 +249,7 @@ function Get-ProcessCodeText {
         }
         $map[$f.FullName] = ($out -join "`n")
     }
-    return $map
+    return @{ Stripped = $map; Raw = $rawMap }
 }
 
 function New-ProcessAdoptionClass {
@@ -294,17 +303,14 @@ function Get-BuildProcessMetrics {
     if (-not $ToolRoot) { $ToolRoot = Split-Path -Parent $PSScriptRoot }
     $files = @(Get-ProcessCodeFile -ToolRoot $ToolRoot)
     $prod  = @($files | Where-Object { $_.Kind -eq 'production' })
-    $text  = Get-ProcessCodeText -Files $files
+    # ONE read, TWO views: the stripped text (prose/emit ratios) and the raw
+    # text (localeKeyWiring - a key can be consumed inside an emitted template
+    # script, which the stripper blanks as data).
+    $views  = Get-ProcessCodeText -Files $files
+    $text   = $views.Stripped
+    $rawTxt = $views.Raw
     $allProd = (($prod | ForEach-Object { [string]$text[$_.FullName] }) -join "`n")
-    # localeKeyWiring needs raw text too: a locale key can be consumed inside an
-    # emitted template script. The shared text map blanks here-strings for
-    # prose-emit measurement, but the key is still real usage if the emitted
-    # script itself calls Resolve-LogMessage with it.
-    $allProdRaw = @()
-    foreach ($f in @($prod)) {
-        try { $allProdRaw += @([System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)) } catch { }
-    }
-    $allProdRaw = $allProdRaw -join "`n"
+    $allProdRaw = (($prod | ForEach-Object { [string]$rawTxt[$_.FullName] }) -join "`n")
     $all   = (($files | ForEach-Object { [string]$text[$_.FullName] }) -join "`n")
     $classes = [System.Collections.ArrayList]::new()
 

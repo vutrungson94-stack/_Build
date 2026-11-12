@@ -15,7 +15,7 @@ Set-StrictMode -Version 1.0
 $__gbuildModulesDir = Split-Path -Parent $PSScriptRoot
 $__gbuildStepBootstrap = Join-Path $__gbuildModulesDir 'Modules/StepBootstrap.ps1'
 if (Test-Path -LiteralPath $__gbuildStepBootstrap -PathType Leaf) {
-    . $__gbuildStepBootstrap -Sentinels @('Write-Log', 'Resolve-BuildState', 'Resolve-ConfigValue', 'Get-BuildConstant') -Modules @()
+    . $__gbuildStepBootstrap -Sentinels @('Write-Log', 'Resolve-BuildState', 'Resolve-ConfigValue', 'Get-BuildConstant', 'Get-PathComparison') -Modules @()
 }
 Remove-Variable -Name __gbuildModulesDir, __gbuildStepBootstrap -ErrorAction SilentlyContinue
 if (-not $State -and (Get-Command Resolve-BuildState -ErrorAction SilentlyContinue)) { $State = Resolve-BuildState $State }
