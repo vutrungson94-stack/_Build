@@ -110,3 +110,10 @@ single-repo platform that is the expected ceiling.
    (`Tests/Run-CoreTests.ps1`, `Run-Tests.ps1`) instead of running every
    `*.Tests.ps1` in one session. Out of `_Build` scope, but it is the reason
    finding 9 exists.
+
+## 2026-11-12 update (measured)
+
+- **Coverage (merged line, JaCoCo union):** raised from **53.77% (13,134 / 24,424)** baseline to **56.08% (13,696 / 24,424)** by adding targeted hermetic tests (SDK discovery waterfall; Build helpers `Get-CacheArtifactPatterns`/`Get-BuildPluginCacheKey`/`New-BuildResult`/`Invoke-BuildOutputReveal`/`Invoke-AndroidArtifactDeploy`; SharedUtils env/mode/CI/report/arg/syntax helpers; Orchestrator SDK/service helpers; HotReload plugin delegation). `Tests/process-baseline.json` `coverage.floorPercent` ratcheted **15 → 55** (raise only).
+- **Coverage speed (parallel, state-isolated):** auto coverage degree raised to `min(ProcessorCount, 16)` with **LPT (longest-processing-time-first)** scheduling from the measured per-scope cost table (`Tests/TestResults/scope-timings.csv`), so the long pole (`ProcessMetrics` ~978s) starts first. Measured baseline wall **1,557.3s** at degree 16 (sum 14,168.5s); sharded CI balances by the same cost table and restores it from the prior `test` artifact.
+- **Runner/CI workflow:** per-child coverage XMLs tagged `<shard>-<scope>` to avoid cross-shard PID collisions; `-MergeOnly -Coverage` merges existing JaCoCo XMLs and enforces the line floor without requiring Pester. `.github/workflows/build.yml` coverage shards use runner auto degree/LPT and restore the measured cost table for balanced sharding.
+- **Still open:** full-coverage wall-clock under LPT remains bounded by the `ProcessMetrics` pole (~16 min of scope work); further speedup requires splitting/optimizing that scope’s covered work, not weakening isolation. Remaining high-miss areas include Build `Invoke-AutoDeploy`/`Invoke-DeviceDebug`/AAB/signing flows, HotReload watch loop, and Orchestrator event/pipeline registration paths.

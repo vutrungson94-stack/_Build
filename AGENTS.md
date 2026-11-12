@@ -270,11 +270,23 @@ aspiration - raise it as coverage grows, never lower it to go green.
 
 `-Coverage` implies the **full parallel** path: every scope is scheduled as its own
 isolated child through a bounded pool (`-ParallelScopes N`, default
-`min(ProcessorCount, 8)`, override with `GBUILD_SCOPE_PARALLELISM`). Pester
+`min(ProcessorCount, 16)`, override with `GBUILD_SCOPE_PARALLELISM`). Pester
 coverage is breakpoint-based and ~10x slower, so the sequential 112-scope run
 took ~2 h and could never fit a CI budget. Each child is still a separate
 process, so the state-isolation guarantee above is unchanged - do not
 "optimise" this back into one session.
+
+The coverage queue is ordered **longest-processing-time-first (LPT)** using the
+measured per-scope costs in `Tests/TestResults/scope-timings.csv`, so the long
+poles (e.g. `ProcessMetrics`) start immediately and the wall clock tracks the
+longest scope instead of the unluckiest tail. Sharded CI runs balance shards by
+the same cost table and restore it from the prior `test` artifact when available.
+
+Child coverage XMLs are named `coverage-<pid>-<tag>.xml`; sharded runs pass
+`-CoverageTag <shard>-<scope>` so reports from different machines cannot collide
+on a reused PID. `-MergeOnly -Coverage` merges the XMLs already present and
+enforces the line-coverage floor from `Tests/process-baseline.json`; it does not
+execute Pester and does not require Pester to be installed.
 
 Without `-Coverage` the runner uses the **hybrid** path: the state-sensitive
 scopes still get their own child process, but the children run CONCURRENTLY

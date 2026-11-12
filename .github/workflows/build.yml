@@ -420,28 +420,47 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   coverage:
-    name: Code coverage
+    name: Code coverage (${{ matrix.shard }}/4)
     runs-on: ubuntu-24.04
     needs: test
     # Run on both push and pull_request: a push-only skip made the gate
     # invisible, so a coverage regression could ship without any red job.
     if: github.event_name == 'pull_request' || github.event_name == 'push'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # Pester coverage is breakpoint-based and roughly an order of magnitude
-    # slower than the plain run; the sequential 114-scope run was documented
-    # at ~2 h and the parallel path brings it to well under an hour. The
-    # default timeout is 6 h, which is long enough to hide a wedged run -
-    # this one fails fast instead.
-    timeout-minutes: 120
-    env:
-      # Every scope is its own child process under -Coverage, so the degree
-      # is the only lever on the wall clock. Four children on a four-core
-      # runner is the sweet spot: more children only add contention, because
-      # every child is single-threaded.
-      GBUILD_SCOPE_PARALLELISM: 4
+    # slower than the plain run. The suite is sharded across four jobs that
+    # run in parallel, so the wall clock is the longest shard, not the sum of
+    # every scope. Each shard merges only its own slice and uploads the raw
+    # coverage XMLs; the merge job combines every slice and enforces the gate.
+    #
+    # No fixed GBUILD_SCOPE_PARALLELISM: under -Coverage the runner's auto rule
+    # is min(ProcessorCount, 16), which is 4 on a standard four-core runner and
+    # scales up on a larger one. Every scope is its own child process, and the
+    # queue is ordered longest-first from the measured cost table, so the long
+    # pole starts immediately instead of queueing behind the short scopes.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Restore the measured scope-cost table
+        # Shard selection is balanced by the MEASURED per-scope cost. On a fresh
+        # checkout Tests/TestResults/ is gitignored, so without this step every
+        # scope costs 1 s and the shards degrade to round-robin alphabetical:
+        # the long poles can land in the same shard and the wall clock is set by
+        # the unluckiest shard. The `test` job measured the same suite minutes
+        # earlier and uploaded the table; reuse it. A missing table is not fatal
+        # (the runner falls back to cost 1), so a failed download must not fail
+        # the shard.
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: gbuild-testresults
+          path: .
 
       - name: Cache PSGallery modules
         uses: actions/cache@v4
@@ -461,45 +480,35 @@ jobs:
               Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
           }
 
-      - name: Run the suite with code coverage
+      - name: Run the suite with code coverage (shard ${{ matrix.shard }}/4)
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
           # Use the scope-isolated runner, not a raw Invoke-Pester over Tests/.
           # A single-session run of every *.Tests.ps1 leaks module-global state
           # between state-sensitive scopes and produces ~16 false failures
-          # (see AGENTS.md section 6). The runner also merges per-scope
-          # coverage and enforces the ratchet below.
-          # RATCHET, not an aspiration. The gate used to demand 85% while the
-          # same run measured 57.05% of 44,589 commands across 80 files (run
-          # 2026-10-27), so the job was red on every push for a number no test
-          # had ever reached - and a permanently red gate hides real
-          # regressions. 55 is the measured floor minus a small margin: raise
-          # it whenever new tests move the number, never lower it to go green.
+          # (see AGENTS.md section 6). The shard runs the slice selected by
+          # -Shard/-ShardCount, balanced on the measured cost table downloaded
+          # above, and writes one coverage XML per child; each child's file name
+          # carries "<shard>-<scope>" so two shards cannot collide on a reused
+          # PID. The merged line-coverage gate is enforced by the
+          # coverage-merge job. No -MinCoveragePct here: a single shard
+          # exercises only a fraction of the suite, so the Pester
+          # command-coverage target would fail on every shard by construction.
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
             -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
-            -Scope All -StrictSkips -Coverage -MinCoveragePct 55
+            -Scope All -StrictSkips -Coverage -Shard ${{ matrix.shard }} -ShardCount 4
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Report the failing assertions
         # MUST run even when the run failed - GitHub skips every step after
-        # the first failure without it, and this job is where the coverage
-        # gate turns red. A red coverage run that only says "2 failed" is not
-        # actionable: the failing test NAMES and the assertion details are
-        # what a maintainer needs.
+        # the first failure without it. A red shard that only says "2 failed"
+        # is not actionable: the failing test NAMES are what a maintainer needs.
         if: always()
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
           $dir = Join-Path (Join-Path $root 'Tests') 'TestResults'
-          # The merged coverage baseline the ratchet measured, and where the
-          # time went.
-          $baseline = Join-Path $dir 'coverage-baseline.json'
-          if (Test-Path -LiteralPath $baseline -PathType Leaf) {
-            Write-Host '===== merged coverage baseline ====='
-            $b = Get-Content -LiteralPath $baseline -Raw -Encoding UTF8 | ConvertFrom-Json
-            Write-Host ("coverage {0}% of {1} lines ({2} covered / {3} missed) across {4} file(s)" -f $b.coveragePercent, $b.linesTotal, $b.linesCovered, $b.linesMissed, @($b.perFile).Count)
-          }
           $timings = Join-Path $dir 'scope-timings.csv'
           if (Test-Path -LiteralPath $timings -PathType Leaf) {
             Write-Host '===== slowest scopes (scope,seconds,status,passed,skipped,total) ====='
@@ -520,10 +529,83 @@ jobs:
           }
           exit 0
 
-      - name: Upload test results
-        # Always: the coverage baseline and the per-scope timing table are
-        # the artefacts of this job, and a green run is exactly when they are
-        # worth having.
+      - name: Upload coverage shard
+        # Always: the raw XMLs are what the merge job measures, and a failed
+        # shard's diagnostics are only visible if they are uploaded.
+        if: always()
+        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: gbuild-coverage-shard-${{ matrix.shard }}
+          path: |
+            Tests/TestResults/coverage/*.xml
+            Tests/TestResults/scope-timings.csv
+            Tests/TestResults/failed-*.txt
+            Tests/suite-progress-*.log
+          retention-days: 3
+          compression-level: 9
+          if-no-files-found: warn
+
+  coverage-merge:
+    name: Code coverage (merged)
+    runs-on: ubuntu-24.04
+    needs: coverage
+    # Merge even when a shard failed: the per-shard failures are reported by
+    # the shard jobs, and the merged baseline is still the clearest view of
+    # what was actually measured.
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'push')
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage shards
+        uses: actions/download-artifact@v7
+        with:
+          pattern: gbuild-coverage-shard-*
+          path: shards
+          merge-multiple: false
+
+      - name: Merge coverage and enforce the gate
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $dir = Join-Path $root 'Tests/TestResults/coverage'
+          if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+              New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          }
+          $xmls = @(Get-ChildItem -LiteralPath (Join-Path $root 'shards') -Filter 'coverage-*.xml' -Recurse -File -ErrorAction SilentlyContinue)
+          if ($xmls.Count -eq 0) {
+              Write-Host 'no coverage XMLs found - a shard likely failed before producing any'
+              exit 1
+          }
+          Write-Host "merging $($xmls.Count) coverage report(s) from the shards"
+          foreach ($x in $xmls) {
+              Copy-Item -LiteralPath $x.FullName -Destination (Join-Path $dir $x.Name) -Force
+          }
+          & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File (Join-Path $root 'Tests/Run-CoreTests.ps1') -MergeOnly -Coverage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Report the merged baseline
+        if: always()
+        shell: pwsh
+        run: |
+          $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
+          $baseline = Join-Path $root 'Tests/TestResults/coverage-baseline.json'
+          if (Test-Path -LiteralPath $baseline -PathType Leaf) {
+            Write-Host '===== merged coverage baseline ====='
+            $b = Get-Content -LiteralPath $baseline -Raw -Encoding UTF8 | ConvertFrom-Json
+            Write-Host ("coverage {0}% of {1} lines ({2} covered / {3} missed) across {4} file(s)" -f $b.coveragePercent, $b.linesTotal, $b.linesCovered, $b.linesMissed, @($b.perFile).Count)
+            $b.perFile | Sort-Object -Property @{e={$_.Missed};d=$true} | Select-Object -First 10 | ForEach-Object {
+              Write-Host ("  {0,6} missed / {1,6} total  {2}" -f $_.Missed, ($_.Executed + $_.Missed), $_.File)
+            }
+          } else {
+            Write-Host 'no merged coverage baseline produced'
+          }
+
+      - name: Upload merged coverage
         if: always()
         uses: actions/upload-artifact@v7
         continue-on-error: true
@@ -531,7 +613,6 @@ jobs:
           name: gbuild-coverage-results
           path: |
             Tests/TestResults/**
-            Tests/suite-progress-*.log
           retention-days: 3
           compression-level: 9
           if-no-files-found: ignore

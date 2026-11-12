@@ -1,13 +1,13 @@
 {
   "$schema": "./process-baseline.schema.json",
   "description": "Quantitative baseline of the gbuild verification process itself. This file is the L4 artefact: the numbers below are MEASURED, not aspirational. The per-run adoption curve is appended to Tests/TestResults/process-trend.jsonl (gitignored); the Hygiene gate reads the committed floor in this file, so it works on a fresh checkout with no history. Nothing regenerates a per-run process-baseline.json - that claim was removed when the trend file became the per-run artefact. Update this file only when the process itself changes (new scope, new gate, accepted skip) - never to make a red run green.",
-  "generatedAtUtc": "2026-11-11T11:00:00Z",
-  "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All + Tests/Run-E2ETests.ps1 -Scope All",
+  "generatedAtUtc": "2026-11-12T03:40:00Z",
+  "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All -StrictSkips (parallel/LPT) + coverage merge (Tests/Run-CoreTests.ps1 -MergeOnly -Coverage)",
   "host": "windows-2025 / pwsh 7.6",
   "core": {
-    "scopes": 115,
-    "testsTotal": 1604,
-    "passed": 1596,
+    "scopes": 118,
+    "testsTotal": 1634,
+    "passed": 1626,
     "failedAllowed": 0,
     "skipped": 8,
     "skippedMaxAllowed": 8,
@@ -24,9 +24,12 @@
   },
   "coverage": {
     "metric": "line coverage of Modules/**/*.psm1 (Pester 5 + JaCoCo LINE counters)",
-    "floorPercent": 15,
+    "floorPercent": 55,
+    "measuredMergedLineCoverage": 56.08,
+    "measuredLinesCovered": 13696,
+    "measuredLinesTotal": 24424,
     "measuredSingleScopeOrchestrator": 12.77,
-    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. The floor is a ratchet: raise only, never lower. The CI job itself gates a DIFFERENT metric - Pester COMMAND coverage over Modules - at 55% (measured 57.05% of 44,589 commands in 80 files, run 2026-10-27); the two percentages must never be compared with each other, and each is raised only from its own measurement."
+    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurement 56.08% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build helpers, SharedUtils helpers, Orchestrator/HotReload helpers) with LPT scheduling and parallel scope isolation; raise only, never lower. The CI job itself gates a DIFFERENT metric - Pester COMMAND coverage over Modules - at 55% (measured 57.05% of 44,589 commands in 80 files, run 2026-10-27); the two percentages must never be compared with each other, and each is raised only from its own measurement."
   },
   "hygiene": {
     "gates": 8,

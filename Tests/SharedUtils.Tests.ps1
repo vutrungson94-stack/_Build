@@ -482,3 +482,152 @@ Describe 'Resolve-BuildOpenOutput' {
         Resolve-BuildOpenOutput -State $state | Should -BeOfType [bool]
     }
 }
+
+Describe 'SharedUtils targeted coverage helpers' {
+    Context 'Test-EnvToggle and Get-EnvMode' {
+        It 'Test-EnvToggle parses true/false variants and returns null for unset or unknown' {
+            $name = 'GBUILD_TEST_TOGGLE_' + [guid]::NewGuid().ToString('N')
+            try {
+                foreach ($v in @('1','true','YES','on','Enabled')) {
+                    [Environment]::SetEnvironmentVariable($name, $v, 'Process')
+                    Test-EnvToggle -Name $name | Should -BeTrue
+                }
+                foreach ($v in @('0','false','NO','off','disabled')) {
+                    [Environment]::SetEnvironmentVariable($name, $v, 'Process')
+                    Test-EnvToggle -Name $name | Should -BeFalse
+                }
+                [Environment]::SetEnvironmentVariable($name, 'maybe', 'Process')
+                Test-EnvToggle -Name $name | Should -BeNullOrEmpty
+                [Environment]::SetEnvironmentVariable($name, '', 'Process')
+                Test-EnvToggle -Name $name | Should -BeNullOrEmpty
+                [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+                Test-EnvToggle -Name $name | Should -BeNullOrEmpty
+            } finally {
+                [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+            }
+        }
+        It 'Get-EnvMode returns lowercased trimmed value or empty string' {
+            $name = 'GBUILD_TEST_MODE_' + [guid]::NewGuid().ToString('N')
+            try {
+                [Environment]::SetEnvironmentVariable($name, '  AUDIT  ', 'Process')
+                Get-EnvMode -Name $name | Should -Be 'audit'
+                [Environment]::SetEnvironmentVariable($name, '', 'Process')
+                Get-EnvMode -Name $name | Should -Be ''
+                [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+                Get-EnvMode -Name $name | Should -Be ''
+            } finally {
+                [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+            }
+        }
+    }
+
+    Context 'Test-BuildCIHost' {
+        It 'detects CI from common environment variables' {
+            $orig = @{ CI=$env:CI; GITHUB_ACTIONS=$env:GITHUB_ACTIONS; TF_BUILD=$env:TF_BUILD; GITLAB_CI=$env:GITLAB_CI }
+            try {
+                $env:GITHUB_ACTIONS=''; $env:TF_BUILD=''; $env:GITLAB_CI=''; $env:CI=''
+                Test-BuildCIHost | Should -BeFalse
+                $env:CI='true'; Test-BuildCIHost | Should -BeTrue
+                $env:CI='1'; Test-BuildCIHost | Should -BeTrue
+                $env:CI=''; $env:GITHUB_ACTIONS='true'; Test-BuildCIHost | Should -BeTrue
+                $env:GITHUB_ACTIONS=''; $env:TF_BUILD='True'; Test-BuildCIHost | Should -BeTrue
+                $env:TF_BUILD=''; $env:GITLAB_CI='true'; Test-BuildCIHost | Should -BeTrue
+            } finally {
+                $env:CI=$orig.CI; $env:GITHUB_ACTIONS=$orig.GITHUB_ACTIONS; $env:TF_BUILD=$orig.TF_BUILD; $env:GITLAB_CI=$orig.GITLAB_CI
+            }
+        }
+    }
+
+    Context 'Get-ProjectShortName' {
+        It 'returns the project root leaf and falls back when root is unavailable' {
+            $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-shortname-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $root -Force | Out-Null
+            try {
+                $name = Get-ProjectShortName -State ([PSCustomObject]@{ ProjectRoot = $root })
+                $name | Should -Be (Split-Path $root -Leaf)
+            } finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+            # With no resolvable root, result is either the provided default or a
+            # resolved fallback; it must be a non-empty name.
+            $fallback = Get-ProjectShortName -State ([PSCustomObject]@{}) -Default 'fallback-name'
+            [string]::IsNullOrWhiteSpace([string]$fallback) | Should -BeFalse
+        }
+    }
+
+    Context 'Get-ReportDirectory' {
+        It 'resolves a report directory under ProjectRoot' {
+            $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-report-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $root -Force | Out-Null
+            try {
+                $dir = Get-ReportDirectory -State ([PSCustomObject]@{ ProjectRoot = $root })
+                $dir | Should -Not -BeNullOrEmpty
+                $dir.StartsWith([System.IO.Path]::GetFullPath($root), [System.StringComparison]::OrdinalIgnoreCase) | Should -BeTrue
+            } finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+        It 'throws for a present state without ProjectRoot or ScriptRoot' {
+            { Get-ReportDirectory -State ([PSCustomObject]@{ Other = 'x' }) } | Should -Throw
+        }
+    }
+
+    Context 'ConvertTo-BuildArgument' {
+        It 'quotes empty and space-containing arguments correctly for the host' {
+            ConvertTo-BuildArgument -Value '' | Should -Be '""'
+            $quoted = ConvertTo-BuildArgument -Value 'hello world'
+            $quoted | Should -Match 'hello world'
+            $quoted.Length | Should -BeGreaterThan 'hello world'.Length
+            $simple = ConvertTo-BuildArgument -Value 'simple'
+            $simple | Should -Be 'simple'
+        }
+        It 'returns quoted empty string for null input' {
+            ConvertTo-BuildArgument -Value $null | Should -Be '""'
+        }
+    }
+
+    Context 'Test-RequiredResult' {
+        It 'returns true for succeeded results and false or throws for failures' {
+            $ok = [PSCustomObject]@{ Status='Succeeded'; Operation='op'; ReasonCode='OK'; Message='ok' }
+            Test-RequiredResult -Result $ok -Operation 'op' | Should -BeTrue
+            $bad = [PSCustomObject]@{ Status='Failed'; Operation='op'; ReasonCode='X'; Message='boom' }
+            Test-RequiredResult -Result $bad -Operation 'op' | Should -BeFalse
+            { Test-RequiredResult -Result $bad -Operation 'op' -Throw } | Should -Throw
+        }
+    }
+
+    Context 'Invoke-UniversalSyntaxCheck' {
+        It 'validates a mixed temp tree and reports parse errors' {
+            $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-syntax-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $root -Force | Out-Null
+            try {
+                Set-Content -LiteralPath (Join-Path $root 'ok.ps1') -Value 'Write-Output "hi"' -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'bad.ps1') -Value 'function {' -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'ok.json') -Value '{"a":1}' -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'bad.json') -Value '{"a":' -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'ok.toml') -Value "[section]`nkey = 'v'" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'bad.toml') -Value "key = 'v'" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'ok.yaml') -Value "a: 1" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'Dockerfile') -Value "FROM alpine:3.20" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'Dockerfile.bad') -Value "RUN echo hi" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'CMakeLists.txt') -Value "project(demo)`nadd_executable(demo main.c)" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'CMakeLists.bad') -Value "add_executable(demo main.c)" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'build.gradle') -Value "plugins { id 'java' }" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'ok.cs') -Value "class C { void M() { } }" -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'bad.cs') -Value "class C { void M() { " -Encoding UTF8
+                Set-Content -LiteralPath (Join-Path $root 'proj.csproj') -Value '<Project></Project>' -Encoding UTF8
+                # Rename bad variants to names the checker recognizes where needed
+                Remove-Item (Join-Path $root 'Dockerfile.bad') -Force
+                $dock = Join-Path $root 'dock'
+                New-Item -ItemType Directory -Path $dock -Force | Out-Null
+                Set-Content -LiteralPath (Join-Path $dock 'Dockerfile') -Value "RUN echo hi" -Encoding UTF8
+                Remove-Item (Join-Path $root 'CMakeLists.bad') -Force
+                $cm = Join-Path $root 'cm'
+                New-Item -ItemType Directory -Path $cm -Force | Out-Null
+                Set-Content -LiteralPath (Join-Path $cm 'CMakeLists.txt') -Value "add_executable(demo main.c)" -Encoding UTF8
+
+                $r = Invoke-UniversalSyntaxCheck -Root $root
+                $r.FilesChecked | Should -BeGreaterThan 5
+                $r.FilesWithErrors | Should -BeGreaterThan 0
+                @($r.Errors).Count | Should -BeGreaterThan 0
+                ($r.Errors -join "`n") | Should -Match 'bad\.ps1|bad\.json|bad\.toml|bad\.cs|Dockerfile|CMakeLists'
+            } finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+    }
+}

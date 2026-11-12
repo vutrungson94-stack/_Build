@@ -351,3 +351,378 @@ Describe 'SDK memo project scoping' {
         { Reset-SdkMemo } | Should -Not -Throw
     }
 }
+
+# The discovery waterfall is the part of SDK that decides WHICH toolchain a
+# build runs with. Its finders were previously reachable only through a real
+# host install, so every branch that matters on a fresh machine (env home,
+# PATH, cache, priority paths, project tree, custom paths, Windows drives) was
+# unmeasured. These tests fabricate the tool trees in TestDrive and mock the
+# executable probe, which keeps them hermetic on Windows, Linux and macOS.
+Describe 'SDK discovery waterfall' {
+    BeforeAll {
+        # Get-LocaleMessage lives in Locale.psm1. The real bootstrap imports it
+        # globally before SDK; a standalone SDK import does not, and the
+        # discovery logging path calls it unguarded.
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Locale.psm1') -Global -Force -DisableNameChecking -ErrorAction SilentlyContinue
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SDK.psm1') -Force -DisableNameChecking -ErrorAction Stop
+
+        $script:jdkExeName = if ($IsWindows) { 'javac.exe' } else { 'javac' }
+        $script:dotnetExeName = if ($IsWindows) { 'dotnet.exe' } else { 'dotnet' }
+        $script:NewJdkTree = {
+            param([string]$Root)
+            $bin = Join-Path $Root 'bin'
+            New-Item -ItemType Directory -Path $bin -Force | Out-Null
+            $exe = Join-Path $bin $script:jdkExeName
+            [System.IO.File]::WriteAllText($exe, '')
+            return $exe
+        }
+        # Writes a runnable fake tool. Windows uses a .cmd shim; POSIX uses a
+        # shell script marked executable so Get-Command resolves it.
+        $script:WriteFakeExe = {
+            param([string]$Path, [string[]]$Lines = @(), [int]$ExitCode = 0, [string]$ListSdksOutput = '')
+            if ($IsWindows) {
+                $body = "@echo off`r`n"
+                foreach ($line in $Lines) { $body += "echo $line`r`n" }
+                $body += "exit /b $ExitCode`r`n"
+                [System.IO.File]::WriteAllText($Path, $body)
+            } else {
+                $body = "#!/bin/sh`n"
+                foreach ($line in $Lines) { $body += "echo '$line'`n" }
+                $body += "exit $ExitCode`n"
+                [System.IO.File]::WriteAllText($Path, $body)
+                & chmod +x $Path
+            }
+        }
+    }
+
+    BeforeEach {
+        $script:state = [PSCustomObject]@{
+            ScriptRoot     = $TestDrive
+            ProjectRoot    = $TestDrive
+            WorkingDir     = $TestDrive
+            OS             = if ($IsWindows) { 'Windows' } elseif ($IsMacOS) { 'MacOS' } else { 'Linux' }
+            NonInteractive = $true
+            SDKCache       = (Join-Path $TestDrive 'sdkcache.json')
+            BuildConfig    = [PSCustomObject]@{}
+            Colors         = [PSCustomObject]@{ Warn = 'Yellow'; Err = 'Red'; Cyan = 'Cyan'; Gray = 'Gray'; Succ = 'Green'; Info = 'Cyan' }
+        }
+    }
+
+    It 'GetAndroidPriorityPaths returns platform SDK locations' {
+        InModuleScope SDK -Parameters @{ State = $script:state } {
+            param($State)
+            $paths = @(GetAndroidPriorityPaths -State $State)
+            $paths.Count | Should -BeGreaterThan 0
+            foreach ($p in $paths) { [string]::IsNullOrWhiteSpace($p) | Should -BeFalse }
+        }
+    }
+
+    It 'Get-CommonSdkPaths merges configured search and custom paths' {
+        $state = [PSCustomObject]@{
+            ScriptRoot  = $TestDrive
+            ProjectRoot = $TestDrive
+            OS          = $script:state.OS
+            BuildConfig = [PSCustomObject]@{
+                sdk = [PSCustomObject]@{
+                    searchPaths = [PSCustomObject]@{ primary = @('C:\sdk-primary'); fallback = @('C:\sdk-fallback') }
+                    customPaths = @('C:\sdk-custom')
+                }
+            }
+        }
+        InModuleScope SDK -Parameters @{ State = $state } {
+            param($State)
+            $common = @(Get-CommonSdkPaths -State $State)
+            $common | Should -Contain 'C:\sdk-primary'
+            $common | Should -Contain 'C:\sdk-fallback'
+            $common | Should -Contain 'C:\sdk-custom'
+            $common | Should -Contain (Join-Path $State.ScriptRoot '.sdk')
+            $common | Should -Contain (Join-Path (Split-Path $State.ScriptRoot -Parent) '.sdk')
+        }
+    }
+
+    It 'Update-AndroidSdkConfig rebinds the cmdline-tools bin directory' {
+        $state = [PSCustomObject]@{
+            BuildConfig = [PSCustomObject]@{
+                sdk = [PSCustomObject]@{ androidCmdLineToolsRelPath = 'custom/cmdline-tools/latest/bin' }
+            }
+        }
+        InModuleScope SDK -Parameters @{ State = $state } {
+            param($State)
+            $cfg = $script:SDK_Config['Android']
+            $savedDir = $script:AndroidCmdLineToolsBinDir
+            $savedBin = $cfg.Bin
+            try {
+                Update-AndroidSdkConfig -State $State
+                $script:AndroidCmdLineToolsBinDir | Should -Be 'custom/cmdline-tools/latest/bin'
+                $cfg.Bin | Should -Be 'custom/cmdline-tools/latest/bin'
+            } finally {
+                $script:AndroidCmdLineToolsBinDir = $savedDir
+                $cfg.Bin = $savedBin
+            }
+        }
+    }
+
+    It 'Register-SdkCandidate rejects missing and failing candidates' {
+        InModuleScope SDK -Parameters @{ State = $script:state; Missing = (Join-Path $TestDrive 'missing.exe') } {
+            param($State, $Missing)
+            Mock Write-Log { }
+            Register-SdkCandidate -ExePath $Missing -ToolType 'JDK' -State $State | Should -BeNullOrEmpty
+            Mock Test-SdkExe { return $false }
+            $exe = Join-Path $TestDrive 'failing.exe'
+            [System.IO.File]::WriteAllText($exe, '')
+            Register-SdkCandidate -ExePath $exe -ToolType 'JDK' -State $State | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'Register-SdkCandidate returns the JDK home and sets JAVA_HOME' {
+        $jdkRoot = Join-Path $TestDrive 'jdk'
+        $null = & $script:NewJdkTree $jdkRoot
+        $savedJavaHome = $env:JAVA_HOME
+        try {
+            InModuleScope SDK -Parameters @{ State = $script:state; JdkRoot = $jdkRoot; ExeName = $script:jdkExeName } {
+                param($State, $JdkRoot, $ExeName)
+                Mock Test-SdkExe { return $true }
+                Mock Write-Log { }
+                $r = Register-SdkCandidate -ExePath (Join-Path (Join-Path $JdkRoot 'bin') $ExeName) -ToolType 'JDK' -State $State -LogLabel 'from env'
+                $r | Should -Not -BeNullOrEmpty
+                Test-Path -LiteralPath (Join-Path (Join-Path $r 'bin') $ExeName) | Should -BeTrue
+                Test-Path -LiteralPath (Join-Path $r 'bin') | Should -BeTrue
+                $env:JAVA_HOME | Should -Not -BeNullOrEmpty
+            }
+        } finally {
+            $env:JAVA_HOME = $savedJavaHome
+        }
+    }
+
+    It 'Register-SdkCandidate returns the muxer for Dotnet and the root for Android' {
+        $dotnetRoot = Join-Path $TestDrive 'dotnet'
+        New-Item -ItemType Directory -Path $dotnetRoot -Force | Out-Null
+        $dotnetExe = Join-Path $dotnetRoot $script:dotnetExeName
+        [System.IO.File]::WriteAllText($dotnetExe, '')
+        $androidRoot = Join-Path $TestDrive 'Android/Sdk'
+        $androidBin = Join-Path $androidRoot 'cmdline-tools/latest/bin'
+        New-Item -ItemType Directory -Path $androidBin -Force | Out-Null
+        $sdkManager = Join-Path $androidBin $(if ($IsWindows) { 'sdkmanager.bat' } else { 'sdkmanager' })
+        [System.IO.File]::WriteAllText($sdkManager, '')
+
+        InModuleScope SDK -Parameters @{ State = $script:state; DotnetExe = $dotnetExe; SdkManager = $sdkManager } {
+            param($State, $DotnetExe, $SdkManager)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            $r = Register-SdkCandidate -ExePath $DotnetExe -ToolType 'Dotnet' -State $State
+            $r | Should -Not -BeNullOrEmpty
+            (Split-Path $r -Leaf) | Should -Be (Split-Path $DotnetExe -Leaf)
+            Test-Path -LiteralPath $r | Should -BeTrue
+            $r = Register-SdkCandidate -ExePath $SdkManager -ToolType 'Android' -State $State -LogLabel 'on drive C:\'
+            $r | Should -Match 'Android[/\\]Sdk$'
+        }
+    }
+
+    It 'Find-SdkFromEnvHome resolves JAVA_HOME and declines an empty tree' {
+        $jdkRoot = Join-Path $TestDrive 'jdk-env'
+        $null = & $script:NewJdkTree $jdkRoot
+        $emptyRoot = Join-Path $TestDrive 'empty-env'
+        New-Item -ItemType Directory -Path $emptyRoot -Force | Out-Null
+        $savedJavaHome = $env:JAVA_HOME
+        try {
+            $env:JAVA_HOME = $jdkRoot
+            InModuleScope SDK -Parameters @{ State = $script:state } {
+                param($State)
+                Mock Test-SdkExe { return $true }
+                Mock Write-Log { }
+                Find-SdkFromEnvHome -State $State -ToolType 'JDK' | Should -Not -BeNullOrEmpty
+            }
+            $env:JAVA_HOME = $emptyRoot
+            InModuleScope SDK -Parameters @{ State = $script:state } {
+                param($State)
+                Mock Test-SdkExe { return $true }
+                Mock Write-Log { }
+                Find-SdkFromEnvHome -State $State -ToolType 'JDK' | Should -BeNullOrEmpty
+            }
+        } finally {
+            $env:JAVA_HOME = $savedJavaHome
+        }
+    }
+
+    It 'Find-SdkFromSystemPath resolves a PATH entry and rejects a ghost' {
+        $bin = Join-Path $TestDrive 'path-bin'
+        New-Item -ItemType Directory -Path $bin -Force | Out-Null
+        $exe = Join-Path $bin $script:jdkExeName
+        if ($IsWindows) {
+            [System.IO.File]::WriteAllText($exe, '')
+        } else {
+            $null = & $script:WriteFakeExe $exe
+            & chmod +x $exe
+        }
+        $savedPath = $env:PATH
+        try {
+            $env:PATH = "$bin$([System.IO.Path]::PathSeparator)$env:PATH"
+            InModuleScope SDK -Parameters @{ State = $script:state } {
+                param($State)
+                Mock Test-SdkExe { return $true }
+                Mock Write-Log { }
+                Find-SdkFromSystemPath -State $State -ToolType 'JDK' | Should -Not -BeNullOrEmpty
+            }
+            InModuleScope SDK -Parameters @{ State = $script:state } {
+                param($State)
+                Mock Test-SdkExe { return $false }
+                Mock Write-Log { }
+                Find-SdkFromSystemPath -State $State -ToolType 'JDK' | Should -BeNullOrEmpty
+            }
+        } finally {
+            $env:PATH = $savedPath
+        }
+    }
+
+    It 'Find-SdkFromCache uses a valid cache entry and ignores NOT_FOUND' {
+        $jdkRoot = Join-Path $TestDrive 'jdk-cache'
+        $null = & $script:NewJdkTree $jdkRoot
+        Set-CachedSdk -State $script:state -SdkName 'JDK' -Path $jdkRoot
+        InModuleScope SDK -Parameters @{ State = $script:state; JdkRoot = $jdkRoot } {
+            param($State, $JdkRoot)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            Find-SdkFromCache -State $State -ToolType 'JDK' | Should -Be $JdkRoot
+        }
+        Set-CachedSdk -State $script:state -SdkName 'JDK' -Path 'NOT_FOUND'
+        InModuleScope SDK -Parameters @{ State = $script:state } {
+            param($State)
+            Mock Write-Log { }
+            Find-SdkFromCache -State $State -ToolType 'JDK' | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'Find-SdkInPriorityPaths scans a configured priority root' {
+        $root = Join-Path $TestDrive 'priority'
+        $null = & $script:NewJdkTree (Join-Path $root 'jdk')
+        InModuleScope SDK -Parameters @{ State = $script:state; Root = $root } {
+            param($State, $Root)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            $cfg = $script:SDK_Config['JDK']
+            $saved = $cfg.PriorityPaths
+            try {
+                $cfg.PriorityPaths = { param($s) @($Root) }.GetNewClosure()
+                Find-SdkInPriorityPaths -State $State -ToolType 'JDK' | Should -Not -BeNullOrEmpty
+            } finally {
+                $cfg.PriorityPaths = $saved
+            }
+        }
+    }
+
+    It 'Find-SdkInProjectTree scans the working directory' {
+        $root = Join-Path $TestDrive 'project'
+        $null = & $script:NewJdkTree (Join-Path $root 'jdk')
+        $state = $script:state.PSObject.Copy()
+        $state.WorkingDir = $root
+        InModuleScope SDK -Parameters @{ State = $state } {
+            param($State)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            Find-SdkInProjectTree -State $State -ToolType 'JDK' | Should -Not -BeNullOrEmpty
+        }
+    }
+
+    It 'Find-SdkFromCustomPaths resolves absolute and relative roots' {
+        $absoluteRoot = Join-Path $TestDrive 'custom-abs'
+        $null = & $script:NewJdkTree $absoluteRoot
+        $relativeRoot = Join-Path $TestDrive 'vendor/jdk'
+        $null = & $script:NewJdkTree $relativeRoot
+        $absoluteState = [PSCustomObject]@{
+            ProjectRoot = $TestDrive
+            OS          = $script:state.OS
+            BuildConfig = [PSCustomObject]@{ sdk = [PSCustomObject]@{ customPaths = @($absoluteRoot) } }
+        }
+        InModuleScope SDK -Parameters @{ State = $absoluteState } {
+            param($State)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            Find-SdkFromCustomPaths -State $State -ToolType 'JDK' | Should -Not -BeNullOrEmpty
+        }
+        $relativeState = [PSCustomObject]@{
+            ProjectRoot = $TestDrive
+            OS          = $script:state.OS
+            BuildConfig = [PSCustomObject]@{ sdk = [PSCustomObject]@{ customPaths = @('vendor/jdk') } }
+        }
+        InModuleScope SDK -Parameters @{ State = $relativeState } {
+            param($State)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            Find-SdkFromCustomPaths -State $State -ToolType 'JDK' | Should -Not -BeNullOrEmpty
+        }
+        InModuleScope SDK -Parameters @{ State = $script:state } {
+            param($State)
+            Find-SdkFromCustomPaths -State $State -ToolType 'JDK' | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'Find-SdkOnWindowsDrives is Windows-only and registrable when mocked' {
+        if (-not $IsWindows) {
+            InModuleScope SDK -Parameters @{ State = $script:state } {
+                param($State)
+                Find-SdkOnWindowsDrives -State $State -ToolType 'Dotnet' | Should -BeNullOrEmpty
+            }
+            return
+        }
+        $sdkRoot = Join-Path $TestDrive 'drive-dotnet'
+        New-Item -ItemType Directory -Path $sdkRoot -Force | Out-Null
+        $exe = Join-Path $sdkRoot $script:dotnetExeName
+        [System.IO.File]::WriteAllText($exe, '')
+        InModuleScope SDK -Parameters @{ State = $script:state; SdkRoot = $sdkRoot; Exe = $exe } {
+            param($State, $SdkRoot, $Exe)
+            Mock Test-SdkExe { return $true }
+            Mock Write-Log { }
+            Mock Find-SdkByDirectory { return $SdkRoot }
+            Mock Get-AvailableDrives { return @() }
+            $State.WorkingDir = 'C:\fake\project'
+            $r = Find-SdkOnWindowsDrives -State $State -ToolType 'Dotnet'
+            $r | Should -Not -BeNullOrEmpty
+            (Split-Path $r -Leaf) | Should -Be (Split-Path $Exe -Leaf)
+            Test-Path -LiteralPath $r | Should -BeTrue
+        }
+    }
+
+    It 'Test-ExeWithTimeout runs a batch shim on Windows and fails closed elsewhere' {
+        $bat = Join-Path $TestDrive 'probe.bat'
+        [System.IO.File]::WriteAllText($bat, "@exit /b 0`r`n")
+        if ($IsWindows) {
+            Test-ExeWithTimeout -ExePath $bat -Arguments '' -TimeoutMilliseconds 5000 | Should -BeTrue
+            $savedComSpec = $env:ComSpec
+            try {
+                $env:ComSpec = ''
+                Test-ExeWithTimeout -ExePath $bat -Arguments '' -TimeoutMilliseconds 5000 | Should -BeFalse
+            } finally {
+                $env:ComSpec = $savedComSpec
+            }
+        } else {
+            Test-ExeWithTimeout -ExePath $bat -Arguments '' -TimeoutMilliseconds 5000 | Should -BeFalse
+        }
+    }
+
+    It 'Test-IsGhostSdk flags a silent stub and accepts real output' {
+        $stub = Join-Path $TestDrive $(if ($IsWindows) { 'ghost.cmd' } else { 'ghost' })
+        if ($IsWindows) {
+            [System.IO.File]::WriteAllText($stub, "@echo off`r`nif `"%~1`"==`"--list-sdks`" exit /b 0`r`nexit /b 1`r`n")
+        } else {
+            [System.IO.File]::WriteAllText($stub, "#!/bin/sh`nif [ `"`$1`" = `"--list-sdks`" ]; then exit 0; fi`nexit 1`n")
+            & chmod +x $stub
+        }
+        $real = Join-Path $TestDrive $(if ($IsWindows) { 'real-sdk.cmd' } else { 'real-sdk' })
+        $lines = @('10.0.100 [/fake/sdk]')
+        $null = & $script:WriteFakeExe $real -Lines $lines
+        InModuleScope SDK -Parameters @{ Stub = $stub; Real = $real } {
+            param($Stub, $Real)
+            Test-IsGhostSdk -ExePath $Stub | Should -BeTrue
+            Test-IsGhostSdk -ExePath $Real | Should -BeFalse
+        }
+    }
+
+    It 'Get-LatestSdkTfm parses the highest installed SDK and fails closed' {
+        $fake = Join-Path $TestDrive $(if ($IsWindows) { 'dotnet-list.cmd' } else { 'dotnet-list' })
+        $null = & $script:WriteFakeExe $fake -Lines @('8.0.100 [C:\sdk8]', '10.0.200 [C:\sdk10]')
+        Get-LatestSdkTfm -DotnetExe $fake | Should -Be 'net10.0'
+        $failing = Join-Path $TestDrive $(if ($IsWindows) { 'dotnet-fail.cmd' } else { 'dotnet-fail' })
+        $null = & $script:WriteFakeExe $failing -Lines @('8.0.100 [C:\sdk8]') -ExitCode 1
+        Get-LatestSdkTfm -DotnetExe $failing | Should -BeNullOrEmpty
+    }
+}

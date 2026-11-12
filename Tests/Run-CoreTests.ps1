@@ -50,17 +50,46 @@ param(
     [double]$MinCoveragePct = 0,
     # Parallel scope execution. 0 = auto: sequential (degree 1) unless -Coverage
     # is present, in which case every scope is scheduled through a bounded pool
-    # of isolated child processes (degree = min(ProcessorCount, 8)). An explicit
+    # of isolated child processes (degree = min(ProcessorCount, 16)). An explicit
     # value > 0 always wins; GBUILD_SCOPE_PARALLELISM overrides the auto rule.
     # Pester coverage is breakpoint-based and roughly an order of magnitude
     # slower, so a sequential coverage run of 112 scopes takes ~2 h and blows
     # the CI budget. Parallel children are still separate processes, so the
     # state-contamination guarantee of the sequential path is preserved.
-    [int]$ParallelScopes = 0
+    [int]$ParallelScopes = 0,
+    # Where an isolated child writes its own console output. Set by the
+    # parent when it spawns the child; empty when the script is run by hand.
+    [string]$CaptureFile = '',
+    # Where an isolated child writes its verdict line. The verdict used to
+    # travel back through the job host's output stream; a FILE is simpler,
+    # needs no pipe, and cannot deadlock on a descendant that keeps the pipe
+    # handle open.
+    [string]$VerdictFile = '',
+    # Sharding. -Shard N of -ShardCount M runs only the N-th slice of the
+    # scope list. The slices are balanced by the MEASURED cost of each scope
+    # (Tests/TestResults/scope-timings.csv), so the long poles do not all
+    # land in the same slice. The coverage job uses this to spread one
+    # serial measurement over several machines and merge the results.
+    [int]$Shard = 0,
+    [int]$ShardCount = 0,
+    # Merge only: do not run any scope, just merge the coverage XMLs that are
+    # already in Tests/TestResults/coverage and enforce the line-coverage
+    # floor. This is the second half of a sharded coverage run: every shard
+    # measures its slice, this job merges the slices.
+    [switch]$MergeOnly,
+    # Optional tag embedded in the coverage report file name. The sharded CI run
+    # passes "<shard>-<scope>" so two shards on different machines cannot
+    # collide on a reused PID; an untagged local run keeps the legacy name.
+    [string]$CoverageTag = ''
 )
 
 Set-StrictMode -Version 1.0
-Import-Module Pester -MinimumVersion 5.0.0 -ErrorAction Stop
+# Merge-only does not execute Pester: it parses the JaCoCo XMLs the shard jobs
+# already produced. Importing Pester unconditionally made the merge job require
+# a Pester install just to read XML, so a minimal merge job could never run.
+if (-not $MergeOnly) {
+    Import-Module Pester -MinimumVersion 5.0.0 -ErrorAction Stop
+}
 # -NoCoverage must actually win over -Coverage. This flag is read through
 # $script:NoCoverage in New-PesterConfigFor and in the merge below; before it
 # was materialised here, the variable was never set, so -NoCoverage silently
@@ -130,6 +159,11 @@ function Write-SuiteMessage {
     else { Write-Host $Message }
 }
 
+# Every scope child this runner started. The children are separate processes:
+# if the runner dies (Ctrl+C, an unhandled error) they would keep running and
+# write into the repository. The list lets the runner take them down with it.
+$script:ChildProcesses = [System.Collections.Generic.List[object]]::new()
+
 function New-PesterConfigFor {
     param([string[]]$Files)
     $cfg = New-PesterConfiguration
@@ -161,7 +195,15 @@ function New-PesterConfigFor {
                 if (-not (Test-Path -LiteralPath $CoverageDir -PathType Container)) {
                     try { New-Item -ItemType Directory -Path $CoverageDir -Force -ErrorAction Stop | Out-Null } catch { }
                 }
-                $cfg.CodeCoverage.OutputPath  = Join-Path $CoverageDir ("coverage-{0}.xml" -f $PID)
+                # The file name carries a unique tag: PIDs are per-machine, so
+                # two shards running on different machines can produce the SAME
+                # PID, and the merged artefact would lose one of the two
+                # reports. The sharded CI run passes -CoverageTag
+                # "<shard>-<scope>"; a local run keeps the legacy shard tag.
+                $shardTag = ''
+                if ($CoverageTag) { $shardTag = '-' + ($CoverageTag -replace '[^A-Za-z0-9_.-]', '_') }
+                elseif ($Shard -gt 0) { $shardTag = "-s$Shard" }
+                $cfg.CodeCoverage.OutputPath  = Join-Path $CoverageDir ("coverage-{0}{1}.xml" -f $PID, $shardTag)
                 $cfg.CodeCoverage.OutputFormat = 'CoverageGutters'
                 # Tests are NOT part of the measured surface.
                 $cfg.CodeCoverage.ExcludeTests = $true
@@ -196,6 +238,7 @@ $scopeMap = @{
     'AutoTuner'               = 'AutoTuner.Tests.ps1'
 
     'Build'                   = 'Build.Tests.ps1'
+    'BuildHelpers'            = 'Build.Helpers.Tests.ps1'
     'BuildConstants'          = 'BuildConstants.Tests.ps1'
     'BuildContext'            = 'BuildContext.Tests.ps1'
     'BuildImport'             = 'BuildImport.Tests.ps1'
@@ -237,6 +280,7 @@ $scopeMap = @{
     'EventBus'                = 'EventBus.Tests.ps1'
     'HealthCheck'             = 'HealthCheck.Tests.ps1'
     'HotReload'               = 'HotReload.Tests.ps1'
+    'HotReloadHelpers'        = 'HotReload.Helpers.Tests.ps1'
     'IContract'               = 'IContract.Tests.ps1'
     'InfraVerification'       = 'InfraVerification.Tests.ps1'
     'Integration'             = 'Integration.Tests.ps1'
@@ -253,6 +297,7 @@ $scopeMap = @{
     'ModuleHygiene'           = 'ModuleHygiene.Tests.ps1'
     'Node'                    = 'Node.Tests.ps1'
     'Orchestrator'            = 'Orchestrator.Tests.ps1'
+    'OrchestratorHelpers'     = 'Orchestrator.Helpers.Tests.ps1'
     'Parallel'                = 'Parallel.Tests.ps1'
     'PathUtils'               = 'PathUtils.Tests.ps1'
     'PHP'                     = 'PHP.Tests.ps1'
@@ -352,6 +397,61 @@ function Get-ResultCount {
     }
 }
 
+# The MEASURED cost of every scope, read from the timing table the last run
+# published. A scope that was never measured costs 1, so the split still
+# works on a fresh checkout.
+function Get-ScopeCostTable {
+    param([string]$Path)
+    $costs = @{}
+    if ([string]::IsNullOrWhiteSpace($Path)) { return $costs }
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $costs }
+    try {
+        foreach ($row in @(Import-Csv -LiteralPath $Path)) {
+            $name = [string]$row.scope
+            if ([string]::IsNullOrWhiteSpace($name)) { continue }
+            $value = 0.0
+            try { $value = [double]$row.seconds } catch { $value = 0.0 }
+            if ($value -lt 0) { $value = 0 }
+            $costs[$name] = $value
+        }
+    } catch { }
+    return $costs
+}
+
+# Split a scope list into balanced slices.
+#
+# Longest-processing-time-first: the most expensive scope goes to the slice
+# that carries the least work so far. A round-robin would put Standalone,
+# ProcessMetrics and Hygiene in the same slice whenever their names happen to
+# line up, and that slice would then run twice as long as the others.
+function Select-ShardScopes {
+    param(
+        [string[]]$Scopes,
+        [int]$Shard,
+        [int]$ShardCount,
+        [hashtable]$Costs = @{}
+    )
+    if ($ShardCount -lt 1) { $ShardCount = 1 }
+    if ($Shard -lt 1 -or $Shard -gt $ShardCount) { return @($Scopes) }
+    $loads = New-Object double[] $ShardCount
+    $assigned = @()
+    for ($i = 0; $i -lt $ShardCount; $i++) { $assigned += ,([System.Collections.Generic.List[string]]::new()) }
+    $ordered = @($Scopes | Sort-Object -Property `
+        @{ Expression = { if ($Costs.ContainsKey($_)) { [double]$Costs[$_] } else { 1.0 } }; Descending = $true },
+        @{ Expression = { $_ }; Descending = $false })
+    foreach ($s in $ordered) {
+        $cost = 1.0
+        if ($Costs.ContainsKey($s)) { $cost = [double]$Costs[$s] }
+        $lightest = 0
+        for ($i = 1; $i -lt $ShardCount; $i++) {
+            if ($loads[$i] -lt $loads[$lightest]) { $lightest = $i }
+        }
+        $assigned[$lightest].Add($s)
+        $loads[$lightest] = $loads[$lightest] + $cost
+    }
+    return @($assigned[$Shard - 1])
+}
+
 function New-ScopeResult {
     param(
         [Parameter(Mandatory)][string]$Scope,
@@ -415,9 +515,24 @@ function Get-ChildVerdict {
 }
 
 function Write-CoreVerdict {
-    param([Parameter(Mandatory)][object]$Result)
+    param(
+        [Parameter(Mandatory)][object]$Result,
+        # When set, the verdict is ALSO written to this file. The parent reads
+        # it from there: a file cannot deadlock, and a pipe can.
+        [string]$Path = ''
+    )
     $line = 'GBUILD_CORE_VERDICT {0} Passed={1} Failed={2} Skipped={3} Total={4}' -f $Result.Status, $Result.Passed, $Result.Failed, $Result.Skipped, $Result.Total
     [Console]::Out.WriteLine($line)
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        try {
+            $dir = Split-Path -Parent $Path
+            if ($dir -and -not (Test-Path -LiteralPath $dir -PathType Container)) {
+                New-Item -ItemType Directory -Path $dir -Force -ErrorAction SilentlyContinue | Out-Null
+            }
+            Set-Content -LiteralPath $Path -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
+        }
+        catch { }
+    }
 }
 
 function Invoke-ScopeInProcess {
@@ -466,7 +581,7 @@ function Invoke-ScopeInProcess {
         $failedFile = Join-Path $failedDir "failed-$ScopeName.txt"
         @($res.Failed | ForEach-Object { "$($_.ExpandedPath) :: $($_.Name)" }) | Set-Content -LiteralPath $failedFile -Encoding UTF8
     }
-    Write-ProgressLine "[$ScopeName] $($result.Status) ($passed passed, $failed failed, $skipped skipped, $total total, {0:N1}s)" -f $elapsed
+    Write-ProgressLine ("[$ScopeName] $($result.Status) ($passed passed, $failed failed, $skipped skipped, $total total, {0:N1}s)" -f $elapsed)
     return $result
 }
 
@@ -476,14 +591,6 @@ function Start-ScopeChildJob {
     # is a fresh process without them, so skip the self-heal there.
     if (-not $WaitOnly) { Restore-RunnerSelf }
     $ps = if ($PSVersionTable.PSEdition -eq 'Core') { 'pwsh' } else { 'powershell' }
-    $childArgs = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $runnerSelf, '-Scope', $ScopeName, '-WaitOnly')
-    if ($StrictSkips.IsPresent) { $childArgs += '-StrictSkips' }
-    # Coverage must propagate into the isolated child or the merge below only
-    # ever sees the in-process scopes. -NoCoverage stays the default for speed;
-    # the dedicated CI job passes -Coverage -MinCoveragePct.
-    if ($Coverage.IsPresent) { $childArgs += '-Coverage' }
-    if ($NoCoverage.IsPresent) { $childArgs += '-NoCoverage' }
-    if ($MinCoveragePct -gt 0) { $childArgs += @('-MinCoveragePct', ([string]$MinCoveragePct)) }
     # Hard cap per scope child. The suite used to block FOREVER on a stuck child
     # (a bare `& $ps ... | Out-String` with no timeout), so a single wedged scope
     # hung the whole run with zero output after its START line. A scope that cannot
@@ -500,77 +607,78 @@ function Start-ScopeChildJob {
         }
     } catch { $scopeBudgetSec = 1800 }
     Write-ProgressLine "[$ScopeName] START (isolated child: $ps -Scope $ScopeName, budget ${scopeBudgetSec}s)"
-    $job = $null
     $captureFile = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-scope-' + $ScopeName + '-' + [guid]::NewGuid().ToString('N') + '.log')
+    $verdictFile = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-verdict-' + $ScopeName + '-' + [guid]::NewGuid().ToString('N') + '.txt')
+    $proc = $null
     try {
-        # PS 5.1-safe: explicit param() + -ArgumentList (no $using: dependency).
+        # ONE process per scope.
         #
-        # Output capture goes to a TEMP FILE, never to redirected pipes. An earlier
-        # design captured stdout/stderr through Process pipes with ReadToEnd after
-        # WaitForExit+Kill. That deadlocked whenever the scope child left a
-        # descendant holding an inherited pipe handle: Kill() reaped the child but
-        # ReadToEnd waited for an EOF that could never arrive, so the job - and
-        # therefore the whole suite - hung with no grandchild process alive at all
-        # (observed: parent heartbeating, zero descendants, 20+ minutes). With file
-        # capture there is nothing to deadlock: Kill() always terminates the wait,
-        # and a killed child simply leaves a partial file, which parses to the
-        # existing KILLED/no-verdict path.
-        $job = Start-Job -Name ("gbuild-scope-{0}" -f $ScopeName) -ScriptBlock {
-            param([string]$Exe, [string[]]$ExeArgs, [int]$BudgetSec, [string]$CaptureFile)
-            # Single-quoted inner command: no interpolation hazards from paths with
-            # spaces or $ signs. `exit $LASTEXITCODE` preserves the child code
-            # through the wrapping -Command layer on both PS 5.1 and PS 7+.
-            $inner = '& "' + $Exe + '"'
-            foreach ($a in $ExeArgs) { $inner += " '" + ($a -replace "'", "''") + "'" }
-            $wrapped = '& { ' + $inner + ' *>&1 | Tee-Object -FilePath ''' + ($CaptureFile -replace "'", "''") + ''' | Out-Null }; exit $LASTEXITCODE'
-            $psi = New-Object System.Diagnostics.ProcessStartInfo
-            $psi.FileName = $Exe
-            $psi.Arguments = '-NoProfile -ExecutionPolicy Bypass -Command "' + ($wrapped -replace '"', '\"') + '"'
-            $psi.UseShellExecute = $false
-            $psi.CreateNoWindow = $true
-            $psi.RedirectStandardInput = $true
-            $proc = $null
-            try {
-                $proc = [System.Diagnostics.Process]::Start($psi)
-                # The child must NOT inherit this job's stdin. Start-Job runs the
-                # scriptblock in `pwsh -s`, whose stdin is the job system's command
-                # pipe - a pipe that never reaches EOF. A test that spawns an
-                # MSYS2/mingw tool (git rev-parse in DeployTargets.Publish-Environment,
-                # HealthCheck, Versioning) makes that runtime wait on stdin, and the
-                # child - therefore the whole suite - hangs with no process left to
-                # kill. Giving the child its own stdin pipe and closing it delivers
-                # the EOF a non-interactive child expects.
-                try { $proc.StandardInput.Close() } catch { }
-                # stdout/stderr stay INHERITED on purpose: they feed the Tee-Object
-                # capture file below, and redirecting them to .NET pipes is what
-                # deadlocked when a scope child left a descendant holding the pipe.
-                $exited = $proc.WaitForExit($BudgetSec * 1000)
-                if (-not $exited) {
-                    try { $proc.Kill() } catch { }
-                    try { [void]$proc.WaitForExit(10000) } catch { }
-                    return @{ ExitCode = 124; TimedOut = $true; CaptureFile = $CaptureFile }
-                }
-                return @{ ExitCode = [int]$proc.ExitCode; TimedOut = $false; CaptureFile = $CaptureFile }
-            } catch {
-                return @{ ExitCode = 1; TimedOut = $false; CaptureFile = $CaptureFile; Error = [string]$_.Exception.Message }
-            } finally {
-                if ($proc) { try { $proc.Dispose() } catch { } }
-            }
-        } -ArgumentList @($ps, $childArgs, $scopeBudgetSec, $captureFile)
-        if (-not $job) { throw 'Start-Job returned no job object.' }
+        # This used to be a Start-Job: the job host was a SECOND pwsh that
+        # existed only to spawn the scope child and wait for it. On a four-core
+        # runner that doubled the runnable processes per scope (job host +
+        # child), so four concurrent scopes needed EIGHT processes plus the
+        # parent - and every scope ran at a fraction of the speed it has alone.
+        # Measured on the Ubuntu runner: the job took 589 s for 906 s of scope
+        # work, where four-way scaling would give 227 s.
+        #
+        # The child writes its own console output to a capture FILE and its
+        # verdict to a verdict FILE. No pipe is involved anywhere, which also
+        # removes the deadlock class this file documents: an earlier design
+        # captured stdout through .NET pipes and hung forever whenever a scope
+        # child left a descendant holding the inherited pipe handle.
+        $argLine = '-NoProfile -ExecutionPolicy Bypass -File "' + ($runnerSelf -replace '"', '') + '"' +
+                   ' -Scope "' + ($ScopeName -replace '"', '') + '"' +
+                   ' -WaitOnly' +
+                   ' -CaptureFile "' + ($captureFile -replace '"', '') + '"' +
+                   ' -VerdictFile "' + ($verdictFile -replace '"', '') + '"'
+        if ($StrictSkips.IsPresent) { $argLine += ' -StrictSkips' }
+        # Coverage must propagate into the isolated child or the merge below only
+        # ever sees the in-process scopes. -NoCoverage stays the default for speed;
+        # the dedicated CI job passes -Coverage.
+        if ($Coverage.IsPresent) {
+            $argLine += ' -Coverage'
+            # A child's coverage file name must be unique across SHARDS, not
+            # just across the scopes of one shard: the parent's own -Shard is
+            # not passed down (the child runs exactly one scope, so sharding it
+            # again would drop it), and PIDs are per-machine. The scope name is
+            # unique within a run and the shard number separates the machines.
+            $childTag = ('s{0}-{1}' -f $Shard, $ScopeName)
+            $argLine += ' -CoverageTag "' + ($childTag -replace '"', '') + '"'
+        }
+        if ($NoCoverage.IsPresent) { $argLine += ' -NoCoverage' }
+        if ($MinCoveragePct -gt 0) { $argLine += ' -MinCoveragePct ' + ([string]$MinCoveragePct) }
+
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $ps
+        $psi.Arguments = $argLine
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        # The child must NOT inherit this runner's stdin. A test that spawns an
+        # MSYS2/mingw tool (git rev-parse in DeployTargets.Publish-Environment,
+        # HealthCheck, Versioning) makes that runtime wait on stdin, and the
+        # child - therefore the whole suite - hangs with no process left to
+        # kill. Giving the child its own stdin pipe and closing it delivers
+        # the EOF a non-interactive child expects.
+        $psi.RedirectStandardInput = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        if (-not $proc) { throw 'the scope child could not be started.' }
+        try { $proc.StandardInput.Close() } catch { }
+        $script:ChildProcesses.Add($proc)
         return [pscustomobject]@{
             Scope       = $ScopeName
-            Job         = $job
+            Proc        = $proc
             BudgetSec   = $scopeBudgetSec
             CaptureFile = $captureFile
+            VerdictFile = $verdictFile
             Started     = [System.Diagnostics.Stopwatch]::StartNew()
         }
     } catch {
         return [pscustomobject]@{
             Scope       = $ScopeName
-            Job         = $null
+            Proc        = $null
             BudgetSec   = $scopeBudgetSec
             CaptureFile = $captureFile
+            VerdictFile = $verdictFile
             Started     = [System.Diagnostics.Stopwatch]::StartNew()
             StartError  = [string]$_.Exception.Message
         }
@@ -581,7 +689,7 @@ function Complete-ScopeChildJob {
     param([Parameter(Mandatory)]$Wrapper)
     $ScopeName = [string]$Wrapper.Scope
     $scopeBudgetSec = [int]$Wrapper.BudgetSec
-    $job = $Wrapper.Job
+    $proc = $Wrapper.Proc
     $out = ''
     $childExitCode = 1
     $timedOut = $false
@@ -594,73 +702,69 @@ function Complete-ScopeChildJob {
         return New-ScopeResult -Scope $ScopeName -Status 'KILLED' -Killed $true -NoVerdict $true -ChildExitCode 1 -Seconds $elapsed
     }
     try {
-        # Poll so a long scope is VISIBLE: heartbeat every 60s. Without this the
-        # parent prints START and then nothing until the verdict, which is exactly
-        # what made a slow scope indistinguishable from a hung one. The outer wait
-        # is a backstop (budget + 120s grace for the in-job kill to land); the
-        # in-job WaitForExit above is the real enforcer.
+        # Poll the child process so a long scope is VISIBLE: heartbeat every
+        # 60 s. Without this the parent prints START and then nothing until
+        # the verdict, which is exactly what made a slow scope
+        # indistinguishable from a hung one.
+        #
+        # The budget is enforced HERE (the parent), not by the child: a child
+        # that hangs cannot be trusted to time itself out.
         $watch = [System.Diagnostics.Stopwatch]::StartNew()
-        $finished = $false
-        $outerBudgetSec = $scopeBudgetSec + 120
-        while ($watch.Elapsed.TotalSeconds -lt $outerBudgetSec) {
-            $remaining = [int]($outerBudgetSec - $watch.Elapsed.TotalSeconds)
-            if ($remaining -le 0) { break }
-            $slice = [math]::Min(60, $remaining)
-            $w = Wait-Job -Job $job -Timeout $slice 2>$null
-            if ($job.State -eq 'Completed' -or $job.State -eq 'Failed' -or $job.State -eq 'Stopped') { $finished = $true; break }
-            Write-ProgressLine ("[{0}] still running ({1:N0}s elapsed, budget {2}s)" -f $ScopeName, $watch.Elapsed.TotalSeconds, $scopeBudgetSec)
+        $exited = $false
+        while ($watch.Elapsed.TotalSeconds -lt $scopeBudgetSec) {
+            try { if ($proc.HasExited) { $exited = $true; break } } catch { $exited = $true; break }
+            if ($watch.Elapsed.TotalSeconds -ge 60) {
+                Write-ProgressLine ("[{0}] still running ({1:N0}s elapsed, budget {2}s)" -f $ScopeName, $watch.Elapsed.TotalSeconds, $scopeBudgetSec)
+                $watch.Restart()
+            }
+            Start-Sleep -Milliseconds 250
         }
-        $watch.Stop()
-        if (-not $finished) {
+        if (-not $exited) {
             $timedOut = $true
-            Write-ProgressLine ("[{0}] TIMEOUT (outer backstop, {1:N0}s): stopping job" -f $ScopeName, $watch.Elapsed.TotalSeconds)
-            try { Stop-Job -Job $job -ErrorAction SilentlyContinue } catch { }
-            $out = "SCOPE TIMEOUT: outer backstop fired after ${outerBudgetSec}s."
+            Write-ProgressLine ("[{0}] TIMEOUT (budget {1}s): killing the child" -f $ScopeName, $scopeBudgetSec)
+            try { $proc.Kill() } catch { }
+            try { [void]$proc.WaitForExit(10000) } catch { }
+            $out = "SCOPE TIMEOUT: the child exceeded its ${scopeBudgetSec}s budget."
             $childExitCode = 124
-        } else {
-            $rawRes = Receive-Job -Job $job -ErrorAction SilentlyContinue
-            # Harden: the job must yield exactly the result hashtable, but any
-            # stray output (a leaked bool, a warning record) turns it into an
-            # array. Take the LAST hashtable; anything else is noise.
-            $res = @($rawRes | Where-Object { $_ -is [System.Collections.Hashtable] }) | Select-Object -Last 1
-            if ($res -and $res.ContainsKey('CaptureFile')) {
-                # Child output lives in the capture file (see the pipe-deadlock
-                # note at Start-Job above). A killed child leaves a partial file;
-                # a missing file means the child never got far enough to redirect.
-                $capFile = [string]$res['CaptureFile']
-                $out = ''
+        }
+        else {
+            try { $childExitCode = [int]$proc.ExitCode } catch { $childExitCode = 1 }
+            # The verdict travels in a FILE, not through a pipe: no pipe can
+            # deadlock on a descendant that keeps the handle open, and a
+            # missing file simply means the child died before it could write
+            # one (the KILLED/no-verdict path below).
+            $verdictFile = [string]$Wrapper.VerdictFile
+            if ($verdictFile -and (Test-Path -LiteralPath $verdictFile -PathType Leaf)) {
                 try {
-                    if ($capFile -and (Test-Path -LiteralPath $capFile -PathType Leaf)) {
-                        $out = Get-Content -LiteralPath $capFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
-                        if ($null -eq $out) { $out = '' }
-                    }
+                    $out = Get-Content -LiteralPath $verdictFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+                    if ($null -eq $out) { $out = '' }
                 } catch { $out = '' }
+                try { Remove-Item -LiteralPath $verdictFile -Force -ErrorAction SilentlyContinue } catch { }
+            }
+            else {
+                $out = ''
+            }
+            # The child's console output lives in the capture file. It is kept
+            # for the failure report: a red scope that only says "1 failed" is
+            # not actionable, and the assertion text is right here.
+            $capFile = [string]$Wrapper.CaptureFile
+            if ($capFile -and (Test-Path -LiteralPath $capFile -PathType Leaf)) {
                 try {
-                    if ($capFile -and (Test-Path -LiteralPath $capFile)) {
-                        Remove-Item -LiteralPath $capFile -Force -ErrorAction SilentlyContinue
+                    $captured = Get-Content -LiteralPath $capFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+                    if ($captured) {
+                        $tail = @($captured -split "`r?`n")
+                        if ($tail.Count -gt 40) { $tail = $tail[($tail.Count - 40)..($tail.Count - 1)] }
+                        $out += "`n" + ($tail -join "`n")
                     }
                 } catch { }
-                if ($res.ContainsKey('Error') -and $res['Error']) {
-                    $out += "`nJOB-ERROR: " + [string]$res['Error']
-                }
-                $childExitCode = [int]$res['ExitCode']
-                if ($res.ContainsKey('TimedOut') -and [bool]$res['TimedOut']) {
-                    $timedOut = $true
-                    $childExitCode = 124
-                }
-            } elseif ($res) {
-                $out = [string]$res
-                $childExitCode = 0
-            } else {
-                $out = ''
-                $childExitCode = 1
+                try { Remove-Item -LiteralPath $capFile -Force -ErrorAction SilentlyContinue } catch { }
             }
         }
     } catch {
         $out = $_.Exception.Message
         $childExitCode = 1
     } finally {
-        if ($job) { try { Remove-Job -Job $job -Force -ErrorAction SilentlyContinue } catch { } }
+        if ($proc) { try { $proc.Dispose() } catch { } }
     }
     $lines = @($out -split "`r?`n")
     $verdict = Get-ChildVerdict -Lines $lines
@@ -683,9 +787,10 @@ function Complete-ScopeChildJob {
         Write-ProgressLine "[$ScopeName] KILLED before verdict"
         return New-ScopeResult -Scope $ScopeName -Status 'KILLED' -Killed $true -NoVerdict $true -ChildExitCode $childExitCode -Seconds $elapsed
     }
-    Write-ProgressLine "[$ScopeName] $status (isolated: $childExitCode, {0:N1}s)" -f $elapsed
+    Write-ProgressLine ("[$ScopeName] $status (isolated: $childExitCode, {0:N1}s)" -f $elapsed)
     return New-ScopeResult -Scope $ScopeName -Passed $verdict.Passed -Failed $failed -Skipped $verdict.Skipped -Total $verdict.Total -Status $status -ChildExitCode $childExitCode -Seconds $elapsed
 }
+
 
 # Sequential path: start one child, wait for it, return its verdict. Kept as a
 # thin wrapper so the sequential and parallel paths share ONE child-spawning
@@ -717,7 +822,13 @@ function Get-ParallelDegree {
         $cores = 1
         try { $cores = [Environment]::ProcessorCount } catch { $cores = 1 }
         if ($cores -lt 1) { $cores = 1 }
-        $degree = [math]::Min($cores, 8)
+        # 16, not 8: a full coverage run is now dominated by a single long
+        # pole (ProcessMetrics measured 978 s while the whole suite was
+        # 1,557 s), and the extra slots let the shorter scopes drain before
+        # that pole finishes instead of queueing behind it. The cap still
+        # scales down on small CI runners, and an explicit -ParallelScopes
+        # or GBUILD_SCOPE_PARALLELISM always wins.
+        $degree = [math]::Min($cores, 16)
     }
     if ($degree -lt 1) { $degree = 1 }
     return $degree
@@ -737,15 +848,26 @@ function Get-ParallelDegree {
 # would only pay a process startup for every one of its ~50 scopes. Running
 # it here hides it INSIDE the pool's runtime instead of adding it to the
 # critical path.
+#
+# -Costs is the measured per-scope cost table (scope-timings.csv). The queue
+# is ordered LONGEST FIRST (longest-processing-time-first): the pool's wall
+# clock is set by its slowest scope, so starting ProcessMetrics (measured
+# 978 s) in the last wave instead of the first one added ~16 minutes to a
+# measured full run. A scope with no measurement costs 1 s, so a fresh
+# checkout still works and simply falls back to alphabetical order.
 function Invoke-ScopesParallel {
     param(
         [Parameter(Mandatory)][string[]]$Scopes,
         [Parameter(Mandatory)][int]$Degree,
-        [string[]]$ForegroundScopes = @()
+        [string[]]$ForegroundScopes = @(),
+        [hashtable]$Costs = @{}
     )
     $results = [System.Collections.Generic.List[object]]::new()
     $queue = [System.Collections.Generic.Queue[string]]::new()
-    foreach ($s in $Scopes) { $queue.Enqueue($s) }
+    $orderedScopes = @($Scopes | Sort-Object -Property `
+        @{ Expression = { if ($Costs.ContainsKey($_)) { [double]$Costs[$_] } else { 1.0 } }; Descending = $true },
+        @{ Expression = { $_ }; Descending = $false })
+    foreach ($s in $orderedScopes) { $queue.Enqueue($s) }
     $foreground = [System.Collections.Generic.Queue[string]]::new()
     foreach ($s in $ForegroundScopes) { $foreground.Enqueue($s) }
     $running = [System.Collections.Generic.Dictionary[string, object]]::new()
@@ -754,8 +876,11 @@ function Invoke-ScopesParallel {
         # Reap FIRST. A child that finished frees its slot, and a slot that is
         # freed late is a slot that stays empty while the next scope waits.
         $finished = @($running.Keys | Where-Object {
-            $st = $running[$_].Job.State
-            $st -eq 'Completed' -or $st -eq 'Failed' -or $st -eq 'Stopped'
+            $w = $running[$_]
+            if ($w.PSObject.Properties.Name -contains 'StartError' -and $w.StartError) { return $true }
+            $p = $w.Proc
+            if (-not $p) { return $true }
+            try { $p.HasExited } catch { $true }
         })
         foreach ($s in $finished) {
             $w = $running[$s]
@@ -790,10 +915,8 @@ function Invoke-ScopesParallel {
                 }) -join ', ')
                 Write-ProgressLine ("[parallel] {0} running, {1} queued (degree {2}): {3}" -f $running.Count, $queue.Count, $Degree, $runningList)
             }
-            # Poll rather than Wait-Job: Wait-Job's multi-job timeout semantics
-            # differ between PS 5.1 and 7, and a short poll keeps the heartbeat
-            # uniform on both. Children are separate processes; the parent has
-            # nothing else to do while they run. The interval was 5 s, and a
+            # Poll: a short interval keeps the heartbeat uniform and lets a
+            # finished child free its slot promptly. The interval was 5 s, and a
             # finished child waited that long for its slot to be reused - on a
             # 60-scope run that is up to 5 s of idle pool per scope, so the
             # pool ran at a fraction of its degree.
@@ -804,8 +927,24 @@ function Invoke-ScopesParallel {
 }
 
 # ---- scope selection ----
+$swSuite = [System.Diagnostics.Stopwatch]::StartNew()
+$summary = @()
+$killedScopes = 0
+$noVerdictScopes = 0
+$zeroTestScopes = 0
+
 $selected = $null
-if ($env:GBUILD_SS_LIST) {
+if ($MergeOnly) {
+    # Merge a sharded coverage run: the per-shard XMLs are already present in
+    # Tests/TestResults/coverage, so there is nothing to execute. The merge and
+    # the line-coverage gate run below, and the run is a success when the gate
+    # passes. $summary stays empty on purpose: the test verdict was decided by
+    # the shard jobs that produced these reports.
+    Write-ProgressLine "Merge-only: combining coverage reports from $CoverageDir"
+    $script:NoCoverage = $false
+    $selected = @()
+}
+elseif ($env:GBUILD_SS_LIST) {
     $selected = @($env:GBUILD_SS_LIST -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $scopeMap.ContainsKey($_) })
 } elseif ($Scope -eq 'All') {
     $selected = @($scopeMap.Keys | Sort-Object)
@@ -816,9 +955,23 @@ if ($env:GBUILD_SS_LIST) {
     exit 2
 }
 
-if ($null -eq $selected -or $selected.Count -eq 0) {
+if (-not $MergeOnly -and ($null -eq $selected -or $selected.Count -eq 0)) {
     Write-Error 'No test scopes were selected.'
     exit 1
+}
+
+# Sharding: keep only this shard's slice of the scope list. The slices are
+# balanced by the MEASURED cost of every scope, so the three or four most
+# expensive scopes end up in DIFFERENT shards instead of the same one.
+# The same table orders the parallel pool (longest first), so it is read once.
+$costTable = Get-ScopeCostTable -Path (Join-Path $testRoot 'TestResults/scope-timings.csv')
+if (-not $MergeOnly -and $ShardCount -gt 1 -and $Shard -ge 1) {
+    $selected = @(Select-ShardScopes -Scopes $selected -Shard $Shard -ShardCount $ShardCount -Costs $costTable)
+    Write-ProgressLine "Shard $Shard of ${ShardCount}: $($selected.Count) scope(s) ($($selected -join ', '))"
+    if ($selected.Count -eq 0) {
+        Write-Error "Shard $Shard of $ShardCount has no scope to run."
+        exit 1
+    }
 }
 
 $isolated = @($selected | Where-Object { $_ -in $stateSensitive })
@@ -862,25 +1015,36 @@ try {
     }
 } catch { }
 if ($WaitOnly) {
-    $r = Invoke-ScopeInProcess -ScopeName $Scope
-    Write-CoreVerdict -Result $r
+    # An isolated child. It runs its scope and reports the verdict.
+    #
+    # The console output is captured to a FILE by the child itself, and the
+    # verdict is written to a FILE. Both used to travel through a job host
+    # (a second pwsh per scope) and a pipe; a file needs neither, so the
+    # scope costs ONE process and cannot deadlock on a descendant that keeps
+    # an inherited pipe handle open.
+    $r = $null
+    if (-not [string]::IsNullOrWhiteSpace($CaptureFile)) {
+        $script:__childScopeResult = $null
+        & {
+            $script:__childScopeResult = Invoke-ScopeInProcess -ScopeName $Scope
+        } *>&1 | Tee-Object -FilePath $CaptureFile | Out-Null
+        $r = $script:__childScopeResult
+    }
+    else {
+        $r = Invoke-ScopeInProcess -ScopeName $Scope
+    }
+    Write-CoreVerdict -Result $r -Path $VerdictFile
     if ($r.Total -gt 0 -and (($r.Status -eq 'PASSED') -or ($r.Status -eq 'SKIPPED' -and -not $StrictSkips.IsPresent))) {
         exit 0
     }
     exit 1
 }
 
-Write-ProgressLine "Suite start: $($selected.Count) scopes ($($inProc.Count) in-process core, $($isolated.Count) isolated state-sensitive)"
-# Wall clock of the whole suite: the number the CI job duration is made of.
-$swSuite = [System.Diagnostics.Stopwatch]::StartNew()
-
-$summary = @()
-$killedScopes = 0
-$noVerdictScopes = 0
-$zeroTestScopes = 0
-
+if (-not $MergeOnly) {
+    Write-ProgressLine "Suite start: $($selected.Count) scopes ($($inProc.Count) in-process core, $($isolated.Count) isolated state-sensitive)"
+}
 $parallelDegree = Get-ParallelDegree -ExplicitDegree $ParallelScopes
-if ($parallelDegree -gt 1) {
+if (-not $MergeOnly -and $parallelDegree -gt 1 -and $selected.Count -gt 0) {
     if ($Coverage.IsPresent) {
         # Coverage path: EVERY scope is its own isolated child, scheduled
         # through a bounded pool. This is the coverage path: Pester coverage is
@@ -893,8 +1057,8 @@ if ($parallelDegree -gt 1) {
         if ($env:GBUILD_SKIP_CORE -eq '1') {
             $parallelScopeNames = @($selected | Where-Object { $_ -in $stateSensitive })
         }
-        Write-ProgressLine "Parallel execution: degree $parallelDegree over $($parallelScopeNames.Count) scope(s) (coverage: every scope is its own child)"
-        $summary = @(Invoke-ScopesParallel -Scopes $parallelScopeNames -Degree $parallelDegree)
+        Write-ProgressLine "Parallel execution: degree $parallelDegree over $($parallelScopeNames.Count) scope(s) (coverage: every scope is its own child, longest first)"
+        $summary = @(Invoke-ScopesParallel -Scopes $parallelScopeNames -Degree $parallelDegree -Costs $costTable)
     }
     else {
         # HYBRID path: the SAME process topology as the sequential run - the
@@ -913,9 +1077,9 @@ if ($parallelDegree -gt 1) {
         # the same work is ~230 s.
         $foreground = if ($env:GBUILD_SKIP_CORE -eq '1') { @() } else { $inProc }
         Write-ProgressLine "Parallel execution: degree $parallelDegree over $($isolated.Count) isolated scope(s); $($foreground.Count) in-process scope(s) run in the parent meanwhile"
-        $summary = @(Invoke-ScopesParallel -Scopes $isolated -Degree $parallelDegree -ForegroundScopes $foreground)
+        $summary = @(Invoke-ScopesParallel -Scopes $isolated -Degree $parallelDegree -ForegroundScopes $foreground -Costs $costTable)
     }
-} else {
+} elseif (-not $MergeOnly) {
     if ($env:GBUILD_SKIP_CORE -ne '1') {
         foreach ($s in $inProc) {
             $r = Invoke-ScopeInProcess -ScopeName $s
@@ -930,6 +1094,22 @@ if ($parallelDegree -gt 1) {
         $summary += $r
     }
 }
+
+# Take the scope children down with the runner. A child is a separate
+# process: if the runner is interrupted (Ctrl+C, an unhandled error) the
+# children would keep running and keep writing into the repository.
+try {
+    foreach ($p in @($script:ChildProcesses)) {
+        try {
+            if ($p -and -not $p.HasExited) {
+                $p.Kill()
+                Write-ProgressLine "Cleanup: stopped a scope child that was still running."
+            }
+        } catch { }
+        try { $p.Dispose() } catch { }
+    }
+    $script:ChildProcesses.Clear()
+} catch { }
 
 foreach ($r in $summary) {
     if ($r.Killed) { $killedScopes++ }
@@ -1061,10 +1241,14 @@ try {
 # and writes a single machine-readable baseline. A measurement nobody consumes
 # is not a control, so -MinCoveragePct turns it into a gate.
 $coverageSummary = $null
-if ($Coverage -and -not $script:NoCoverage -and (Test-Path -LiteralPath $CoverageDir -PathType Container)) {
+if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -LiteralPath $CoverageDir -PathType Container)) {
     try {
+        # The "ignore what was already there" filter protects a normal run
+        # from merging a stale report. A MERGE run is the opposite: the
+        # reports it merges were DOWNLOADED into the folder before this
+        # process started, so filtering them out would merge nothing at all.
         $coverageFiles = @(Get-ChildItem -LiteralPath $CoverageDir -Filter 'coverage-*.xml' -File -ErrorAction SilentlyContinue |
-            Where-Object { -not $preExistingCoverageFiles.Contains($_.FullName) })
+            Where-Object { $MergeOnly -or -not $preExistingCoverageFiles.Contains($_.FullName) })
         if ($coverageFiles.Count -gt 0) {
             $executed = 0; $missed = 0; $files = @{}
             foreach ($cf in $coverageFiles) {
@@ -1119,7 +1303,7 @@ if ($Coverage -and -not $script:NoCoverage -and (Test-Path -LiteralPath $Coverag
             $pct = if ($totalCmds -gt 0) { [math]::Round(($executed / $totalCmds) * 100, 2) } else { 0 }
             $baseline = [ordered]@{
                 generatedAtUtc   = (Get-Date).ToUniversalTime().ToString('o')
-                pesterVersion    = (Get-Module -Name Pester | Select-Object -First 1).Version.ToString()
+                pesterVersion    = $(if ($MergeOnly) { $pm = Get-Module -ListAvailable -Name Pester | Select-Object -First 1; if ($pm) { $pm.Version.ToString() } else { 'n/a (merge-only)' } } else { (Get-Module -Name Pester | Select-Object -First 1).Version.ToString() })
                 hostOs           = [string]$PSVersionTable.OS
                 hostEdition      = [string]$PSVersionTable.PSEdition
                 hostVersion      = $PSVersionTable.PSVersion.ToString()
@@ -1170,6 +1354,20 @@ if ($Coverage -and -not $script:NoCoverage -and (Test-Path -LiteralPath $Coverag
     } catch {
         Write-ProgressLine "COVERAGE: report failed (non-fatal): $($_.Exception.Message)"
     }
+}
+
+if ($MergeOnly) {
+    # The shard jobs decided the test verdict; this job decides the merge and
+    # the line-coverage gate. A gate failure exits above, so reaching here
+    # means the merged report is good.
+    $mergeMsg = 'MERGE OK'
+    if ($coverageSummary) {
+        $mergeMsg = "MERGE OK: $($coverageSummary.coveragePercent)% line coverage ($($coverageSummary.linesCovered)/$($coverageSummary.linesTotal))"
+    }
+    Write-ProgressLine "RESULT: $mergeMsg"
+    Write-SuiteMessage $mergeMsg 'Succ'
+    try { Remove-Item -LiteralPath $progressLog -Force -ErrorAction SilentlyContinue } catch { }
+    exit 0
 }
 
 if ($totFailed -gt 0 -or $killedScopes -gt 0 -or $noVerdictScopes -gt 0 -or $zeroTestScopes -gt 0 -or $strictSkipFailure -or $summary.Count -eq 0) {
