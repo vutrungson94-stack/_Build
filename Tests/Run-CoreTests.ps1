@@ -298,6 +298,7 @@ $scopeMap = @{
     'ModuleHygiene'           = 'ModuleHygiene.Tests.ps1'
     'Node'                    = 'Node.Tests.ps1'
     'Orchestrator'            = 'Orchestrator.Tests.ps1'
+    'OrchestratorPipelineSteps' = 'Orchestrator.PipelineSteps.Tests.ps1'
     'OrchestratorHelpers'     = 'Orchestrator.Helpers.Tests.ps1'
     'Parallel'                = 'Parallel.Tests.ps1'
     'PathUtils'               = 'PathUtils.Tests.ps1'
@@ -363,6 +364,8 @@ $stateSensitive = @(
     'CredentialVault', 'Orchestrator', 'Environment', 'EnvironmentModel',
     'Deploy', 'DeployTargets', 'DeployOrchestration', 'PipelineEngine',
     'PipelineRunner', 'PipelineE2E', 'Level5Parity', 'Hygiene', 'GateSelfTest', 'ProviderContracts',
+    # Imports the Orchestrator module and stubs its commands in module scope.
+    'OrchestratorPipelineSteps',
     'PluginSDK', 'RBAC', 'AuditLedger',
     # Touches the shared append-only process-trend file, so it must not share a
     # process with the runner step that appends the real sample.
