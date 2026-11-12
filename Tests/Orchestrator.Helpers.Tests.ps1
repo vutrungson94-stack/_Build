@@ -80,4 +80,37 @@ Describe 'Orchestrator pipeline event and service helpers' {
             $state.DotnetCmd | Should -Be 'C:\dotnet\dotnet.exe'
         }
     }
+
+    It 'Register-BuildEventSubscribers captures handlers and executes handler bodies' {
+        $state = [PSCustomObject]@{}
+        InModuleScope Orchestrator -Parameters @{ state = $state } {
+            $handlers = @{}
+            function Add-BuildEvent { param($EventName,$Label,$Handler) $handlers[$EventName] = $Handler }
+            function Send-Alert { param($Message,$Severity,$State,$Data) $script:lastAlert = $Message }
+            function Get-Command { param($Name) [pscustomobject]@{ Name = $Name } }
+            function Get-BuildEventSubscribers { @{} }
+            function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+            function Get-EventPayloadField { param($Data,$EventName,$Field,$Default) if ($Data -and $Data.PSObject.Properties.Name -contains $Field) { return $Data.$Field } return $Default }
+            function Get-FlowLogLevel { param($State) 'Info' }
+            function Write-Log { param($Message,$Level,$State) $script:lastLog = $Message }
+            Mock Add-BuildEvent { param($EventName,$Label,$Handler) $handlers[$EventName] = $Handler }
+            Mock Send-Alert { param($Message,$Severity,$State,$Data) $script:lastAlert = $Message }
+            Mock Get-Command { [pscustomobject]@{ Name = $Name } } -ParameterFilter { $Name -in 'Add-BuildEvent','Send-Alert' }
+            Mock Get-BuildEventSubscribers { @{} }
+            Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+            Mock Get-EventPayloadField { param($Data,$EventName,$Field,$Default) if ($Data -and $Data.PSObject.Properties.Name -contains $Field) { $Data.$Field } else { $Default } }
+            Mock Get-FlowLogLevel { 'Info' }
+            Mock Write-Log { param($Message,$Level,$State) $script:lastLog = $Message }
+            # Ensure event name variables exist in scope
+            foreach ($n in 'EVT_BUILD_START','EVT_BUILD_COMPLETE','EVT_BUILD_ERROR','EVT_BUILD_WARNING','EVT_STEP_START','EVT_STEP_COMPLETE','EVT_STEP_ERROR','EVT_STEP_SKIPPED','EVT_STEP_PROGRESS','EVT_ON_ERROR','EVT_ON_RETRY','EVT_ON_ROLLBACK','EVT_PLUGIN_LOADED','EVT_PLUGIN_ERROR','EVT_CACHE_HIT','EVT_CACHE_MISS','EVT_TELEMETRY_RECORDED','EVT_DEPLOY_START','EVT_DEPLOY_COMPLETE','EVT_DEPLOY_ERROR') { Set-Variable -Name $n -Value $n -Scope Script -Force }
+            Register-BuildEventSubscribers -State $state
+            $handlers.Count | Should -BeGreaterThan 10
+            if ($handlers['EVT_BUILD_START']) { & $handlers['EVT_BUILD_START'] $state @{} }
+            if ($handlers['EVT_BUILD_COMPLETE']) { & $handlers['EVT_BUILD_COMPLETE'] $state ([pscustomobject]@{ Success = $true }) }
+            if ($handlers['EVT_BUILD_ERROR']) { & $handlers['EVT_BUILD_ERROR'] $state ([pscustomobject]@{ Message = 'boom' }) }
+            if ($handlers['EVT_ON_ERROR']) { & $handlers['EVT_ON_ERROR'] $state ([pscustomobject]@{ Message = 'err' }) }
+            if ($handlers['EVT_ON_RETRY']) { & $handlers['EVT_ON_RETRY'] $state ([pscustomobject]@{ Operation='op'; Attempt=1; MaxAttempts=3; Message='x' }) }
+            if ($handlers['EVT_DEPLOY_ERROR']) { & $handlers['EVT_DEPLOY_ERROR'] $state ([pscustomobject]@{ Target='t'; Message='d' }) }
+        }
+    }
 }

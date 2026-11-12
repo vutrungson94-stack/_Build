@@ -18,11 +18,17 @@ BeforeAll {
     $script:ToolRoot   = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
     $script:ModulePath = Join-Path $script:ToolRoot 'Modules/ProcessMetrics.psm1'
     Import-Module $script:ModulePath -Force -Global -DisableNameChecking -ErrorAction Stop
+    # Cache the full-tree measurement once for read-only assertions. The engine
+    # is deterministic and scans the entire repository; re-measuring in every It
+    # dominated scope runtime. Tests that need fresh/independent measurements
+    # (determinism, trend/control/QPM flows, throwaway baselines) compute their
+    # own metrics explicitly.
+    $script:M = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
 }
 
 Describe 'ProcessMetrics - measurement engine' {
     It 'measures every governance class the baseline declares' {
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $m | Should -Not -BeNullOrEmpty
         $m.Classes.Count | Should -BeGreaterOrEqual 7
         $names = @($m.Classes | ForEach-Object { $_.Class })
@@ -36,7 +42,7 @@ Describe 'ProcessMetrics - measurement engine' {
     }
 
     It 'labels below-parity classes unambiguously' {
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $below = @($m.Classes | Where-Object { $_.Adoption -lt 1.0 }).Count
         $m.BelowParityCount | Should -Be $below -Because 'the count must match the classes it was computed from'
         $m.BelowParityRatio | Should -Be ([math]::Round(($below / [math]::Max(1, $m.ClassCount)), 4)) -Because 'a ratio named below-parity must not be mistaken for mean adoption'
@@ -59,7 +65,7 @@ Describe 'ProcessMetrics - measurement engine' {
     It 'never includes generated output in the scanned corpus' {
         # Scanning Tests\TestResults or logs would make every ratio depend on how
         # much the previous run happened to leave behind.
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $m.FilesScanned | Should -BeGreaterThan 50
         $trendPath = Get-BuildProcessTrendPath -ToolRoot $script:ToolRoot
         $m.Classes | Should -Not -BeNullOrEmpty
@@ -70,7 +76,7 @@ Describe 'ProcessMetrics - measurement engine' {
         # If a class that a binary gate holds at zero measures BELOW 1.0, the
         # metric and the gate disagree, and one of the two is wrong. This pins
         # the two together.
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $parity = @('fileLockDelegation', 'eventNameRegistry', 'localeKeyWiring')
         foreach ($name in $parity) {
             $c = @($m.Classes | Where-Object { $_.Class -eq $name })[0]
@@ -79,7 +85,7 @@ Describe 'ProcessMetrics - measurement engine' {
     }
 
     It 'agrees with the hygiene gate on platform path literals' {
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $c = @($m.Classes | Where-Object { $_.Class -eq 'platformPathLiterals' })[0]
         $c.Adoption | Should -Be 1.0 -Because 'Hygiene.Tests.ps1 asserts zero backslash path constructions outside its allow-list'
     }
@@ -92,7 +98,7 @@ Describe 'ProcessMetrics - time series' {
         # Write-BuildProcessTrend derives its path from the tool root, so exercise
         # the reader/writer contract against a real tool root and then clean up.
         $before = @(Get-BuildProcessTrend -ToolRoot $script:ToolRoot).Count
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $path = Write-BuildProcessTrend -Metrics $m -ToolRoot $script:ToolRoot -RunId 'testrun01' -Channel 'test'
         $path | Should -Match 'process-trend\.jsonl$'
         Test-Path -LiteralPath $path | Should -BeTrue
@@ -121,7 +127,7 @@ Describe 'ProcessMetrics - time series' {
         try {
             # Seed one valid record so the assertion below is about SURVIVAL of
             # the corrupt line, not about an empty file.
-            $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+            $m = $script:M
             [void](Write-BuildProcessTrend -Metrics $m -ToolRoot $script:ToolRoot -RunId 'corrupttest' -Channel 'test')
             $beforeCount = @(Get-BuildProcessTrend -ToolRoot $script:ToolRoot).Count
             $beforeCount | Should -BeGreaterThan 0
@@ -143,7 +149,7 @@ Describe 'ProcessMetrics - time series' {
     }
 
     It 'renders a curve with one row per measured class' {
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $lines = @(Get-BuildProcessSparkline -Metrics $m -ToolRoot $script:ToolRoot -Ascii)
         $lines.Count | Should -Be ($m.Classes.Count + 1) -Because 'a header plus one row per class'
         ($lines[0]) | Should -Match 'ADOPTION CURVE'
@@ -157,7 +163,7 @@ Describe 'ProcessMetrics - time series' {
 
 Describe 'ProcessMetrics - the floor is a ratchet' {
     It 'finds a floor entry for every class and reports no regression today' {
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $c = Compare-BuildProcessTrend -Metrics $m -ToolRoot $script:ToolRoot
         $c.HasFloor | Should -BeTrue
         @($c.Untracked) | Should -BeNullOrEmpty -Because 'a measured class with no floor is ungoverned'
@@ -168,7 +174,7 @@ Describe 'ProcessMetrics - the floor is a ratchet' {
     It 'detects a regression when a class drops below its floor' {
         # Prove the gate can actually FAIL. A gate that has only ever passed is
         # indistinguishable from a gate that cannot fail.
-        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        $m = $script:M
         $target = @($m.Classes)[0]
         $tampered = [PSCustomObject]@{
             Classes   = @($m.Classes | ForEach-Object {

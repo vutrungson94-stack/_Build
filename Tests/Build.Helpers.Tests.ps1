@@ -211,4 +211,67 @@ Describe 'Build helper functions' {
             $r | Should -BeNullOrEmpty
         }
     }
+
+    Context 'Build deploy, AAB, and device-debug branches' {
+        It 'Invoke-DeviceDebug returns early when adb path is missing or no devices are connected' {
+            InModuleScope Build {
+                function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                function Write-Log { param($Message,$Level,$State) }
+                function Find-AdbPath { param($State) $null }
+                function Get-AdbDevices { param($State,$AdbPath) @() }
+                function Test-Path { param([Parameter(ValueFromRemainingArguments=$true)]$a) $true }
+                Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                Mock Write-Log { }
+                Mock Find-AdbPath { $null }
+                { Invoke-DeviceDebug -State ([PSCustomObject]@{ Colors = [pscustomobject]@{ Warn='Yellow'; Cyan='Cyan'; Gray='Gray' } }) -Project (Join-Path ([System.IO.Path]::GetTempPath()) 'x.csproj') -Tfm 'net8.0-android' } | Should -Not -Throw
+                Mock Find-AdbPath { 'adb' }
+                Mock Test-Path { $true }
+                Mock Get-AdbDevices { @() }
+                { Invoke-DeviceDebug -State ([PSCustomObject]@{ Colors = [pscustomobject]@{ Warn='Yellow'; Cyan='Cyan'; Gray='Gray' } }) -Project (Join-Path ([System.IO.Path]::GetTempPath()) 'x.csproj') -Tfm 'net8.0-android' } | Should -Not -Throw
+            }
+        }
+
+        It 'New-AndroidAab sets signing env vars for Start-BuildAndShow and cleans them up' {
+            $ks = Join-Path ([System.IO.Path]::GetTempPath()) ('ks-' + [guid]::NewGuid().ToString('N') + '.keystore')
+            Set-Content -LiteralPath $ks -Value 'x' -Encoding UTF8
+            $csproj = Join-Path ([System.IO.Path]::GetTempPath()) ('app-' + [guid]::NewGuid().ToString('N') + '.csproj')
+            Set-Content -LiteralPath $csproj -Value '<Project />' -Encoding UTF8
+            try {
+                $keystore = [pscustomobject]@{ Path = $ks; Alias = 'alias1'; StorePass = 'sp'; KeyPass = 'kp' }
+                $state = [PSCustomObject]@{ Colors = [pscustomobject]@{ Cyan='Cyan'; Err='Red' } }
+                InModuleScope Build -Parameters @{ state = $state; csproj = $csproj; keystore = $keystore } {
+                    function Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                    function Write-Log { param($Message,$Level,$State) }
+                    function Start-BuildAndShow {
+                        param($State,$Project,$Tfm,$OutputSubDir,$BuildArgs,$ProjectType,[switch]$Incremental)
+                        $script:seenStore = $env:ANDROID_KEYSTORE_PASS
+                        $script:seenKey = $env:ANDROID_KEY_PASS
+                        $script:seenAlias = $env:AndroidSigningKeyAlias
+                    }
+                    Mock Get-LocaleMessage { param($Key,$MessageArgs) $Key }
+                    Mock Write-Log { }
+                    Mock Start-BuildAndShow {
+                        param($State,$Project,$Tfm,$OutputSubDir,$BuildArgs,$ProjectType,[switch]$Incremental)
+                        $script:seenStore = $env:ANDROID_KEYSTORE_PASS
+                        $script:seenKey = $env:ANDROID_KEY_PASS
+                        $script:seenAlias = $env:AndroidSigningKeyAlias
+                    }
+                    Remove-Item Env:ANDROID_KEYSTORE_PASS -ErrorAction SilentlyContinue
+                    Remove-Item Env:ANDROID_KEY_PASS -ErrorAction SilentlyContinue
+                    Remove-Item Env:AndroidSigningKeyAlias -ErrorAction SilentlyContinue
+                    Remove-Item Env:AndroidSigningStorePass -ErrorAction SilentlyContinue
+                    Remove-Item Env:AndroidSigningKeyPass -ErrorAction SilentlyContinue
+                    New-AndroidAab -State $state -ProjectPath $csproj -Tfm 'net8.0-android' -Keystore $keystore -ProjectType 'MAUI'
+                    $script:seenStore | Should -Be 'sp'
+                    $script:seenKey | Should -Be 'kp'
+                    $script:seenAlias | Should -Be 'alias1'
+                    [string]$env:ANDROID_KEYSTORE_PASS | Should -Be ''
+                    [string]$env:ANDROID_KEY_PASS | Should -Be ''
+                }
+            } finally {
+                Remove-Item -LiteralPath $ks -Force -ErrorAction SilentlyContinue
+                Remove-Item -LiteralPath $csproj -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
 }
