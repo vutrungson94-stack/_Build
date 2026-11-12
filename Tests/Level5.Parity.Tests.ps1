@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 Set-StrictMode -Version 1.0
 
 # Level 5 parity: early-boot mirrors + menu maps must match single source.
@@ -281,4 +281,25 @@ Describe 'Level 5 parity - the platform tools stay independent' {
         }
     }
 }
+
+    Context 'the coverage shards are balanced on measured coverage costs' {
+        It 'the committed coverage cost table carries every scope' {
+            # The coverage shards are balanced on Tests/coverage-costs.json, not
+            # on the plain timing table: the coverage instrumentation multiplies
+            # the scopes by very different factors, so the plain table balances
+            # the shards by the wrong weights. A scope missing from the table is
+            # balanced as if it were free - which is the bug the table removes.
+            $costPath = Join-Path $buildRoot 'Tests/coverage-costs.json'
+            Test-Path -LiteralPath $costPath -PathType Leaf | Should -BeTrue -Because 'a fresh CI checkout has no history to learn the coverage costs from'
+            $j = Get-Content -LiteralPath $costPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $names = @($j.scopes.PSObject.Properties.Name)
+            $names.Count | Should -BeGreaterThan 0
+            $b = Get-Content -LiteralPath (Join-Path $buildRoot 'Tests/process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+            $names.Count | Should -Be ([int]$b.core.scopes) -Because 'a scope that is missing from the table is balanced as if it were free'
+            foreach ($n in $names) {
+                $value = $j.scopes.PSObject.Properties[$n].Value
+                [double]$value | Should -BeGreaterThan 0 -Because "every scope must carry its measured coverage cost: $n"
+            }
+        }
+    }
 }

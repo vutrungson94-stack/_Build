@@ -6,8 +6,8 @@
   "host": "windows-2025 / pwsh 7.6",
   "core": {
     "scopes": 121,
-    "testsTotal": 1680,
-    "passed": 1672,
+    "testsTotal": 1684,
+    "passed": 1676,
     "failedAllowed": 0,
     "skipped": 8,
     "skippedMaxAllowed": 8,
@@ -25,16 +25,16 @@
   "coverage": {
     "metric": "merged LINE coverage of Modules/**/*.psm1 (Pester 5 JaCoCo reports, union over scopes) - THE single enforced coverage gate",
     "floorPercent": 55,
-    "measuredMergedLineCoverage": 56.67,
-    "measuredLinesCovered": 13855,
+    "measuredMergedLineCoverage": 55.96,
+    "measuredLinesCovered": 13691,
     "measuredLinesTotal": 24450,
     "measuredSingleScopeOrchestrator": 12.77,
     "publishedSecondaryView": "the same run's BYTECODE view (JaCoCo INSTRUCTION counters) over the same files with the same union rule, published as instructionCoveragePercent in Tests/TestResults/coverage-baseline.json - it carries NO floor and is trend-only",
-    "measuredMergedInstructionCoverage": 49.74,
-    "measuredInstructionsCovered": 22947,
-    "measuredInstructionsTotal": 46134,
+    "measuredMergedInstructionCoverage": 49.14,
+    "measuredInstructionsCovered": 22681,
+    "measuredInstructionsTotal": 46155,
     "reconciliation": "ONE gate, ONE artefact set. The floor is applied to the merged LINE view, because that view is the only one that can be recomputed from the merged JaCoCo reports alone (the merge job installs no Pester, by design). The bytecode view comes from the SAME reports and the SAME union rule and is published next to it for trend only. Pester's own command-coverage percentage (the -MinCoveragePct target) is a THIRD number: it is Pester's in-process statement analysis of a single process, it is NOT reproducible from the merged reports, and it is therefore NOT a repository gate - it is only the per-process target Pester enforces when -MinCoveragePct is given. The three percentages must never be compared with each other; each is published under its own name and denominator.",
-    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurements 56.08% then 56.27% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build/SharedUtils/Orchestrator/HotReload helpers, deploy/AAB/SDK event-service paths) with LPT scheduling and parallel scope isolation; raise only, never lower. The measured line and bytecode figures above come from the SAME merge (the union of the baseline reports plus the targeted helper-scope reports), so they are comparable with each other. A SHARD publishes its own partial figure as coverage-shard-<n>-of-<m>.json and is never gated: a shard measures a slice, and the floor belongs to the merge job that holds every shard's reports. Measured 2026-11-12 on a FULL coverage run (118 scopes, degree 16): 12,848 s of scope work, of which the measurement engine alone was 566 s. The engine was split into four scopes (ProcessMetricsEngine / Trend / Ratchet / Control) so the long pole could be spread across the shards, and the coverage matrix now runs 8 shards instead of 4."
+    "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurements 56.08% then 56.27% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build/SharedUtils/Orchestrator/HotReload helpers, deploy/AAB/SDK event-service paths) with LPT scheduling and parallel scope isolation; raise only, never lower. The measured line and bytecode figures above come from the SAME merge (the union of the baseline reports plus the targeted helper-scope reports), so they are comparable with each other. A SHARD publishes its own partial figure as coverage-shard-<n>-of-<m>.json and is never gated: a shard measures a slice, and the floor belongs to the merge job that holds every shard's reports. Measured 2026-11-12 on a FULL coverage run (121 scopes, degree 16, the report folder holding only that run's reports so the merge is not mixed with earlier ones): 15,618 s of scope work. The measurement engine alone was 566 s and became the long pole, so it was split into four scopes (ProcessMetricsEngine / Trend / Ratchet / Control) and the coverage matrix now runs 12 shards instead of 4. The coverage shards are balanced on Tests/coverage-costs.json - the MEASURED cost under instrumentation, because the plain timing table is the wrong input for an instrumented run and balanced the shards by the wrong weights."
   },
   "hygiene": {
     "gates": 8,

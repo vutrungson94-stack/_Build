@@ -499,7 +499,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
   coverage:
-    name: Code coverage (${{ matrix.shard }}/8)
+    name: Code coverage (${{ matrix.shard }}/12)
     runs-on: ubuntu-24.04
     needs: test
     # Run on both push and pull_request: a push-only skip made the gate
@@ -508,19 +508,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Eight shards, because the shard wall clock is the shard's slice of
+        # Twelve shards, because the shard wall clock is the shard's slice of
         # the MEASURED scope work divided by the parallelism INSIDE the shard,
         # with the longest single scope as a floor that no shard count can
-        # lift. Measured 2026-11-12 on a full coverage run: 12,848 s of scope
-        # work over 118 scopes under coverage instrumentation. Four shards put
-        # ~3,212 s of work in each - over 50 minutes on that host - so every
-        # shard ran long. Eight shards halve the slice, and the measurement
-        # engine was split into four scopes (ProcessMetricsEngine / Trend /
-        # Ratchet / Control), which removed the 566 s pole; the floor is now
-        # the ~474 s Hygiene scope.
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        # lift. Measured 2026-11-12 on a full coverage run: 15,618 s of scope
+        # work over 121 scopes under coverage instrumentation - and the
+        # instrumentation is the multiplier: the same scopes cost roughly ten
+        # times as much under it, so these are coverage numbers, not plain
+        # ones. Four shards put ~3,904 s of work in each (over an hour on that
+        # host); eight left ~1,952 s per shard; twelve leave ~1,301 s, which a
+        # four-core runner divides by its intra-shard parallelism into ~325 s.
+        # The floor is the heaviest single scope: the measurement engine, at
+        # ~490 s per scan of the tree, because a whole-tree scan is minutes of
+        # wall clock while the coverage breakpoints are on.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     # Pester coverage is breakpoint-based and roughly an order of magnitude
-    # slower than the plain run. The suite is sharded across four jobs that
+    # slower than the plain run. The suite is sharded across twelve jobs that
     # run in parallel, so the wall clock is the longest shard, not the sum of
     # every scope. Each shard merges only its own slice and uploads the raw
     # coverage XMLs; the merge job combines every slice and enforces the gate.
@@ -570,7 +573,7 @@ jobs:
               Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
           }
 
-      - name: Run the suite with code coverage (shard ${{ matrix.shard }}/8)
+      - name: Run the suite with code coverage (shard ${{ matrix.shard }}/12)
         shell: pwsh
         run: |
           $root = (Get-Item -LiteralPath $env:GITHUB_WORKSPACE).FullName
@@ -596,7 +599,7 @@ jobs:
           # shard cannot meet it by construction.
           & pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass `
             -File (Join-Path $root 'Tests/Run-CoreTests.ps1') `
-            -Scope All -StrictSkips -Coverage -Shard ${{ matrix.shard }} -ShardCount 8
+            -Scope All -StrictSkips -Coverage -Shard ${{ matrix.shard }} -ShardCount 12
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Report the failing assertions

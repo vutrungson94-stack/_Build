@@ -57,7 +57,14 @@ Describe 'ProcessMetrics - measurement engine' {
     It 'is deterministic across repeated measurement' {
         # A time series is worthless if two runs of the same tree disagree: the
         # curve would show noise, and every trend read off it would be fiction.
-        $a = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        #
+        # The first measurement is the one the scope already took (an
+        # independent measurement of the same tree, taken minutes earlier in
+        # this very scope) and the second is a fresh one. That is still two
+        # measurements of one tree - the property under test - and it costs ONE
+        # scan instead of two: under the coverage instrumentation the CI job
+        # turns on, a single scan of the tree is minutes of wall clock.
+        $a = $script:M
         $b = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
         foreach ($c in @($a.Classes)) {
             $other = @($b.Classes | Where-Object { $_.Class -eq $c.Class })[0]

@@ -285,14 +285,21 @@ when available.
 
 A shard's wall clock is its slice of the measured scope work divided by the
 parallelism **inside** the shard, with the longest single scope as a floor that
-no shard count can lift. Measured 2026-11-12: 12,848 s of scope work over 118
-scopes under coverage instrumentation, so four shards put ~3,212 s of work in
-each. The coverage matrix therefore runs **8 shards**, and the measurement
-engine was split into four scopes (`ProcessMetricsEngine`, `ProcessMetricsTrend`,
-`ProcessMetricsRatchet`, `ProcessMetricsControl`) so its 566 s pole could be
-spread. A scope that is too slow to schedule is a scope that should be SPLIT -
-splitting a scope keeps the isolation guarantee (each part still runs in its own
-child) and changes nothing about what is measured.
+no shard count can lift. Measured 2026-11-12: 15,618 s of scope work over 121
+scopes under coverage instrumentation - and the instrumentation is roughly a
+ten-fold multiplier that is NOT the same for every scope (the measurement
+engine scans the whole tree and pays the breakpoint tax on every line of it,
+while a scope that touches three modules pays it on three modules' worth), so
+the plain timing table is the wrong input for a coverage run. The coverage
+matrix therefore runs **12 shards**, balances them on
+`Tests/coverage-costs.json` (the MEASURED coverage cost of every scope,
+committed for the same reason the other baselines are: a fresh CI checkout has
+no history to learn from), and the measurement engine was split into four
+scopes (`ProcessMetricsEngine`, `ProcessMetricsTrend`, `ProcessMetricsRatchet`,
+`ProcessMetricsControl`) so its pole could be spread. A scope that is too slow
+to schedule is a scope that should be SPLIT - splitting a scope keeps the
+isolation guarantee (each part still runs in its own child) and changes nothing
+about what is measured.
 
 **A shard never applies the global coverage floor.** A shard measures a slice,
 so its percentage is a PARTIAL measurement and is published as
