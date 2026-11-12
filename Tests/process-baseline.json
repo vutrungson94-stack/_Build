@@ -119,6 +119,26 @@
     "ledger": "Tests/qpm-ledger.json (validated by Test-BuildQpmLedger; the gate reads ledger VALIDITY, never the count)",
     "note": "QPM gate (gbuild.ps1 -SelfTest): FAILS when the window change-failure rate exceeds maxChangeFailureRate, or when the ledger is invalid/unreadable. It does not gate on escaped-defect count - escapes happen, and a build cannot pass with an UNLOGGED escape; any new escaped defect must add a Tests/qpm-ledger.json entry (enforced by review, visible in every report). RATCHET: lower maxChangeFailureRate as the rate falls, NEVER raise it to make a red run green - same doctrine as adoptionFloor and coverage floor."
   },
+  "slo": {
+    "objective": "No verification defect may reach a green state unnoticed, and the process that verifies this platform must itself stay at the targets it publishes: every escaped defect is analysed, logged and CLOSED inside a bounded time, and the structural classes that measure the process stay at parity.",
+    "escapeRate": {
+      "maxNewEscapesPerWindow": 0,
+      "windowDays": 7,
+      "measured": "0 escapes detected in the last 7 days (both recorded escapes are dated 2026-11-03; measured 2026-11-12)",
+      "why": "An escaped defect is a defect that reached a green state. The objective forbids that from going unnoticed for longer than the window, so the target is 0 new escapes per 7 days: an escape that is not analysed and logged inside a week turns the gate red. This is a TARGET derived from the objective, not a ceiling copied from a historical rate - which is why it is separate from qpm.maxChangeFailureRate (a ceiling on the process, not a goal)."
+    },
+    "mttr": {
+      "maxMeanRecoverySeconds": 900,
+      "measured": "137s mean recovery time over the 50-sample QPM window (measured 2026-11-12). The metric reports n/a when the window holds no recovery incident, and the target is then fail-open, exactly like the SPC gate - it never fails a run it cannot measure.",
+      "why": "The objective requires every escape to be CLOSED, not merely logged. A 15-minute ceiling on the mean recovery time forces the fix to land inside a working day, which is what makes the escape-rate target achievable instead of aspirational."
+    },
+    "adoption": {
+      "minMeanAdoption": 0.99,
+      "measured": "1.0 (7 of 7 adoption classes at parity, 0 class below floor; measured 2026-11-12)",
+      "why": "The process classes are this platform's own structural health, and the objective keeps them at parity. The target is a MEAN of 0.99 across the classes, so a single class that starts to slip is caught by the target before the per-class floor gate fires - the target is earlier and softer than the floor, which is exactly the difference between a goal and a guard."
+    },
+    "note": "SLOs are TARGETS derived from the stated objective and are enforced by gbuild.ps1 -SelfTest against values MEASURED in the same run: the escape window over Tests/qpm-ledger.json, the mean recovery time from Get-BuildQpmMeasures, and the mean adoption from Get-BuildProcessMetrics. Unlike the floors in adoptionFloor / coverage.floorPercent, an SLO may legitimately be re-derived when the OBJECTIVE changes - and the objective, the derivation and the measurement stay in this file so the change is reviewable. Never lower an SLO to make a red run green: the escape-rate and MTTR targets move only when the objective moves, and the adoption target only when a class is migrated."
+  },
   "adoptionFloorNote": "L5 ratchet. Each class is an ADOPTION RATIO (0..1) measured by Modules/ProcessMetrics.psm1, not a raw defect count, so it is comparable across refactors. A run FAILS if any class falls below minAdoption. Raise a value when the backlog shrinks; NEVER lower one to make a red run green - that is the same anti-pattern the file description above already forbids for the numeric sections. THE GATE READS minAdoption ONLY. The 'measured' string beside it is a human-readable SNAPSHOT of the last engine run and is NOT an input to the gate - when the two disagreed (the file claimed 24/24 and 191/191 while the engine reported 18/18 and 208/208) the artifact the whole process trusts was contradicting the process, which is precisely the failure mode this file exists to prevent. Re-measure with Get-BuildProcessMetrics and refresh these strings whenever you touch the metrics engine. The per-run trend is appended to Tests/TestResults/process-trend.jsonl and published as a CI artifact; this file is only the floor, because the floor must be version-controlled for the gate to work on a fresh checkout with no history.",
   "platformPathLiteralExemptions": [
     {

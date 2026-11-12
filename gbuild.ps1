@@ -471,6 +471,89 @@ if ($SelfTest.IsPresent) {
         } catch { $pmFail++; $failures.Add("qpm: $($_.Exception.Message)") }
     } else { $pmFail++; $failures.Add('Get-BuildQpmMeasures unavailable') }
 
+    # 6d. SLO GATE (CMMI L5 "objective-derived targets").
+    #
+    # The floors above say "not worse than the committed minimum". An SLO says
+    # "this platform's verification process has a TARGET, derived from a stated
+    # objective, and the target is enforced". Without one the process has
+    # ceilings but no goals: a floor can stop a regression, but it can never say
+    # the process is good enough - and "good enough" is the difference between a
+    # managed process and an optimising one.
+    #
+    # The objective, the three target families and the derivation live in
+    # Tests/process-baseline.json .slo. Each target is compared with a value
+    # MEASURED in this same run - the ledger window, the QPM recovery time and
+    # the measured adoption mean. Nothing here is aspirational, and no target
+    # is ever relaxed to make a run green.
+    $sloMetrics = $null
+    try { $sloMetrics = Get-Variable -Name 'pm' -ValueOnly -ErrorAction Stop } catch { $sloMetrics = $null }
+    $sloQpm = $null
+    try { $sloQpm = Get-Variable -Name 'qpm' -ValueOnly -ErrorAction Stop } catch { $sloQpm = $null }
+    try {
+        $sloBaseline = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Tests/process-baseline.json'), [System.Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+        if (-not (($sloBaseline.PSObject.Properties.Name -contains 'slo') -and $sloBaseline.slo)) {
+            $pmFail++
+            $failures.Add('slo: Tests/process-baseline.json declares no slo section - the process has ceilings but no objective-derived targets')
+            Write-Host (Resolve-LogMessage -Key 'log.gbuild.sloMissing') -ForegroundColor Red
+        } else {
+            $slo = $sloBaseline.slo
+            $sloProblems = [System.Collections.Generic.List[string]]::new()
+            # (a) ESCAPE-RATE TARGET: no NEW escaped defect inside the window.
+            $windowDays = 7
+            $maxNewEscapes = 0
+            if (($slo.PSObject.Properties.Name -contains 'escapeRate') -and $slo.escapeRate) {
+                if ($null -ne $slo.escapeRate.windowDays) { $windowDays = [int]$slo.escapeRate.windowDays }
+                if ($null -ne $slo.escapeRate.maxNewEscapesPerWindow) { $maxNewEscapes = [int]$slo.escapeRate.maxNewEscapesPerWindow }
+            }
+            $cutoff = (Get-Date).ToUniversalTime().AddDays(-$windowDays)
+            $newEscapes = 0
+            try {
+                $ledgerPath = Join-Path $PSScriptRoot 'Tests/qpm-ledger.json'
+                if (Test-Path -LiteralPath $ledgerPath -PathType Leaf) {
+                    $led = [System.IO.File]::ReadAllText($ledgerPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json -ErrorAction Stop
+                    foreach ($e in @($led.entries)) {
+                        # A near-miss is a defect that did NOT escape; it is not
+                        # an escape and must not consume the escape budget.
+                        if ([string]$e.class -notin @('escaped-defect', 'process-failure')) { continue }
+                        $rawStamp = [string]$e.detectedAtUtc
+                        if ([string]::IsNullOrWhiteSpace($rawStamp)) { continue }
+                        try { $stamp = ([datetime]::Parse($rawStamp, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::RoundtripKind)).ToUniversalTime() } catch { continue }
+                        if ($stamp -ge $cutoff) { $newEscapes++ }
+                    }
+                }
+            } catch { }
+            if ($newEscapes -gt $maxNewEscapes) {
+                $sloProblems.Add(("escape rate: {0} new escaped defect(s) in the last {1} day(s), target {2}" -f $newEscapes, $windowDays, $maxNewEscapes)) | Out-Null
+            }
+            # (b) RECOVERY-TIME TARGET: every escape closed inside a working day.
+            if (($slo.PSObject.Properties.Name -contains 'mttr') -and $slo.mttr -and $null -ne $slo.mttr.maxMeanRecoverySeconds -and $null -ne $sloQpm -and $null -ne $sloQpm.MeanRecoveryTimeSeconds) {
+                if ([double]$sloQpm.MeanRecoveryTimeSeconds -gt [double]$slo.mttr.maxMeanRecoverySeconds) {
+                    $sloProblems.Add(("mean recovery time {0}s exceeds target {1}s" -f $sloQpm.MeanRecoveryTimeSeconds, $slo.mttr.maxMeanRecoverySeconds)) | Out-Null
+                }
+            }
+            # (c) ADOPTION TARGET: the process classes stay at parity.
+            if (($slo.PSObject.Properties.Name -contains 'adoption') -and $slo.adoption -and $null -ne $slo.adoption.minMeanAdoption -and $null -ne $sloMetrics) {
+                if ([double]$sloMetrics.MeanAdoption -lt [double]$slo.adoption.minMeanAdoption) {
+                    $sloProblems.Add(("mean adoption {0:P2} below target {1:P2}" -f [double]$sloMetrics.MeanAdoption, [double]$slo.adoption.minMeanAdoption)) | Out-Null
+                }
+            }
+            if ($sloProblems.Count -gt 0) {
+                $pmFail++
+                foreach ($problem in $sloProblems) { $failures.Add("slo: $problem") }
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.sloFailed' -MessageArgs @((@($sloProblems) -join '; '))) -ForegroundColor Red
+            } else {
+                $ok++
+                $sloMttr = if ($null -eq $sloQpm -or $null -eq $sloQpm.MeanRecoveryTimeSeconds) { 'n/a' } else { "$($sloQpm.MeanRecoveryTimeSeconds)s" }
+                $sloAdoption = if ($null -eq $sloMetrics) { 'n/a' } else { ('{0:P1}' -f [double]$sloMetrics.MeanAdoption) }
+                Write-Host (Resolve-LogMessage -Key 'log.gbuild.sloOk' -MessageArgs @([string]$newEscapes, [string]$windowDays, $sloMttr, $sloAdoption))
+            }
+        }
+    } catch {
+        $pmFail++
+        $failures.Add("slo: $($_.Exception.Message)")
+        Write-Host (Resolve-LogMessage -Key 'log.gbuild.sloFailed' -MessageArgs @([string]$_.Exception.Message)) -ForegroundColor Red
+    }
+
     # PSScriptAnalyzer gate (error/warning). Runs only when the analyzer module
     # is available (CI installs PSScriptAnalyzer 1.25.0; local dev may use the
     # bundled .tools copy). A missing analyzer degrades to a skip, never a fail.

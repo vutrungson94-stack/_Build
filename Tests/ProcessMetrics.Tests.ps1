@@ -435,3 +435,37 @@ Describe 'ProcessMetrics - QPM measures' {
         $b.qpm.note | Should -Match 'never raise'
     }
 }
+
+Describe 'ProcessMetrics - the SLO is derived from a stated objective' {
+    It 'publishes an objective and one target family per SLO dimension' {
+        $b = Get-Content -LiteralPath (Join-Path $script:ToolRoot 'Tests/process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $b.PSObject.Properties.Name | Should -Contain 'slo' -Because 'a process with ceilings but no objective-derived targets is managed, not optimising'
+        $b.slo.objective | Should -Not -BeNullOrEmpty
+        $b.slo.objective | Should -Not -BeNullOrEmpty -Because 'an SLO without an objective is a number with no derivation'
+        $b.slo.escapeRate.PSObject.Properties.Name | Should -Contain 'maxNewEscapesPerWindow'
+        $b.slo.escapeRate.PSObject.Properties.Name | Should -Contain 'windowDays'
+        $b.slo.mttr.PSObject.Properties.Name | Should -Contain 'maxMeanRecoverySeconds'
+        $b.slo.adoption.PSObject.Properties.Name | Should -Contain 'minMeanAdoption'
+        # Every family states WHY the number is what it is, so a later change of
+        # the target is reviewable as a change of the objective, not of taste.
+        foreach ($family in @('escapeRate','mttr','adoption')) {
+            $b.slo.$family.why | Should -Not -BeNullOrEmpty -Because "the $family target must carry its derivation"
+        }
+    }
+
+    It 'is met by the measured values right now' {
+        $b = Get-Content -LiteralPath (Join-Path $script:ToolRoot 'Tests/process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $ledger = Get-Content -LiteralPath (Join-Path $script:ToolRoot 'Tests/qpm-ledger.json') -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $cutoff = (Get-Date).ToUniversalTime().AddDays(-[int]$b.slo.escapeRate.windowDays)
+        $newEscapes = 0
+        foreach ($e in @($ledger.entries)) {
+            if ([string]$e.class -notin @('escaped-defect','process-failure')) { continue }
+            $stamp = [datetime]::Parse([string]$e.detectedAtUtc, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
+            if ($stamp -ge $cutoff) { $newEscapes++ }
+        }
+        $newEscapes | Should -BeLessOrEqual ([int]$b.slo.escapeRate.maxNewEscapesPerWindow) -Because 'the escape-rate target is a live commitment, not a historical average'
+
+        $m = Get-BuildProcessMetrics -ToolRoot $script:ToolRoot
+        [double]$m.MeanAdoption | Should -BeGreaterOrEqual ([double]$b.slo.adoption.minMeanAdoption) -Because 'the adoption target keeps the process classes at parity'
+    }
+}
