@@ -294,6 +294,7 @@ $scopeMap = @{
     'Metrics'                 = 'Metrics.Tests.ps1'
     'MockHelpers'             = 'MockHelpers.Tests.ps1'
     'ModuleDependencies'      = 'ModuleDependencies.Tests.ps1'
+    'ModuleBodies'            = 'ModuleBodies.Tests.ps1'
     'ModuleHygiene'           = 'ModuleHygiene.Tests.ps1'
     'Node'                    = 'Node.Tests.ps1'
     'Orchestrator'            = 'Orchestrator.Tests.ps1'
@@ -382,6 +383,9 @@ $stateSensitive = @(
     'DistributedCertificate',  'CircuitBreaker', 'CircuitBreakerPersistence',
     'AnomalyDetector', 'AutoTuner', 'Chaos', 'RootCause', 'ClusterOrchestrator',
     'ModuleDependencies',
+    # Re-imports every shipped module with -Force, so it mutates the session's
+    # module table and must not share a process with anything else.
+    'ModuleBodies',
     'ConfigContamination', 'BootstrapResilience', 'DotEnv', 'HealthCheck',
     'InfraVerification', 'Policy', 'Sast', 'Siem', 'Standalone', 'SupplyChain',
     'Preflight', 'Loader', 'Plugins', 'PluginDispatch', 'Documentation',
@@ -1384,6 +1388,13 @@ try {
 # diagnostic and never as the baseline.
 $coverageSummary = $null
 $isPartialShard = ($ShardCount -gt 1 -and $Shard -ge 1 -and -not $MergeOnly)
+# A PARTIAL RUN is not a whole-suite measurement. A shard measures a slice, a
+# scope list measures a slice, and both produce a percentage that is not
+# comparable with the global floor: the scope-list run above measured 9.7% of
+# the tree and would have failed against the 55% floor for the same reason a
+# shard did - the floor belongs to the measurement of the WHOLE suite, which
+# is what the merge job performs.
+$isPartialRun = ($isPartialShard -or (-not $MergeOnly) -and ($Scope -ne 'All' -or $env:GBUILD_SS_LIST))
 if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -LiteralPath $CoverageDir -PathType Container)) {
     try {
         # The "ignore what was already there" filter protects a normal run
@@ -1521,16 +1532,17 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
                     }
                 }
             } catch { }
-            if ($isPartialShard) {
-                # A shard measures a SLICE. Its percentage is not comparable with
-                # the global floor, so it is published and NOT gated. The floor
-                # is enforced by the merge job, which holds every shard's
-                # reports and computes the union.
-                Write-ProgressLine ("COVERAGE (shard {0} of {1}): {2}% of {3} lines - PARTIAL measurement, not gated here; the merged floor ({4}%) is enforced by the merge job" -f $Shard, $ShardCount, $pct, $totalCmds, $(if ($null -ne $lineFloorPct) { $lineFloorPct } else { 'n/a' }))
+            if ($isPartialRun) {
+                # A shard measures a SLICE, and so does a scope list. Their
+                # percentage is not comparable with the global floor, so it is
+                # published and NOT gated. The floor is enforced by the merge
+                # job, which holds every shard's reports and computes the union
+                # of the whole suite.
+                Write-ProgressLine ("COVERAGE (partial run, not gated here): {0}% of {1} lines - the merged floor ({2}%) is enforced by the merge job" -f $pct, $totalCmds, $(if ($null -ne $lineFloorPct) { $lineFloorPct } else { 'n/a' }))
             } elseif ($null -ne $lineFloorPct) {
                 Write-ProgressLine ("COVERAGE GATE: line floor {0}% (Tests/process-baseline.json coverage.floorPercent); measured {1}%" -f $lineFloorPct, $pct)
             }
-            if ((-not $isPartialShard) -and ($null -ne $lineFloorPct) -and ($pct -lt $lineFloorPct)) {
+            if ((-not $isPartialRun) -and ($null -ne $lineFloorPct) -and ($pct -lt $lineFloorPct)) {
                 $msg = ("COVERAGE GATE FAILED: line coverage {0}% < baseline floor {1}% ({2} lines measured)" -f $pct, $lineFloorPct, $totalCmds)
                 Write-ProgressLine "RESULT: $msg"
                 Write-SuiteMessage $msg 'Err'
