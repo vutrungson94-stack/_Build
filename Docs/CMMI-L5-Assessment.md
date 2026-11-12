@@ -1,9 +1,10 @@
 # CMMI L5 / Enterprise Platform Maturity Assessment — `_Build`
 
-Assessment date: 2026-11-09
-Scope: the `_Build` codebase itself (75,594 LOC across `Modules/` + `Tests/`,
-220 PowerShell files, 7 locale catalogs). Evidence is taken from the code, not
-from README claims. Every score below names the file that proves it.
+Assessment date: 2026-11-09 (re-measured 2026-11-12)
+Scope: the `_Build` codebase itself (74,006 LOC measured across `Modules/`
+(91 files, 50,587 lines) + `Tests/` (130 files, 23,419 lines), 221 PowerShell
+files, 58 shipped modules, 7 locale catalogs). Evidence is taken from the code,
+not from README claims. Every score below names the file that proves it.
 
 ## Verdict
 
@@ -22,7 +23,7 @@ single-repo platform that is the expected ceiling.
 | Defect prevention | **L5** | `Tests/GateDetectors.ps1`, `Tests/GateSelfTest.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1`, pre-commit/pre-push hooks, `Tests/qpm-ledger.json` |
 | Causal analysis | **L4** | `Modules/RootCause.psm1` (CAR ledger, classifier table), `Modules/AnomalyDetector.psm1` |
 | Continuous improvement | **L5** | `Modules/AutoTuner.psm1` (proposal + pilot gate), `Find-RatchetCandidates`, `Tests/ProcessMetrics.Mutation.Tests.ps1` |
-| Verification & validation | **L4** | 1,566 tests, 19 hygiene gates, coverage floor, `Tests/Run-CoreTests.ps1` scope isolation |
+| Verification & validation | **L4** | 1,634 tests in 118 scopes, 19 hygiene gates, coverage floor (line 55 %, command 55 %), `Tests/Run-CoreTests.ps1` scope isolation |
 | Configuration management | **L4** | `gbuild.config.json` + schema, config-key parity gate, `Modules/ConfigProvider.psm1` |
 | Portability / cross-platform | **L5** | `Modules/PathUtils.psm1`, POSIX launcher, Docker multi-arch, CI matrix (ubuntu/macos/windows/arm64) |
 | Code reuse / DRY | **L5** | 7/7 adoption classes at 100 %, governed duplication pinned by tests |
@@ -65,7 +66,7 @@ single-repo platform that is the expected ceiling.
    gate enforces a change-failure rate window, but there is no SLO for escape
    rate, MTTR target, or adoption target derived from a platform objective.
 4. **Coverage is measured on two different metrics that are not reconciled.**
-   `Tests/process-baseline.json` records a 15 % line-coverage floor and a 55 %
+   `Tests/process-baseline.json` records a 55 % line-coverage floor and a 55 %
    command-coverage gate; the file itself warns they must never be compared.
    That is honest, but it is also a sign that the coverage process is not yet
    unified.
@@ -116,4 +117,35 @@ single-repo platform that is the expected ceiling.
 - **Coverage (merged line, JaCoCo union):** raised from **53.77% (13,134 / 24,424)** baseline to **56.08% (13,696 / 24,424)** by adding targeted hermetic tests (SDK discovery waterfall; Build helpers `Get-CacheArtifactPatterns`/`Get-BuildPluginCacheKey`/`New-BuildResult`/`Invoke-BuildOutputReveal`/`Invoke-AndroidArtifactDeploy`; SharedUtils env/mode/CI/report/arg/syntax helpers; Orchestrator SDK/service helpers; HotReload plugin delegation). `Tests/process-baseline.json` `coverage.floorPercent` ratcheted **15 → 55** (raise only).
 - **Coverage speed (parallel, state-isolated):** auto coverage degree raised to `min(ProcessorCount, 16)` with **LPT (longest-processing-time-first)** scheduling from the measured per-scope cost table (`Tests/TestResults/scope-timings.csv`), so the long pole (`ProcessMetrics` ~978s) starts first. Measured baseline wall **1,557.3s** at degree 16 (sum 14,168.5s); sharded CI balances by the same cost table and restores it from the prior `test` artifact.
 - **Runner/CI workflow:** per-child coverage XMLs tagged `<shard>-<scope>` to avoid cross-shard PID collisions; `-MergeOnly -Coverage` merges existing JaCoCo XMLs and enforces the line floor without requiring Pester. `.github/workflows/build.yml` coverage shards use runner auto degree/LPT and restore the measured cost table for balanced sharding.
-- **Still open:** full-coverage wall-clock under LPT remains bounded by the `ProcessMetrics` pole (~16 min of scope work); further speedup requires splitting/optimizing that scope’s covered work, not weakening isolation. Remaining high-miss areas include Build `Invoke-AutoDeploy`/`Invoke-DeviceDebug`/AAB/signing flows, HotReload watch loop, and Orchestrator event/pipeline registration paths.
+- **Still open:** full-coverage wall-clock under LPT remains bounded by the `ProcessMetrics` pole (~16 min of scope work); further speedup requires splitting/optimizing that scope's covered work, not weakening isolation. Remaining high-miss areas include Build `Invoke-AutoDeploy`/`Invoke-DeviceDebug`/AAB/signing flows, HotReload watch loop, and Orchestrator event/pipeline registration paths.
+
+## 2026-11-12 update (measured, second pass)
+
+**CI throughput and hygiene**
+
+- **Core test suite is now sharded across parallel jobs.** The `test` job in `.github/workflows/build.yml` runs a 4-way matrix (`-Shard N -ShardCount 4`), so the suite's wall clock is the longest shard, not the whole suite. Each shard keeps the scope-isolation guarantee: state-sensitive scopes still run in their own child process, and the fast in-process batch runs concurrently with them. Artifacts are per shard (`gbuild-testresults-shard-*`), and the `coverage` job restores the measured cost table from them so coverage shards stay balanced by the same LPT rule.
+- **Shard ceiling (asked and answered):** `Tests/Run-CoreTests.ps1` accepts any `-ShardCount`, but the useful maximum is the number of scopes in the run (one scope per shard; a shard with no scope is an error). With 118 core scopes that is ~118 shards in theory. The practical limits are GitHub Actions job concurrency, per-job setup overhead, and intra-shard core contention — and, decisively, the fact that a single long scope cannot be made shorter by adding shards. The remaining long pole is `ProcessMetrics`.
+- **`ProcessMetrics` scope cost reduced.** `Tests/ProcessMetrics.Tests.ps1` now measures the whole tree ONCE for read-only assertions instead of re-scanning it in every `It` (the engine is deterministic, and the tests that need independent measurements still compute their own). Measured on this host: the file runs 24/24 green in ~30 s instead of repeating a full-tree scan per test.
+- **CI deprecation warnings cleared:** all six `actions/cache@v4` pins are now `actions/cache@v5` (Node 24), removing the "Node.js 20 is deprecated" annotations from the `syntax`, `test`, `gbuild-flow`, `portability`, `macos` and `coverage` jobs.
+- **New defect-prevention gate:** a workflow step fails the build when a stray type-name artifact (`System.Collections.*`, `System.Object`, `System.Management.Automation.*`) appears in the workspace root. That artefact shape is what a hashtable coerced to a path produces, and it had already created a `System.Collections.Hashtable/` directory outside `_Build`; the directory was removed and the guard now prevents a repeat.
+
+**Defect prevention (new)**
+
+- A Linux-only CI failure in scope `HotReloadHelpers` (`Get-CimInstance` does not exist on pwsh/Linux) was fixed at the test level: the Windows cleanup branch is now exercised with a stubbed `Get-CimInstance` when the cmdlet is absent, and a dedicated **Unix cleanup path** regression test was added so the branch can never depend on a Windows-only cmdlet again.
+
+**Measured position (unchanged where not re-measured)**
+
+| Metric | Value | Source |
+|---|---|---|
+| Adoption classes at parity | 7 / 7 (100 %) | `Get-BuildProcessMetrics`, 98 recorded trend samples |
+| Change failure rate | 0.04 over 50 samples | `gbuild.ps1 -SelfTest` (QPM gate, ceiling 0.10) |
+| Mean time to recovery | 137 s | QPM gate |
+| Escaped defects | 2 (ledger valid) | `Tests/qpm-ledger.json` |
+| Merged line coverage | 56.27 % (13,744 / 24,425, 91 files), floor 55 % | `-MergeOnly -Coverage` |
+| Core suite | 118 scopes, 1,634 tests, 1,626 passed, 8 skipped (budget 8) | `Tests/process-baseline.json` |
+| Dependency graph | 184 edges / 74 modules, 0 missing, 0 cycles | `Modules/ModuleDependencies.psm1` |
+| Locale parity | 7 × 1,260 keys | `Locales/*.json` |
+| Hygiene gates | 19 (18 + 1 governed-duplication) | `Tests/Hygiene.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1` |
+| Decision records | 5 ADRs + index | `Docs/ADRs/` |
+
+**Re-verdict after this pass:** still **L4 with several L5 mechanisms operating**. The three L5-shaped capabilities that are genuinely closed are unchanged — the measured process (mutation-tested metric + SPC control limits + ratchet), the escaped-defect ledger, and the improvement loop with a pilot gate. The distance to a full L5 rating is still organisational rather than technical: no published organisation-wide process asset set, no automatic CAR creation from a failed gate, no escape-rate SLO derived from a platform objective, two unreconciled coverage metrics, and one long scope (`ProcessMetrics`) that still sets the coverage wall clock. The new CI sharding removes the *scheduling* limit on verification throughput; it does not change the rating, because the rating is about the process, not about how fast the suite runs.
