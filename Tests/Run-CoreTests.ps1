@@ -1227,6 +1227,10 @@ try {
             foreach ($row in @(Import-Csv -LiteralPath $timingPath -ErrorAction SilentlyContinue)) {
                 $name = [string]$row.scope
                 if ([string]::IsNullOrWhiteSpace($name)) { continue }
+                # A row for a scope that no longer EXISTS is dropped: the table
+                # describes the suite as it is, and a leftover row for a scope
+                # that was split or renamed would keep a cost that nothing pays.
+                if (-not $scopeMap.ContainsKey($name)) { continue }
                 $timings[$name] = [PSCustomObject]@{
                     Scope = $name
                     Seconds = [double]$row.seconds
