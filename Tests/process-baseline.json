@@ -23,8 +23,15 @@
         "Test-NoReparsePointInPath stops at the OS aliases (/var, /tmp), not above them"
       ],
       "Platform": [
+        "Get-SafeJoinPath is consistent regardless of input separator style",
         "Test-SafePath contains a Unix-style nested path under a Unix base",
-        "Test-SafePath rejects a Unix-style traversal outside the base"
+        "Test-SafePath contains a Windows-style nested path under a Windows base",
+        "Test-SafePath rejects a Unix-style traversal outside the base",
+        "Test-SafePath rejects a Windows-style escape outside the base"
+      ],
+      "Sast": [
+        "PathUtils.Test-NoReparsePointInPath accepts a plain path and rejects a junction",
+        "rejects a scan root that traverses a reparse point"
       ],
       "Security": [
         "Test-NpmVulnerabilities returns empty when npm is absent or no vulns",
