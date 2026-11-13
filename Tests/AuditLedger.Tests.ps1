@@ -222,9 +222,13 @@ Describe 'AuditLedger - path, export, range, and tamper detection' {
 
             Initialize-AuditLedger -State $st -Force
             $jsonl = Export-AuditLedger -State $st -Format 'jsonl' -Filter @{ Type = 'RBAC' }
-            $jsonl | Should -Match 'a1'
-            $jsonl | Should -Match 'a3'
-            $jsonl | Should -Not -Match 'a2'
+            # Assert on the serialized key shape, not the bare substring: the
+            # JSON carries HashChain/PreviousHash (Base64) which frequently
+            # contains 'a1'/'a3'/'a2' as coincidence - a bare -Match on those
+            # substrings passed/failed by luck on CI runners.
+            $jsonl | Should -Match '"Action":"a1"'
+            $jsonl | Should -Match '"Action":"a3"'
+            $jsonl | Should -Not -Match '"Action":"a2"'
             $csv = Export-AuditLedger -State $st -Format 'csv'
             $csv | Should -Match 'Action'
 

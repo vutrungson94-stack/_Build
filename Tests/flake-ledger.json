@@ -4,6 +4,18 @@
   "maxNewPerRolling30Days": 4,
   "entries": [
     {
+      "id": "2026-11-13-auditledger-hashchain-substring",
+      "date": "2026-11-13",
+      "scope": "AuditLedger",
+      "test": "AuditLedger - path, export, range, and tamper detection.exports filtered ledger data and verifies a requested range",
+      "detectedIn": "github run 43412243523 (core shard 1/4); passed locally and on the CI re-run diagnostic",
+      "firstOutcome": "fail",
+      "rerunOutcome": "pass",
+      "rootCause": "the -Not -Match assertion matched the whole JSON payload, and the ledger entries carry Base64 HashChain/PreviousHash substrings that contain 'a2' at random chance; nondeterministic assertion, not a product defect",
+      "fix": "this pass - assert on the serialized key shape '\"Action\":\"a2\"' instead of the bare substring",
+      "status": "fixed"
+    },
+    {
       "id": "2026-11-13-pathutils-bounded-walk",
       "date": "2026-11-13",
       "scope": "PathUtils",
@@ -17,3 +29,4 @@
     }
   ]
 }
+
