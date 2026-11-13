@@ -92,6 +92,11 @@ command of their own:
   and must be fixed within 30 days; no more than four flakes per rolling
   30-day window. A flake is an escaped defect in the test, tracked like the
   escaped-defect ledger.
+- **CAR disposition gate** (`Hygiene` scope): a CAR record older than 14 days
+  still marked `Open` fails the suite. Auto-CAR-on-failure without a closure
+  half is a queue, not a loop; every CAR in the working tree carries a
+  resolution or a stated reason (the 14-day budget is how closure is enforced
+  locally; CI checkouts have no CAR directory - the gate is local by design).
 - **Targeted mutation score**: mutation tests in `Tests/PathUtils.Tests.ps1`,
   `Tests/SharedUtils.Tests.ps1` and `Tests/ConfigProvider.Tests.ps1` plant
   nine fail-open regressions in the highest-risk owners (containment,

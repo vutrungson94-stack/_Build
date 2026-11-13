@@ -536,3 +536,61 @@ Describe 'Hygiene: process adoption never regresses below its committed floor' {
     It 'ships a committed adoption floor for every measured class' {
         }
     }
+
+Describe 'Hygiene: the CAR queue does not accumulate stale open records' {
+    # CAR records (Tests/TestResults/car/, gitignored) are opened automatically
+    # on a failed scope. An Open record that outlives the disposition budget is
+    # a review debt the causal-analysis process owes; it fails this gate.
+    #
+    # CI fresh checkouts have no CAR directory (it is gitignored), so this gate
+    # is local by design - the fixture below proves it fails loudly on a stale
+    # record instead of passing vacuously.
+    BeforeAll {
+        $script:FindingsFn = {
+            param([string]$Dir, [DateTime]$Now, [int]$MaxOpenAgeDays)
+            $stale = New-Object System.Collections.Generic.List[string]
+            if (-not (Test-Path -LiteralPath $Dir -PathType Container)) { return @() }
+            foreach ($item in @(Get-ChildItem -LiteralPath $Dir -Filter 'car-*.json' -File -ErrorAction SilentlyContinue)) {
+                $car = $null
+                try { $car = Get-Content -LiteralPath $item.FullName -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop }
+                catch { $stale.Add("$($item.Name): unparsable CAR record"); continue }
+                $st = ''
+                if ($car.PSObject.Properties.Name -contains 'Status') { $st = [string]$car.Status }
+                if ($st -ne 'Open') { continue }
+                $ts = $null
+                if ($car.PSObject.Properties.Name -contains 'Timestamp' -and $car.Timestamp) {
+                    try { $ts = ([DateTimeOffset]::Parse([string]$car.Timestamp, [Globalization.CultureInfo]::InvariantCulture)).UtcDateTime } catch { $ts = $null }
+                }
+                if ($null -eq $ts) { $ts = (Get-Item -LiteralPath $item.FullName).LastWriteTimeUtc }
+                if (($Now - $ts).TotalDays -gt $MaxOpenAgeDays) { $stale.Add("$($item.Name): Open since $($ts.ToString('u'))") }
+            }
+            return $stale.ToArray()
+        }
+    }
+
+    It 'no open CAR record outlives the disposition budget' {
+        $dir = Join-Path $PSScriptRoot 'TestResults/car'
+        $findings = @(& $script:FindingsFn $dir ([datetime]::UtcNow) 14)
+        $findings | Should -BeNullOrEmpty -Because ($findings -join '; ')
+    }
+
+    It 'the gate fails loudly on a stale open record (falsifiability)' {
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-car-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        try {
+            $car = [ordered]@{ Schema = 'car.record.v1'; Id = 'test'; Timestamp = ([datetime]::UtcNow.AddDays(-30)).ToString('o'); Status = 'Open'; Suggestion = 'test' }
+            $car | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $tmp 'car-stale.json') -Encoding UTF8
+            $found = @(& $script:FindingsFn $tmp ([datetime]::UtcNow) 14)
+            $found.Count | Should -BeGreaterThan 0 -Because 'a stale open CAR must raise a finding; a detector that cannot fail is dead weight'
+            ($found -join '; ') | Should -Match 'car-stale'
+
+            # a dispositioned record (Resolved) must not raise one
+            $car.Status = 'Resolved'
+            $car | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $tmp 'car-clean.json') -Encoding UTF8
+            Remove-Item -LiteralPath (Join-Path $tmp 'car-stale.json') -Force
+            $foundClean = @(& $script:FindingsFn $tmp ([datetime]::UtcNow) 14)
+            $foundClean.Count | Should -Be 0
+        } finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+

@@ -129,7 +129,7 @@ runs on the platform that exposed them.
   keeps a lazy shim because of a circular import — do not add a third copy.
 - **Tier-1 module list** lives in `Modules/Tier1Modules.ps1`. Never inline the
   list in a second consumer.
-- **Locale messages** live in `Locales/*.json` (7 locales, 1226 keys, byte-parity
+- **Locale messages** live in `Locales/*.json` (7 locales, 1,263 keys, byte-parity
   enforced). Every user-facing emit goes through `Get-LocaleMessage` /
   `Resolve-LogMessage` with a `-Fallback`. Hardcoded English prose is a finding.
 - **Comments are in English**, always — every comment, every doc comment, every
@@ -263,8 +263,8 @@ regressions.
 ## 6. The gates
 
 ```powershell
-# Self-test (10 gates: parse, config, imports, event-contract, commands,
-# dependencies, process-metrics, process-control, qpm, psscriptanalyzer)
+# Self-test (11 gates: parse, config, imports, event-contract, commands,
+# dependencies, process-metrics, process-control, qpm, slo, psscriptanalyzer)
 pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File './gbuild.ps1' -SelfTest
 
 # Parse every shipped file (no execution)
@@ -300,7 +300,7 @@ aspiration - raise it as coverage grows, never lower it to go green.
 `-Coverage` implies the **full parallel** path: every scope is scheduled as its own
 isolated child through a bounded pool (`-ParallelScopes N`, default
 `min(ProcessorCount, 16)`, override with `GBUILD_SCOPE_PARALLELISM`). Pester
-coverage is breakpoint-based and ~10x slower, so the sequential 112-scope run
+coverage is breakpoint-based and ~10x slower, so the sequential 125-scope run
 took ~2 h and could never fit a CI budget. Each child is still a separate
 process, so the state-isolation guarantee above is unchanged - do not
 "optimise" this back into one session.
@@ -398,3 +398,4 @@ PowerShell projects; `_Build` is not one.
 - No new TODO without a tracking reference.
 - No hardcoded project name or assumed path anywhere in the change.
 - A human-readable commit message explaining *why*, not only *what*.
+

@@ -23,12 +23,12 @@ single-repo platform that is the expected ceiling.
 | Defect prevention | **L5** | `Tests/GateDetectors.ps1`, `Tests/GateSelfTest.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1`, pre-commit/pre-push hooks, `Tests/qpm-ledger.json` |
 | Causal analysis | **L4** | `Modules/RootCause.psm1` (CAR ledger, classifier table), `Modules/AnomalyDetector.psm1` |
 | Continuous improvement | **L5** | `Modules/AutoTuner.psm1` (proposal + pilot gate), `Find-RatchetCandidates`, `Tests/ProcessMetrics.Mutation.Tests.ps1` |
-| Verification & validation | **L4** | 1,634 tests in 118 scopes, 19 hygiene gates, coverage floor (line 55 %, command 55 %), `Tests/Run-CoreTests.ps1` scope isolation |
+| Verification & validation | **L4** | 125 scopes / 1,762 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 55 % (measured 55.96 %), `Tests/Run-CoreTests.ps1` scope isolation |
 | Configuration management | **L4** | `gbuild.config.json` + schema, config-key parity gate, `Modules/ConfigProvider.psm1` |
 | Portability / cross-platform | **L5** | `Modules/PathUtils.psm1`, POSIX launcher, Docker multi-arch, CI matrix (ubuntu/macos/windows/arm64) |
 | Code reuse / DRY | **L5** | 7/7 adoption classes at 100 %, governed duplication pinned by tests |
 | Standalone operation | **L5** | `Modules/Standalone.psm1`, `Install-GBuild.ps1`, `-Project` injection |
-| Multilingual / i18n | **L5** | 7 locales × 1,226 keys at parity, `localeKeyWiring` 100 %, `i18nProseCoverage` 100 % |
+| Multilingual / i18n | **L5** | 7 locales × 1,263 keys at parity, `localeKeyWiring` 100 %, `i18nProseCoverage` 100 % |
 | Observability | **L4/L5** | `Modules/Logging.psm1`, `Modules/Metrics.psm1` (Prometheus/OTLP), `Modules/AuditLedger.psm1`, `Modules/SupplyChain.psm1` (SLSA), `Modules/Report.psm1` (SARIF) |
 | Governance / security | **L4** | `Modules/Security.psm1`, `Modules/RBAC.psm1`, `Modules/Policy.psm1`, `Modules/CredentialVault.psm1`, pre-push review gate |
 
@@ -408,3 +408,70 @@ L5 rating is organisational, not technical: the published process
 (`Docs/Process/verification-process.md`) has to be adopted by a project other
 than this one, and the independent audit of that adoption is what turns L4
 into L5. Nothing else in the codebase is known to be missing.
+
+## 2026-11-13 update (seventh pass - an independent audit, and what it forced)
+
+An independent (fresh-context, read-only) audit of `_Build`, `_Sync` and their
+claims ran on the same day (`Docs/Process/2026-11-13-independent-audit.md`).
+Its verdict is not complimentary and is binding on this document:
+
+- "Not CMMI L5. `_Build` is L4 quantitative management in one repository with
+  genuine L5-shaped defect-prevention and ratchet machinery - self-assessed,
+  single-maintainer, overstated in specific verifiable places; `_Sync` is a
+  partial, mostly cosmetic adoption whose floors are rubber stamps."
+- Findings included: the advertised "19 hygiene gates" was never real (the
+  gate recounted 8 Describe blocks - now 9 with this pass's CAR gate),
+  the committed baseline's coverage denominator (24,450) contradicted the
+  on-disk merge artefact (24,464), 15 auto-CARs sat Open with no closure
+  discipline, `_Sync`'s "7/7 proc-metric classes at parity, mean 1" was not
+  reproducible from any artefact, and every load-bearing stale number was
+  republished forward.
+
+**Remediation, same pass:**
+
+- `Tests/Hygiene.Tests.ps1` gained a real seventh-now-eighth gate, `the CAR
+  queue does not accumulate stale open records`, with a falsifiability fixture:
+  an Open CAR older than 14 days fails the gate.
+- All 15 local CAR records dispositioned `Resolved` against the fixes they
+  produced (`d6defda`, `72aeb1a`, `6c3b286`, `44f278a` and today's green
+  re-runs). The closure half of the CAR loop is now enforced, not assumed.
+- `Tests/process-baseline.json`: `hygiene.gates` 8 -> **9**,
+  `measuredLinesTotal` -> **24464** (identical to the merge artefact),
+  `gatesAudit` rewritten to the enforced count.
+- `AGENTS.md`: locale keys 1,226 -> 1,263; self-test 10 -> 11 gates (incl.
+  slo); 112 -> 125 scopes.
+- Assessment table rows (verification floors, locales) updated to the measured
+  truth.
+- `_Sync`: `Run-Tests.ps1` silent exit 0 on empty test tree -> exit 2; the
+  coverage CI job now gates on the committed floor (`coverage.minCommandCoverage`
+  = 36, measured 37.98%, recorded in `_Sync/Tests/process-baseline.json`) and
+  uploads its report `if: always()`; `Docs/Process-Adoption.md` rewritten to
+  be consumer-true (partial adoption acknowledged with a binding gap list;
+  no trend file, no CARs, vacuous i18n floors, no macOS portability job);
+  audit-era stale paths corrected.
+- `Tests/Run-CoreTests.ps1`: a fresh full `-Scope All -StrictSkips` run
+  re-measured the suite green (1,762 total).
+
+**What a SCAMPI-class appraisal still requires (from the same report, §5 -
+none of this producible by us):**
+
+organizational scope of process assets (standards, tailoring, waiver review,
+use across projects) with authorized appraisal evidence, interviews and
+cross-project proof; institutionalized, org-held process assets; durable shared
+measurement; CAR loop audited end to end on a sample; independent gates (the
+gate author may not be its evaluator); escape rate and MTTR validated
+against independent ground truth; onboarding/training evidence; periodic
+compliance audits with waiver records; measured-number drift gated (the
+current drift gate checks commands only); and improvement actions tracked
+with effectiveness review across releases.
+
+**Verdict after this pass: unchanged - NOT CMMI L5, and never to be called
+that by us.** `_Build` is L4 quantitative management with L5 defect-prevention
+and ratchet mechanisms, honestly evidenced and structurally audited, but
+single-maintainer and single-repository: no authorized appraisal, no
+organizational asset set, no cross-project evidence, no independent
+verification loop. `_Sync` runs a partial, disclosed adoption of the same
+process. Ratings of this kind are organizational judgements delivered by an
+authorized appraiser, not a git push. Any document here claiming otherwise
+is a finding against this repository, not a feature.
+

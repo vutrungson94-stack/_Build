@@ -6,8 +6,8 @@
   "host": "windows-2025 / pwsh 7.6",
   "core": {
     "scopes": 125,
-    "testsTotal": 1762,
-    "passed": 1754,
+    "testsTotal": 1764,
+    "passed": 1756,
     "failedAllowed": 0,
     "skipped": 8,
     "skippedMaxAllowed": 8,
@@ -54,7 +54,7 @@
     "floorPercent": 55,
     "measuredMergedLineCoverage": 55.96,
     "measuredLinesCovered": 13691,
-    "measuredLinesTotal": 24450,
+    "measuredLinesTotal": 24464,
     "measuredSingleScopeOrchestrator": 12.77,
     "publishedSecondaryView": "the same run's BYTECODE view (JaCoCo INSTRUCTION counters) over the same files with the same union rule, published as instructionCoveragePercent in Tests/TestResults/coverage-baseline.json - it carries NO floor and is trend-only",
     "measuredMergedInstructionCoverage": 49.14,
@@ -65,7 +65,7 @@
     "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurements 56.08% then 56.27% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build/SharedUtils/Orchestrator/HotReload helpers, deploy/AAB/SDK event-service paths) with LPT scheduling and parallel scope isolation; raise only, never lower. The measured line and bytecode figures above come from the SAME merge (the union of the baseline reports plus the targeted helper-scope reports), so they are comparable with each other. A SHARD publishes its own partial figure as coverage-shard-<n>-of-<m>.json and is never gated: a shard measures a slice, and the floor belongs to the merge job that holds every shard's reports. Measured 2026-11-12 on a FULL coverage run (121 scopes, degree 16, the report folder holding only that run's reports so the merge is not mixed with earlier ones): 15,618 s of scope work. The measurement engine alone was 566 s and became the long pole, so it was split into four scopes (ProcessMetricsEngine / Trend / Ratchet / Control) and the coverage matrix now runs 12 shards instead of 4. The coverage shards are balanced on Tests/coverage-costs.json - the MEASURED cost under instrumentation, because the plain timing table is the wrong input for an instrumented run and balanced the shards by the wrong weights."
   },
   "hygiene": {
-    "gates": 8,
+    "gates": 9,
     "deadExportedFunctionsAllowed": 0,
     "deliberatePublicApi": [
       "AutoTuner::Approve-AutoTuneProposal",
@@ -88,7 +88,7 @@
       "RootCause::Test-CARAuditPack"
     ],
     "unreferencedConstantsAllowed": 0,
-    "gatesAudit": "gates counted as Describe blocks across Tests/Hygiene.Tests.ps1 (18) + Tests/ModuleHygiene.Tests.ps1 (1) = 19. This replaces a stale '19' that matched nothing. The dead-export gate previously parsed Export-ModuleMember by line scanning and could only read the 38 files that write the statement across multiple lines; it was blind to 281 of 649 exported functions (43%) while still reporting green. It now resolves each statement through the PowerShell AST, so the count and the gate agree by construction. The 19th gate ('intentional cross-module duplication stays governed') was added because AnomalyDetector.psm1 and RootCause.psm1 each carry an approved duplicate of a shared preamble and both files' comments claimed a 'near-duplicate hygiene check' enforced it - no such check existed, so the claim was false and the copies could drift unnoticed. The gate pins the two function bodies byte-identical and requires both files to state the rationale, which makes the existing comment true. Duplication was governed rather than removed on purpose: ModuleHygiene.Tests.ps1 registers these two files as approved sites for the inline root ladder, so deleting the copies would fail that gate.",
+    "gatesAudit": "9 gates as of 2026-11-13 (8 Describe in Tests/Hygiene.Tests.ps1 incl. the CAR-staleness gate added this pass + 1 in Tests/ModuleHygiene.Tests.ps1), counted by the gate itself; the count was previously recorded as 8 (7+1, after consolidation of the suite) and before that as a stale 19 that matched nothing. The current count is only ever the Describe recount and the gate fails on drift. The dead-export gate previously parsed Export-ModuleMember by line scanning and could only read the 38 files that write the statement across multiple lines; it was blind to 281 of 649 exported functions (43%) while still reporting green. It now resolves each statement through the PowerShell AST, so the count and the gate agree by construction. The 19th gate ('intentional cross-module duplication stays governed') was added because AnomalyDetector.psm1 and RootCause.psm1 each carry an approved duplicate of a shared preamble and both files' comments claimed a 'near-duplicate hygiene check' enforced it - no such check existed, so the claim was false and the copies could drift unnoticed. The gate pins the two function bodies byte-identical and requires both files to state the rationale, which makes the existing comment true. Duplication was governed rather than removed on purpose: ModuleHygiene.Tests.ps1 registers these two files as approved sites for the inline root ladder, so deleting the copies would fail that gate.",
     "dependencyGraphAudit": "ModuleDependencies.Get-ModuleDependencyMap previously matched three import patterns with a PowerShell backtick-escaped `$` inside double quotes. `` `$ `` does not emit the regex escape `\\$`, so each pattern degenerated to a `$` end-of-string anchor and matched nothing: Orchestrator reported 23 dependencies instead of 41 and AndroidSdkProvider reported 0 instead of 5, while Test-ModuleDependencies still returned Passed=True. Import shapes are now discovered through the AST (Import-Module subtree, named -Dependencies/-Names/-ModuleNames/-Name arguments, dot-sourced ModuleBootstrap, and foreach-loops whose body actually imports), which validates 184 edges across 74 modules with 0 missing and 0 cycles."
   },
   "compatibility": {
@@ -263,3 +263,4 @@
   ],
   "platformPathLiteralExemptionNote": "PATTERN-scoped, not file-scoped. A file-scoped list silently exempts every future backslash added to that file, which is a suppression wearing a name. Each entry names the exact offending fragment and states why the backslash is correct there. Read by BOTH Tests/Hygiene.Tests.ps1 and Modules/ProcessMetrics.psm1, so the metric and its gate can never disagree."
 }
+
