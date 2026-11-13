@@ -385,6 +385,19 @@ jobs:
           }
           exit 0
 
+      - name: Upload smoke results
+        if: always()
+        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: gbuild-smoke-linux
+          path: |
+            Tests/TestResults/**
+            Tests/suite-progress-*.log
+          retention-days: 3
+          compression-level: 9
+          if-no-files-found: ignore
+
   macos:
     name: macOS (Apple Silicon) self-test + smoke suite
     runs-on: macos-15
@@ -461,6 +474,19 @@ jobs:
             Write-Host "----- $($_.FullName) -----"
             Get-Content $_.FullName -ErrorAction SilentlyContinue
           }
+
+      - name: Upload smoke results
+        if: always()
+        uses: actions/upload-artifact@v7
+        continue-on-error: true
+        with:
+          name: gbuild-smoke-macos
+          path: |
+            Tests/TestResults/**
+            Tests/suite-progress-*.log
+          retention-days: 3
+          compression-level: 9
+          if-no-files-found: ignore
 
   container:
     name: Multi-architecture container build
