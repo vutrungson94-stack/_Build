@@ -42,6 +42,20 @@ Set-StrictMode -Version 1.0
 # user-facing message is emitted.
 $null = Import-Module (Join-Path $PSScriptRoot 'Modules/Locale.psm1') -Global -DisableNameChecking -ErrorAction SilentlyContinue
 
+# Reject coerced .NET type-name arguments (e.g. `./gbuild.ps1 @{...}` passes a
+# hashtable literal that binds positionally and stringifies to
+# "System.Collections.Hashtable", which can then be treated as a path and create
+# stray artifacts in the workspace root). Fail fast before any filesystem work.
+$__strayTypePattern = '^System\.(Collections(\.|$)|Object$|Management\.Automation(\.|$))'
+foreach ($__paramName in @('Project', 'Target', 'Locale', 'LogLevel')) {
+    $__paramValue = Get-Variable -Name $__paramName -Scope Local -ValueOnly -ErrorAction SilentlyContinue
+    if ($__paramValue -is [string] -and $__paramValue -match $__strayTypePattern) {
+        Write-Host ("[FATAL] Invalid -{0} value '{1}': looks like a coerced .NET type name (possible literal hashtable passed instead of a splatted variable, e.g. use @args not @{{...}})." -f $__paramName, $__paramValue) -ForegroundColor Red
+        exit 1
+    }
+}
+Remove-Variable -Name __strayTypePattern,__paramName,__paramValue -ErrorAction SilentlyContinue
+
 # ============================================================================
 # Introspection guides run BEFORE the workspace-root guard: -Help, -SelfTest
 # and -SyntaxCheck are already exempt there, and the -Locale/-Target guides are
