@@ -343,6 +343,7 @@ $scopeMap = @{
     'RootCause'               = 'RootCause.Tests.ps1'
     'Ruby'                    = 'Ruby.Tests.ps1'
     'Runner'                  = 'Runner.Tests.ps1'
+    'FlakeLedger'             = 'FlakeLedger.Tests.ps1'
     'Rust'                    = 'Rust.Tests.ps1'
 
     'Sast'                    = 'Sast.Tests.ps1'

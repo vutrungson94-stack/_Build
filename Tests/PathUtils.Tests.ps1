@@ -325,3 +325,82 @@ Describe 'PathUtils - project candidate discovery' {
         }
     }
 }
+
+Describe 'PathUtils - targeted mutation tests (containment guards)' {
+    # A coverage percentage does not prove the containment assertions bite.
+    # Each test here plants ONE fail-open/fail-closed regression in a throwaway
+    # copy of Modules/ and asserts the mutated guard misbehaves in exactly the
+    # way the suite's real assertions would catch. A mutant that survives (the
+    # wrong behaviour is not observed) fails the test: the guard changed shape
+    # and this file must be re-checked.
+    BeforeAll {
+        $script:ToolRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+        . (Join-Path $PSScriptRoot 'Helpers/MutationHelper.ps1')
+    }
+
+    It 'accepts a sibling prefix when the containment boundary is weakened' {
+        $base = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_mutbase_' + [guid]::NewGuid().ToString('N'))
+        $root = Join-Path $base 'repo'
+        $evil = Join-Path $base 'repo-evil'
+        $null = New-Item -ItemType Directory -Path $root, $evil -Force
+        $sandbox = $null
+        try {
+            $old = '                if (($pc -eq $rc) -or $pc.StartsWith($rc + [System.IO.Path]::DirectorySeparatorChar, $cmp)) { return $true }'
+            $new = '                if (($pc -eq $rc) -or $pc.StartsWith($rc, $cmp)) { return $true }'
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'pu-boundary' -ModuleFile 'PathUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Test-PathUnderRoots'].ScriptBlock
+            (& $fn -Path $evil -AllowedRoots @($root)) | Should -BeTrue -Because 'the mutated boundary guard treats the sibling prefix as contained, which the real guard rejects'
+        } finally {
+            Remove-MutationSandbox $sandbox
+            Remove-Item -LiteralPath $base -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'fails OPEN on an empty path when the empty-input guard is flipped' {
+        $sandbox = $null
+        try {
+            $old = "    if ([string]::IsNullOrWhiteSpace(`$Path)) { return `$false }`n    `$canonical = try { [System.IO.Path]::GetFullPath(`$Path).TrimEnd('\', '/') } catch { return `$false }"
+            $new = "    if ([string]::IsNullOrWhiteSpace(`$Path)) { return `$true }`n    `$canonical = try { [System.IO.Path]::GetFullPath(`$Path).TrimEnd('\', '/') } catch { return `$false }"
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'pu-empty' -ModuleFile 'PathUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Test-PathUnderRoots'].ScriptBlock
+            (& $fn -Path '' -AllowedRoots @('any')) | Should -BeTrue -Because 'a whitespace/empty path must fail CLOSED ($false) in the real guard; the mutated one fails OPEN'
+        } finally {
+            Remove-MutationSandbox $sandbox
+        }
+    }
+
+    It 'lets a control-character path reach the filesystem when the argument-injection guard is disabled' {
+        $base = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_mutbase_' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $base -Force
+        $sandbox = $null
+        try {
+            $old = "    if ([string]::IsNullOrWhiteSpace(`$Path) -or `$Path -match '[\x00-\x1f\x7f]') { return '' }"
+            $new = '    if ($false) { return '''' }'
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'pu-controlchar' -ModuleFile 'PathUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Resolve-BuildContainedPath'].ScriptBlock
+            $resolved = & $fn -Path ("inside$([char]1)name.txt") -Base $base
+            $resolved | Should -Not -BeNullOrEmpty -Because 'the real guard returns an empty string for control characters; the mutated one proceeds to the filesystem'
+        } finally {
+            Remove-MutationSandbox $sandbox
+            Remove-Item -LiteralPath $base -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'reports a plain file as a reparse point when the attribute test is inverted' {
+        $base = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_mutbase_' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $base -Force
+        $file = Join-Path $base 'plain.txt'
+        Set-Content -LiteralPath $file -Value 'x' -Encoding UTF8
+        $sandbox = $null
+        try {
+            $old = '        return [bool](($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0)'
+            $new = '        return [bool](($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -eq 0)'
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'pu-reparse' -ModuleFile 'PathUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Test-ReparsePointItem'].ScriptBlock
+            (& $fn -Path $file) | Should -BeTrue -Because 'a plain file carries no ReparsePoint attribute; the mutated predicate reports it as one'
+        } finally {
+            Remove-MutationSandbox $sandbox
+            Remove-Item -LiteralPath $base -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

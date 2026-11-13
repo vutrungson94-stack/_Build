@@ -325,3 +325,86 @@ the later passes supersede it where they say so):
   5. **Flake ledger.** The runner records timings and failed-scope files but
      not a pass-after-failure history. Record rerun outcomes and gate on the
      flake rate, so intermittent tests are fixed instead of re-run.
+
+## 2026-11-13 update (sixth pass - the flake ledger and the targeted mutation score land, and CI is green end-to-end)
+
+**CI verification (completed).** Run `43392287986` is fully green on `main`
+(`d6defda`): parse+analyzer, PS 5.1, arm64, container, gbuild flow, core
+shards 1-4, POSIX smoke, macOS smoke, all 12 coverage shards and the merged
+coverage job. The failures traced through earlier passes were all closed in
+code in this and the immediately preceding passes:
+
+- `72aeb1a` - the runner never applies the global 55% floor or the regression
+  guard to a PARTIAL measurement (a shard, or a scope-subset run). A shard now
+  publishes `COVERAGE (PARTIAL measurement, not gated here)`. Before the
+  fix, all 12 shards failed their step while every test passed; the merge
+  job correctly passed (the floor is enforced on the union only).
+- `d6defda` - the `PathUtils` bounded-walk fixture depended on the host temp
+  ancestor tree (the "coverage shard 6/12 red, rerun green" flake recorded in
+  the flake ledger). The fixture now lives under a controlled marker-less
+  base, so the bounded-walk case is deterministic on CI.
+- `78aae19` - the Linux and macOS smoke jobs upload `Tests/TestResults/**`
+  and `Tests/suite-progress-*.log`, as the shards do; a smoke failure
+  diagnosed on the runner reads from uploaded diagnostics instead of the job
+  log alone.
+
+**Candidate gaps 1-3 (implemented in earlier passes; verified this pass).**
+The scope-inventory gate (`Runner` scope: `$scopeMap` size vs
+`core.scopes`, every top-level core `*.Tests.ps1` must be mapped), the
+per-scope skip allowlist (budget + per-scope allowlist; unlisted skips fail
+`-StrictSkips`) and the coverage regression guard (floor 55%,
+`regressionDeltaPct` 0.25% against the recorded merge, applied only to
+whole-suite/merge runs) are all in `Tests/Run-CoreTests.ps1` and
+`Tests/process-baseline.json`.
+
+**New (this pass): targeted mutation score, item 4 in the previous candidate
+list.** A mutation-test harness for the highest-risk owners now lives in
+`Tests/Helpers/MutationHelper.ps1`. Each case copies the `Modules/` tree to a
+throwaway directory, applies ONE hand-written mutation to ONE file, imports
+the mutant under its own name, and asserts the mutated guard misbehaves in
+exactly the way the suite's real assertions exist to catch. A survivor fails
+the test. The real tree is never mutated in place, and each mutant is removed
+with its sandbox in `finally`. Planted mutants, all killed:
+
+| Target | Mutant | Expected detection |
+|---|---|---|
+| `PathUtils.Test-PathUnderRoots` | `$pc.StartsWith($rc + separator, ...)` -> `$pc.StartsWith($rc, ...)` | sibling prefix silently accepted as contained |
+| `PathUtils.Test-PathUnderRoots` | empty-path branch returns `$true` | empty input fails OPEN instead of CLOSED |
+| `PathUtils.Resolve-BuildContainedPath` | control-character guard disabled | `0x01` injection reaches `GetFullPath` |
+| `PathUtils.Test-ReparsePointItem` | reparse-point predicate inverted | plain file reported as a reparse point |
+| `SharedUtils.Get-BuildSecretRedactPatterns` | widened `OpenAI Key` narrowed to `sk-or-v1-...` | Azure-style `sk-proj-...` leaks unredacted |
+| `SharedUtils.Get-BuildSecretRedactPatterns` | widened `GitHub Token` narrowed to `ghp_...` | `gho_`/`ghu_`/`ghs_`/`ghr_` leak |
+| `SharedUtils.Protect-BuildSecretText` | assignment evaluator fail-open (`return $match.Value`) | `password=<value>` keeps its secret verbatim |
+| `ConfigProvider.Merge-ConfigObject` | nested merge branch disabled | nested base keys under an overridden node are dropped |
+| `ConfigProvider.Initialize-BuildConfigState` | project-local override branch disabled | the `gbuild.config.json` next to the project is silently ignored |
+
+**New (this pass): flake ledger, item 5 in the previous candidate list.**
+`Tests/flake-ledger.json` is the append-only record of tests that FAILED a
+scope and passed on re-run - the escaped-defect ledger's test-side
+counterpart. `Tests/FlakeLedger.Tests.ps1` (new scope `FlakeLedger`,
+registered in the runner) gates it: required fields, a `status` from
+`fixed|accepted|open`, outcomes from `pass|fail|killed|unknown`, no `open`
+entry may outlive `maxOpenDays` (30), and no more than
+`maxNewPerRolling30Days` (4) entries per rolling 30 days. The gate is
+falsifiable: synthetic fixtures prove it detects a missing field, a stale
+open entry, and a bursty 30-day window. The first recorded flake is the
+`PathUtils` bounded-walk case above (`d6defda`, `2026-11-13`), the same
+escape visible only under coverage instrumentation in run `43388525320`.
+
+**Measured position (re-measured after the additions, 2026-11-13):**
+
+| Metric | Value | Source |
+|---|---|---|
+| Core suite | 125 scopes, 1,762 tests (1,754 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
+| Skip budget | 8 (`core.skippedMaxAllowed`), per-scope allowlist in place | `Tests/process-baseline.json` |
+| Merged line coverage | 55.96% against a 55% floor (last recorded merge, 2026-11-12) | `Tests/process-baseline.json` |
+| Mutation score (targeted) | 9/9 planted mutants detected | `Tests/PathUtils.Tests.ps1`, `Tests/SharedUtils.Tests.ps1`, `Tests/ConfigProvider.Tests.ps1` |
+| Flake ledger | 1 entry (PathUtils, `fixed`); gate 0 findings | `Tests/flake-ledger.json`, `Tests/FlakeLedger.Tests.ps1` |
+| CI (43392287986, d6defda) | all jobs green, including merged coverage | `gh run view 43392287986` |
+
+**Verdict unchanged: still L4 with several L5 mechanisms operating - now with
+all five code-level L5 candidates closed.** The remaining distance to a full
+L5 rating is organisational, not technical: the published process
+(`Docs/Process/verification-process.md`) has to be adopted by a project other
+than this one, and the independent audit of that adoption is what turns L4
+into L5. Nothing else in the codebase is known to be missing.

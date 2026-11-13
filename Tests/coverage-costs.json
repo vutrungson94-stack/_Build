@@ -3,10 +3,11 @@
   "description": "The MEASURED cost of every scope under COVERAGE instrumentation. The plain timing table (Tests/TestResults/scope-timings.csv) is the wrong input for a coverage run: the instrumentation multiplies the scopes by very different factors - the measurement engine scans the whole tree and pays the breakpoint tax on every line of it, while a scope that touches three modules pays it on three modules worth. Balancing the coverage shards on the plain table therefore spreads the work by the wrong weights, and the wall clock is set by the unluckiest shard instead of by the balance. This table is committed for the same reason the other baselines are: a fresh CI checkout has no history to learn from.",
   "generatedAtUtc": "2026-11-12T11:11:14Z",
   "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All -StrictSkips -Coverage (the scope timing table the run publishes), measured on a 28-core host with pwsh 7.6",
-  "measuredScopes": 124,
+  "measuredScopes": 125,
   "scopes": {
     "ProcessMetricsTrend": 456.84,
     "ProcessMetricsRatchet": 456.63,
+    "FlakeLedger": 1.0,
     "ProcessMetricsEngine": 382.86,
     "Orchestrator": 233.6,
     "Standalone": 228.52,

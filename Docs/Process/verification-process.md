@@ -82,7 +82,21 @@ What each gate is for:
 
 Additional gates that belong to this repository and are NOT part of the
 portable set: the pre-commit / pre-push hooks, the pull-request review gate and
-the coverage ratchet (see §7).
+the coverage ratchet (see section 7).
+
+Two repository-local L5 mechanisms ride on the core suite rather than on a
+command of their own:
+
+- **Flake ledger** (`Tests/flake-ledger.json`, gated by the `FlakeLedger`
+  scope): an intermittent test that fails then passes on re-run is recorded
+  and must be fixed within 30 days; no more than four flakes per rolling
+  30-day window. A flake is an escaped defect in the test, tracked like the
+  escaped-defect ledger.
+- **Targeted mutation score**: mutation tests in `Tests/PathUtils.Tests.ps1`,
+  `Tests/SharedUtils.Tests.ps1` and `Tests/ConfigProvider.Tests.ps1` plant
+  nine fail-open regressions in the highest-risk owners (containment,
+  redaction, config merge/override) and assert the mutated guard misbehaves.
+  The suite is green only if every mutant is detected.
 
 ## 5. Evidence
 
@@ -95,6 +109,7 @@ publishes at least one artefact:
 | Coverage report (line + bytecode view) | coverage run / merge | per run |
 | Adoption curve sample (time series) | every core-suite run | append-only series |
 | Escaped-defect ledger entry | a human, when a defect escaped | committed, append-only |
+| Flake ledger entry | a human, when a re-run passes a test that failed | committed, append-only |
 | Corrective-action record | automatically, on a failed gate | per run |
 | Decision record | a human, when a decision was made | committed |
 

@@ -384,3 +384,47 @@ Describe 'ConfigProvider - source and alias contracts' {
         }
     }
 }
+
+Describe 'ConfigProvider - targeted mutation tests (merge and override guards)' {
+    BeforeAll {
+        $script:ToolRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+        . (Join-Path $PSScriptRoot 'Helpers/MutationHelper.ps1')
+    }
+
+    It 'replaces a nested config object wholesale when the nested merge branch is disabled' {
+        $sandbox = $null
+        try {
+            $old = "        if (`$seen.Contains(`$p.Name) -and `$p.Value -is [pscustomobject] -and `$result.(`$p.Name) -is [pscustomobject]) {"
+            $new = "        if (`$seen.Contains(`$p.Name) -and `$false) {"
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'cp-nestedmerge' -ModuleFile 'ConfigProvider.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Merge-ConfigObject'].ScriptBlock
+            $base = [pscustomobject]@{ a = [pscustomobject]@{ keep = 1 } }
+            $over = [pscustomobject]@{ a = [pscustomobject]@{ add = 2 } }
+            $merged = & $fn -Base $base -Override $over
+            $merged.a.keep | Should -BeNull -Because 'the real nested merge preserves base keys under the overridden node; the mutated one drops them'
+        } finally {
+            Remove-MutationSandbox $sandbox
+        }
+    }
+
+    It 'ignores the project-local config override when the project-root branch is disabled' {
+        $baseDir = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuildmut-tool-' + [guid]::NewGuid().ToString('N'))
+        $projDir = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuildmut-proj-' + [guid]::NewGuid().ToString('N'))
+        $sandbox = $null
+        try {
+            $null = New-Item -ItemType Directory -Path $baseDir, $projDir -Force
+            Set-Content -LiteralPath (Join-Path $baseDir 'gbuild.config.json') -Value '{ "build": { "maxParallelJobs": 4 } }' -Encoding UTF8
+            Set-Content -LiteralPath (Join-Path $projDir 'gbuild.config.json') -Value '{ "build": { "maxParallelJobs": 2 } }' -Encoding UTF8
+            $old = "    if (`$projectRoot) {`n        `$projectConfig = Join-Path `$projectRoot 'gbuild.config.json'"
+            $new = "    if (`$false) {`n        `$projectConfig = Join-Path `$projectRoot 'gbuild.config.json'"
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'cp-override' -ModuleFile 'ConfigProvider.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Initialize-BuildConfigState'].ScriptBlock
+            $state = [pscustomobject]@{ ScriptRoot = $baseDir; ProjectRoot = $projDir }
+            $cfg = & $fn -State $state
+            $cfg.build.maxParallelJobs | Should -Be 4 -Because 'the real loader lets the project-local gbuild.config.json win; the mutated one silently drops the override'
+        } finally {
+            Remove-MutationSandbox $sandbox
+            Remove-Item -LiteralPath $baseDir, $projDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

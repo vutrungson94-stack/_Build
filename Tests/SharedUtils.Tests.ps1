@@ -784,3 +784,59 @@ Describe 'SharedUtils - JSON, file move, audit, and gitignore helpers' {
         }
     }
 }
+
+Describe 'SharedUtils - targeted mutation tests (redaction guards)' {
+    # Line coverage does not prove the redaction assertions bite. Each test
+    # here plants ONE fail-open regression in a throwaway copy of Modules/ and
+    # asserts the mutated redactor leaks exactly the secret the suite's real
+    # assertions would catch. A surviver fails the test.
+    BeforeAll {
+        $script:ToolRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+        . (Join-Path $PSScriptRoot 'Helpers/MutationHelper.ps1')
+    }
+
+    It 'leaks an Azure-style sk-proj token when the widened OpenAI key pattern is narrowed' {
+        $sandbox = $null
+        try {
+            $old = "            'OpenAI Key'     = 'sk-(?:or-v1-)?[A-Za-z0-9_-]{20,}'"
+            $new = "            'OpenAI Key'     = 'sk-or-v1-[A-Za-z0-9_-]{20,}'"
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'su-openai' -ModuleFile 'SharedUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Protect-BuildSecretText'].ScriptBlock
+            $secret = 'sk-proj-Abcd1234Efgh5678Ijkl9012Mnop3456Qrst78'
+            $out = & $fn -Text $secret
+            $out | Should -Match 'sk-proj-Abcd1234Efgh5678Ijkl9012Mnop3456Qrst78' -Because 'the widened pattern is what catches Azure-style sk-proj keys; narrowing it to sk-or-v1- re-leaks them'
+        } finally {
+            Remove-MutationSandbox $sandbox
+        }
+    }
+
+    It 'leaks a gho_ token when the widened GitHub token pattern is narrowed' {
+        $sandbox = $null
+        try {
+            $old = "            'GitHub Token'   = 'gh[pousr]_[A-Za-z0-9_]{20,}'"
+            $new = "            'GitHub Token'   = 'ghp_[A-Za-z0-9_]{20,}'"
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'su-github' -ModuleFile 'SharedUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Protect-BuildSecretText'].ScriptBlock
+            $secret = 'gho_Abcd1234Efgh5678Ijkl9012Mnop3456Qrst90'
+            $out = & $fn -Text $secret
+            $out | Should -Match 'gho_[A-Za-z0-9_]{20,}' -Because 'gh[pousr]_ covers gho_/ghu_/ghs_/ghr_; narrowing to ghp_ re-leaks them'
+        } finally {
+            Remove-MutationSandbox $sandbox
+        }
+    }
+
+    It 'leaves the assignment untouched when the assignment evaluator fail-opens' {
+        $sandbox = $null
+        try {
+            $old = "                        return ([string]`$match.Groups['gbuild_key'].Value + [string]`$match.Groups['gbuild_sep'].Value + `$marker)"
+            $new = "                        return [string]`$match.Value"
+            $sandbox = New-MutationSandbox -ToolRoot $script:ToolRoot -Name 'su-assignment' -ModuleFile 'SharedUtils.psm1' -Old $old -New $new
+            $fn = $sandbox.Module.ExportedFunctions['Protect-BuildSecretText'].ScriptBlock
+            $out = & $fn -Text 'password=hunter2abcd1234'
+            $out | Should -Match 'hunter2abcd1234' -Because 'the real assignment rule rewrites the value to the marker; fail-open returns the raw assignment line'
+        } finally {
+            Remove-MutationSandbox $sandbox
+        }
+    }
+}
+

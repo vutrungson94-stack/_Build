@@ -1,0 +1,19 @@
+{
+  "description": "Append-only ledger of FLAKES: tests that failed a scope and then passed on an equivalent re-run (CI diagnostics step, coverage instrumentation context, or a local re-run). This is the L5 counterpart to tests/qpm-ledger.json (escaped defects). A flake that reaches a green state is recorded like an escape, so intermittent tests get fixed instead of re-run. Add an entry whenever the failed-scope diagnostic (or a local re-run) shows a scope passing after failing; never edit an entry's rootCause/fix after the fact. Enforced by Tests/FlakeLedger.Tests.ps1: no entry may stay OPEN longer than maxOpenDays, and no more than maxNewPerRolling30Days entries may appear in any rolling 30-day window. The committed file must validate clean.",
+  "maxOpenDays": 30,
+  "maxNewPerRolling30Days": 4,
+  "entries": [
+    {
+      "id": "2026-11-13-pathutils-bounded-walk",
+      "date": "2026-11-13",
+      "scope": "PathUtils",
+      "test": "Resolve-BuildProjectRoot reports HasMarker=$false and keeps the start dir when the walk is bounded out",
+      "detectedIn": "github run 43388525320 (coverage shard 6/12) under coverage instrumentation; passed on re-run",
+      "firstOutcome": "fail",
+      "rerunOutcome": "pass",
+      "rootCause": "the bounded-walk fixture lived directly under the host temp tree and inherited whatever ancestor the CI runner happened to have; a marker found above the fixture made HasMarker=$true. Non-hermetic test fixture, not a product defect.",
+      "fix": "d6defda (hermetic marker-less orphan base under GetTempPath)",
+      "status": "fixed"
+    }
+  ]
+}
