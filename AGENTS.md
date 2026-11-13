@@ -16,6 +16,27 @@ every project built with it, so the rules below are stricter than they look.
   gate is provably wrong: revert, analyse, change **this file first**, then
   adjust the gate with a note explaining why the gate was wrong.
 
+### 1.1 Reuse-first, smallest-diff (every change)
+
+- **Search before you write.** Find the current owner of the concept first:
+  `Modules/` (helpers, constants, config, paths, locale), `Tests/Helpers/` and
+  `Locales/*.json`. If an owner exists, call it. Do not add a second copy.
+- **Write the shortest correct code.** Prefer a call to an existing function
+  over restating its logic; prefer deleting code over adding code. "Shortest"
+  means a small, clear diff - not compressed or cryptic code. Do not add a
+  helper, parameter, file, config key or locale key unless the fix cannot be
+  correct without it.
+- **Behaviour must not change.** A change is a fix, not a rewrite. Keep the same
+  observable output, exit codes, defaults and messages unless the task is
+  explicitly to change them. Existing tests must stay green and must not be
+  weakened to accommodate the change.
+- **Reuse does not mean coupling.** If the owner is shared, change it once and
+  prove every caller still passes its scoped tests; never fork the owner for one
+  caller.
+- **Duplication is a decision, not an accident.** If duplication is genuinely
+  required (an artifact boundary or a bootstrap cycle), state why next to the
+  copy and pin it with a test, as ADR-0002 requires.
+
 ## 2. The mandatory loop (do not skip)
 
 Every change goes through this loop, in order:
@@ -371,6 +392,9 @@ PowerShell projects; `_Build` is not one.
 
 - All gates green on the changed tree, including the full suite and the docs
   sync gate.
+- The diff is the smallest one that fixes the problem: no new implementation
+  where an existing owner could be reused, and no behaviour change beyond the
+  task.
 - No new TODO without a tracking reference.
 - No hardcoded project name or assumed path anywhere in the change.
 - A human-readable commit message explaining *why*, not only *what*.

@@ -115,7 +115,10 @@ try { $__runnerBytes = [System.IO.File]::ReadAllBytes($runnerSelf) } catch { $__
 function Test-RunnerSelfHeal {
     if ($null -eq $script:GBuildRunnerSelfBytes) { return $false }
     if ($env:GBUILD_SELFHEAL_RUNNER -eq 'Off') { return $false }
-    try { return (Test-Path -LiteralPath $script:GBuildRunnerSelf -PathType Leaf) } catch { return $false }
+    # Heal only a MISSING driver. The earlier form returned true when the file
+    # existed, so every spawn rewrote the runner and logged a false "removed
+    # mid-suite" warning; an existing file must be left untouched.
+    try { return -not (Test-Path -LiteralPath $script:GBuildRunnerSelf -PathType Leaf) } catch { return $false }
 }
 function Restore-RunnerSelf {
     if (-not (Test-RunnerSelfHeal)) { return }
@@ -608,6 +611,20 @@ function Invoke-ScopeInProcess {
     } else {
         try { Remove-Item -LiteralPath (Join-Path $testRoot "TestResults/failed-$ScopeName.txt") -Force -ErrorAction SilentlyContinue } catch { }
     }
+    # Persist the NAMES of skipped tests, not just their count. -StrictSkips
+    # budgets the total, so an environment-dependent skip in one scope can hide
+    # a new skip in another; the allowlist in process-baseline.json names the
+    # skips that are expected, per scope, and the runner fails on any other.
+    # A scope that passes (or fails) with no skips removes its stale record, so
+    # a later green run cannot inherit a previous run's skipped list.
+    if ($res -and $res.Skipped) {
+        $skippedDir = Join-Path $testRoot 'TestResults'
+        if (-not (Test-Path -LiteralPath $skippedDir)) { New-Item -ItemType Directory -Path $skippedDir -Force | Out-Null }
+        $skippedFile = Join-Path $skippedDir "skipped-$ScopeName.txt"
+        @(@($res.Skipped) | ForEach-Object { $_.Name }) | Set-Content -LiteralPath $skippedFile -Encoding UTF8
+    } else {
+        try { Remove-Item -LiteralPath (Join-Path $testRoot "TestResults/skipped-$ScopeName.txt") -Force -ErrorAction SilentlyContinue } catch { }
+    }
     Write-ProgressLine ("[$ScopeName] $($result.Status) ($passed passed, $failed failed, $skipped skipped, $total total, {0:N1}s)" -f $elapsed)
     return $result
 }
@@ -1080,6 +1097,11 @@ if ($WaitOnly) {
 }
 
 if (-not $MergeOnly) {
+    # Start from a clean skipped-list: a scope that did not run in THIS run must
+    # not contribute a stale name to the allowlist check below.
+    foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $testRoot 'TestResults') -Filter 'skipped-*.txt' -File -ErrorAction SilentlyContinue)) {
+        try { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction SilentlyContinue } catch { }
+    }
     Write-ProgressLine "Suite start: $($selected.Count) scopes ($($inProc.Count) in-process core, $($isolated.Count) isolated state-sensitive)"
 }
 $parallelDegree = Get-ParallelDegree -ExplicitDegree $ParallelScopes
@@ -1304,10 +1326,13 @@ catch {
 # The baseline is the deliberate, reviewed record of what is acceptable, so it
 # is the authority. A skip is a failure the moment the run exceeds
 # skippedMaxAllowed, which is what makes -StrictSkips a RATCHET: the allowed
-# count only ever goes down, and the file's own text already says "Update this
-# file only when the process itself changes ... never to make a red run green".
+# count only ever goes down. When the baseline also names the EXPECTED skips
+# (core.skipAllowlist, per scope), the runner fails on any unlisted skip too:
+# a budget alone lets an environment-dependent skip in one scope hide a new
+# skip in another.
 $skipBudget = $null
 $skipBudgetSrc = 'none'
+$skipAllowlist = $null
 try {
     $blPath = Join-Path $testRoot 'process-baseline.json'
     if (Test-Path -LiteralPath $blPath -PathType Leaf) {
@@ -1316,9 +1341,13 @@ try {
             $skipBudget = [int]$bl.core.skippedMaxAllowed
             $skipBudgetSrc = 'Tests/process-baseline.json core.skippedMaxAllowed'
         }
+        if ($bl.PSObject.Properties.Name -contains 'core' -and ($bl.core.PSObject.Properties.Name -contains 'skipAllowlist') -and $null -ne $bl.core.skipAllowlist) {
+            $skipAllowlist = $bl.core.skipAllowlist
+        }
     }
 } catch { }
 $strictSkipFailure = $false
+$unexpectedSkips = [System.Collections.Generic.List[string]]::new()
 if ($StrictSkips.IsPresent) {
     if ($null -eq $skipBudget) {
         # No baseline to enforce against: falling back to "any skip fails"
@@ -1327,10 +1356,31 @@ if ($StrictSkips.IsPresent) {
         $strictSkipFailure = $false
     } else {
         $strictSkipFailure = ($totSkipped -gt $skipBudget)
+        if ($null -ne $skipAllowlist) {
+            foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $testRoot 'TestResults') -Filter 'skipped-*.txt' -File -ErrorAction SilentlyContinue)) {
+                $scopeName = $f.BaseName -replace '^skipped-', ''
+                $allowed = @()
+                if ($skipAllowlist.PSObject.Properties.Name -contains $scopeName) {
+                    $allowed = @($skipAllowlist.$scopeName)
+                }
+                foreach ($name in @(Get-Content -LiteralPath $f.FullName -ErrorAction SilentlyContinue)) {
+                    $n = [string]$name
+                    if ([string]::IsNullOrWhiteSpace($n)) { continue }
+                    if ($allowed -notcontains $n) { [void]$unexpectedSkips.Add(('{0} :: {1}' -f $scopeName, $n)) }
+                }
+            }
+            if ($unexpectedSkips.Count -gt 0) { $strictSkipFailure = $true }
+        }
     }
 }
 if ($StrictSkips.IsPresent) {
-    Write-ProgressLine ("StrictSkips: {0} skipped, budget {1} ({2}) -> {3}" -f $totSkipped, $(if ($null -eq $skipBudget) { 'n/a' } else { $skipBudget }), $skipBudgetSrc, $(if ($strictSkipFailure) { 'FAIL' } else { 'ok' }))
+    $skipVerdict = if ($strictSkipFailure) { 'FAIL' } else { 'ok' }
+    Write-ProgressLine ("StrictSkips: {0} skipped, budget {1} ({2}) -> {3}" -f $totSkipped, $(if ($null -eq $skipBudget) { 'n/a' } else { $skipBudget }), $skipBudgetSrc, $skipVerdict)
+    if ($unexpectedSkips.Count -gt 0) {
+        Write-ProgressLine ("StrictSkips: unlisted skip(s) detected ({0}) - update core.skipAllowlist in Tests/process-baseline.json only with a deliberate, reviewed reason:" -f $unexpectedSkips.Count)
+        foreach ($u in @($unexpectedSkips | Select-Object -First 20)) { Write-ProgressLine ("  - {0}" -f $u) }
+        if ($unexpectedSkips.Count -gt 20) { Write-ProgressLine ("  - ... and {0} more" -f ($unexpectedSkips.Count - 20)) }
+    }
 }
 Write-ProgressLine "Suite complete: $totPassed passed, $totFailed failed, $totSkipped skipped, $totTotal total, $killedScopes killed-by-infra"
 
@@ -1529,29 +1579,45 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
             # line vs a 55% command threshold), which is exactly the failure
             # mode the baseline note warns about.
             $lineFloorPct = $null
+            $measuredMergedPct = $null
+            $coverageDeltaPct = $null
             try {
                 $covBlPath = Join-Path $testRoot 'process-baseline.json'
                 if (Test-Path -LiteralPath $covBlPath -PathType Leaf) {
                     $covBl = Get-Content -LiteralPath $covBlPath -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
-                    if ($covBl.PSObject.Properties.Name -contains 'coverage' -and $null -ne $covBl.coverage.floorPercent) {
-                        $lineFloorPct = [double]$covBl.coverage.floorPercent
+                    if ($covBl.PSObject.Properties.Name -contains 'coverage') {
+                        if ($null -ne $covBl.coverage.floorPercent) { $lineFloorPct = [double]$covBl.coverage.floorPercent }
+                        if ($null -ne $covBl.coverage.measuredMergedLineCoverage) { $measuredMergedPct = [double]$covBl.coverage.measuredMergedLineCoverage }
+                        if ($null -ne $covBl.coverage.regressionDeltaPct) { $coverageDeltaPct = [double]$covBl.coverage.regressionDeltaPct }
                     }
                 }
             } catch { }
+            $coverageRegressionFloor = $null
+            if ($null -ne $measuredMergedPct -and $null -ne $coverageDeltaPct) {
+                $coverageRegressionFloor = [math]::Round($measuredMergedPct - $coverageDeltaPct, 2)
+            }
             if ($isPartialRun) {
                 # A shard measures a SLICE, and so does a scope list. Their
                 # percentage is not comparable with the global floor, so it is
                 # published and NOT gated. The floor is enforced by the merge
                 # job, which holds every shard's reports and computes the union
                 # of the whole suite.
-                Write-ProgressLine ("COVERAGE (partial run, not gated here): {0}% of {1} lines - the merged floor ({2}%) is enforced by the merge job" -f $pct, $totalCmds, $(if ($null -ne $lineFloorPct) { $lineFloorPct } else { 'n/a' }))
+                Write-ProgressLine ("COVERAGE (PARTIAL measurement, not gated here): {0}% of {1} lines - the merged floor ({2}%) is enforced by the merge job" -f $pct, $totalCmds, $(if ($null -ne $lineFloorPct) { $lineFloorPct } else { 'n/a' }))
             } elseif ($null -ne $lineFloorPct) {
                 Write-ProgressLine ("COVERAGE GATE: line floor {0}% (Tests/process-baseline.json coverage.floorPercent); measured {1}%" -f $lineFloorPct, $pct)
             }
+            if ((-not $isPartialRun) -and ($null -ne $coverageRegressionFloor)) {
+                Write-ProgressLine ("COVERAGE DELTA: regression guard >= {0}% (measured {1}% - delta {2}%); measured {3}%" -f $coverageRegressionFloor, $measuredMergedPct, $coverageDeltaPct, $pct)
+            }
+            $coverageGateMsg = $null
             if ((-not $isPartialRun) -and ($null -ne $lineFloorPct) -and ($pct -lt $lineFloorPct)) {
-                $msg = ("COVERAGE GATE FAILED: line coverage {0}% < baseline floor {1}% ({2} lines measured)" -f $pct, $lineFloorPct, $totalCmds)
-                Write-ProgressLine "RESULT: $msg"
-                Write-SuiteMessage $msg 'Err'
+                $coverageGateMsg = ("COVERAGE GATE FAILED: line coverage {0}% < baseline floor {1}% ({2} lines measured)" -f $pct, $lineFloorPct, $totalCmds)
+            } elseif ((-not $isPartialRun) -and ($null -ne $coverageRegressionFloor) -and ($pct -lt $coverageRegressionFloor)) {
+                $coverageGateMsg = ("COVERAGE REGRESSION FAILED: line coverage {0}% < regression guard {1}% (measured {2}% - delta {3}%)" -f $pct, $coverageRegressionFloor, $measuredMergedPct, $coverageDeltaPct)
+            }
+            if ($coverageGateMsg) {
+                Write-ProgressLine "RESULT: $coverageGateMsg"
+                Write-SuiteMessage $coverageGateMsg 'Err'
                 try { Remove-Item -LiteralPath $progressLog -Force -ErrorAction SilentlyContinue } catch { }
                 exit 1
             }

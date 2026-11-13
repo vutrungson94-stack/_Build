@@ -64,6 +64,14 @@
                     "minimum": 0,
                     "description": "The deliberate, reviewed skip allowance. Tests/Run-CoreTests.ps1 -StrictSkips - which every CI job passes - is enforced against THIS number rather than against zero. It was previously 'any skip fails', which cannot hold alongside a baseline that records skips: every run failed for a reason unrelated to the code under test and a genuine new skip was lost in the noise. Lowering this value is the ratchet; never raise it to make a red run green."
                 },
+                "skipAllowlist": {
+                    "type": "object",
+                    "description": "Per-scope allowlist of expected skip test names. A skip not listed here fails -StrictSkips, so a new skip in one scope cannot hide behind budget consumed by another.",
+                    "additionalProperties": {
+                        "type": "array",
+                        "items": { "type": "string", "minLength": 1 }
+                    }
+                },
                 "skipEnforcement": {
                     "type": "string",
                     "minLength": 1,
@@ -119,6 +127,12 @@
                 },
                 "measuredInstructionsCovered": { "type": "integer", "minimum": 0 },
                 "measuredInstructionsTotal": { "type": "integer", "minimum": 1 },
+                "regressionDeltaPct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Maximum allowed drop below measuredMergedLineCoverage on a full merged run. Failing this guard means coverage regressed even if it still clears floorPercent. Ratchet: lower the delta as confidence grows, never raise it to make a red run green."
+                },
                 "publishedSecondaryView": {
                     "type": "string",
                     "minLength": 1,

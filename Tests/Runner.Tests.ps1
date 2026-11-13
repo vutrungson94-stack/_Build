@@ -129,4 +129,33 @@ Describe 'Core test runner' {
             Remove-Item -LiteralPath $carFile -Force -ErrorAction SilentlyContinue
         }
     }
+
+    It 'keeps the scope inventory aligned with the committed baseline and the test tree' {
+        $toolRoot = Split-Path -Parent $PSScriptRoot
+        $baseline = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:runnerPath, [ref]$null, [ref]$null)
+        $scopeAssign = $ast.FindAll({
+            param($n)
+            $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$scopeMap'
+        }, $true) | Select-Object -First 1
+        $scopeAssign | Should -Not -BeNullOrEmpty -Because 'Run-CoreTests.ps1 must declare the scope map'
+        $pairs = @($scopeAssign.Right.Expression.KeyValuePairs)
+        $pairs.Count | Should -Be ([int]$baseline.core.scopes) -Because 'core.scopes is the measured scope inventory; adding or removing a scope requires refreshing the committed baseline in the same change'
+
+        $mappedFiles = @($pairs | ForEach-Object {
+            $v = $_.Item2
+            while ($v -is [System.Management.Automation.Language.PipelineAst] -and $v.PipelineElements.Count -gt 0) { $v = $v.PipelineElements[0].Expression }
+            [string]$v.Value
+        })
+        $mappedFiles.Count | Should -Be ($pairs.Count) -Because 'every scope must map to exactly one test file'
+
+        $allTestFiles = @(Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.Tests.ps1' -File | Select-Object -ExpandProperty Name)
+        $e2eFiles = @($allTestFiles | Where-Object { $_ -like '*E2E.Tests.ps1' })
+        $coreTestFiles = @($allTestFiles | Where-Object { $_ -notlike '*E2E.Tests.ps1' })
+        $unmapped = @($coreTestFiles | Where-Object { $_ -notin $mappedFiles })
+        $missing = @($mappedFiles | Where-Object { $_ -notin $allTestFiles })
+        $unmapped | Should -BeNullOrEmpty -Because 'every top-level core test file must be reachable from -Scope; E2E files are owned by Run-E2ETests.ps1'
+        $missing | Should -BeNullOrEmpty -Because 'a scope must not point at a missing test file'
+        $e2eFiles.Count | Should -BeGreaterThan 0 -Because 'the E2E-owned exclusion must stay intentional and non-empty'
+    }
 }

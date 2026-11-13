@@ -136,4 +136,92 @@ Describe "CacheProvider Config" {
         }
         Remove-Variable -Name cpUploadPath -Scope Global -ErrorAction SilentlyContinue
     }
+
+    It "normalizes and contains cache keys safely" {
+        InModuleScope CacheProvider {
+            ConvertTo-CacheKeyPath -Key 'a\b/c' | Should -Be 'a/b/c'
+            ConvertTo-CacheKeyPath -Key '../escape' | Should -Be ''
+            ConvertTo-CacheKeyPath -Key '/abs/path' | Should -Be ''
+            ConvertTo-CacheKeyPath -Key "bad`0key" | Should -Be ''
+            Get-CacheTenantPrefix -State ([PSCustomObject]@{ TenantId = 'default' }) | Should -Be ''
+            Get-CacheTenantPrefix -State ([PSCustomObject]@{ TenantId = 'team-1' }) | Should -Be 'team-1/'
+            Get-CacheTenantPrefix -State ([PSCustomObject]@{ TenantId = '../bad' }) | Should -BeNullOrEmpty
+
+            $state = [PSCustomObject]@{ TenantId = 'team-1' }
+            Resolve-CacheKey -State $state -Key 'pkg/file.bin' | Should -Be 'team-1/pkg/file.bin'
+            Resolve-CacheKey -State $state -Key 'team-1/pkg/file.bin' | Should -Be 'team-1/pkg/file.bin'
+            Resolve-CacheKey -State $state -Key '../x' | Should -Be ''
+            # other tenant prefix must not be accepted for default tenant
+            Resolve-CacheKey -State ([PSCustomObject]@{ TenantId = 'default' }) -Key 'tenant-b/file.bin' | Should -Be ''
+            Resolve-CacheKey -State ([PSCustomObject]@{ TenantId = 'default' }) -Key 'default/file.bin' | Should -Be 'file.bin'
+        }
+    }
+
+    It "compresses and expands cache files with integrity and size limits" {
+        $src = Join-Path $global:cpTemp 'plain.bin'
+        $cmp = Join-Path $global:cpTemp 'plain.bin.gz'
+        $dst = Join-Path $global:cpTemp 'plain.out.bin'
+        $bytes = [byte[]](0..255)
+        [System.IO.File]::WriteAllBytes($src, $bytes)
+        try {
+            Compress-CacheFile -SourcePath $src -DestinationPath $cmp | Should -BeTrue
+            (Test-Path -LiteralPath $cmp) | Should -BeTrue
+            Expand-CacheFile -SourcePath $cmp -DestinationPath $dst | Should -BeTrue
+            [System.IO.File]::ReadAllBytes($dst) | Should -Be $bytes
+            Remove-Item -LiteralPath $dst -Force -ErrorAction SilentlyContinue
+            # MaxBytes guard must reject oversized decompression and not leave a valid output
+            Expand-CacheFile -SourcePath $cmp -DestinationPath $dst -MaxBytes 10 | Should -BeFalse
+        } finally {
+            foreach ($p in @($cmp,$dst)) { if (Test-Path $p) { Remove-Item $p -Force -ErrorAction SilentlyContinue } }
+        }
+        $bad = Join-Path $global:cpTemp 'bad.gz'
+        [System.IO.File]::WriteAllBytes($bad, [byte[]](1,2,3,4,5))
+        $outBad = Join-Path $global:cpTemp 'bad.out'
+        Expand-CacheFile -SourcePath $bad -DestinationPath $outBad | Should -BeFalse
+        Remove-Item -LiteralPath $bad,$outBad -Force -ErrorAction SilentlyContinue
+    }
+
+    It "evicts cache files by policy while preserving index/lock and never touching outside roots" {
+        $cacheDir = Join-Path $global:cpTemp 'evict-cache'
+        $null = New-Item -ItemType Directory -Path $cacheDir -Force
+        $state = [PSCustomObject]@{
+            ScriptRoot = $global:cpTemp; ProjectRoot = $global:cpTemp; TenantId = 'default'
+            BuildConfig = [PSCustomObject]@{ build = [PSCustomObject]@{ cacheLocal = [PSCustomObject]@{ Enabled = $true; MaxEntries = 2; MaxAgeDays = 3650; MaxSizeMb = 100; Compress = $false } } }
+        }
+        $f1 = Join-Path $cacheDir 'a.bin'; $f2 = Join-Path $cacheDir 'b.bin'; $f3 = Join-Path $cacheDir 'c.bin'
+        $idx = Join-Path $cacheDir 'index.json'; $lock = Join-Path $cacheDir 'index.json.lock'
+        [System.IO.File]::WriteAllBytes($f1, [byte[]](1)); [System.IO.File]::WriteAllBytes($f2, [byte[]](2)); [System.IO.File]::WriteAllBytes($f3, [byte[]](3))
+        Set-Content -LiteralPath $idx -Value '{}' -Encoding UTF8; Set-Content -LiteralPath $lock -Value '' -Encoding UTF8
+        (Get-Item $f1).LastWriteTime = (Get-Date).AddMinutes(-30)
+        (Get-Item $f2).LastWriteTime = (Get-Date).AddMinutes(-20)
+        (Get-Item $f3).LastWriteTime = (Get-Date).AddMinutes(-10)
+        $removed = Invoke-CacheEviction -State $state -CacheDir $cacheDir
+        $removed | Should -BeGreaterOrEqual 1
+        @(Get-ChildItem -LiteralPath $cacheDir -File | Where-Object { $_.Name -like '*.bin' }).Count | Should -BeLessOrEqual 2
+        Test-Path -LiteralPath $idx | Should -BeTrue -Because 'index.json must be preserved'
+        Test-Path -LiteralPath $lock | Should -BeTrue -Because 'index lock must be preserved'
+    }
+
+    It "selects read/write cache regions based on health and write concern" {
+        InModuleScope CacheProvider {
+            $primary = @{ Name = 'primary'; Type = 'azureBlob'; Endpoint = 'https://p'; Container = 'c'; Priority = 1 }
+            $replica = @{ Name = 'replica'; Type = 'azureBlob'; Endpoint = 'https://r'; Container = 'c'; Priority = 2; ReadOnly = $false }
+            $state = [PSCustomObject]@{ TenantId = 'default' }
+
+            # Both healthy: prefer primary for read/write when quorum met
+            Mock Get-RemoteCacheConfig { [PSCustomObject]@{ HA = [PSCustomObject]@{ Consistency = [PSCustomObject]@{ WriteConcern = 'quorum' } } } }
+            Mock Get-PrimaryCacheConfig { $primary }
+            Mock Get-HAReplicaConfigs { @($replica) }
+            Mock Get-HealthyRegions { @($primary, $replica) }
+            (Select-ReadRegion -State $state).Name | Should -Be 'primary'
+            (Select-WriteRegion -State $state).Name | Should -Be 'primary'
+
+            # Primary unhealthy: fail over read selection to healthy replica
+            Mock Get-HealthyRegions { @($replica) }
+            (Select-ReadRegion -State $state).Name | Should -Be 'replica'
+            # Write concern 'all' cannot be met with only 1 of 2 regions healthy
+            Mock Get-RemoteCacheConfig { [PSCustomObject]@{ HA = [PSCustomObject]@{ Consistency = [PSCustomObject]@{ WriteConcern = 'all' } } } }
+            { Select-WriteRegion -State $state } | Should -Throw
+        }
+    }
 }

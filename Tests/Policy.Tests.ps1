@@ -204,3 +204,40 @@ Describe 'Policy - P0 fail-closed regressions' {
         @($portHits | Where-Object { $_.Key -like '*dirty.ps1' }).Count | Should -BeGreaterThan 0
     }
 }
+
+Describe 'Policy - enforcement and rule matching edge cases' {
+    It 'Invoke-PolicyEnforcement returns correct outcomes per mode' {
+        $v = @([PSCustomObject]@{ Rule = 'r'; Message = 'm' })
+        $blocked = Invoke-PolicyEnforcement -Scope 'test' -Violations $v -Enforcement 'block'
+        $blocked.Pass | Should -BeFalse
+        $blocked.Status | Should -Be 'Blocked'
+        @($blocked.Violations).Count | Should -Be 1
+
+        $warned = Invoke-PolicyEnforcement -Scope 'test' -Violations $v -Enforcement 'warn'
+        $warned.Pass | Should -BeTrue
+        $warned.Status | Should -Be 'Warned'
+
+        { Invoke-PolicyEnforcement -Scope 'test' -Violations $v -Enforcement 'fail' } | Should -Throw
+
+        $none = Invoke-PolicyEnforcement -Scope 'test' -Violations @() -Enforcement 'block'
+        $none.Pass | Should -BeTrue
+        $none.Status | Should -Be 'Passed'
+    }
+
+    It 'Invoke-PolicyChecks fails closed in block mode when enabled with no rules and no rego backend' {
+        $state = [PSCustomObject]@{ ProjectRoot = $TestDrive; BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ policy = [PSCustomObject]@{ enabled = $true; enforcement = 'block'; dir = (Join-Path $TestDrive 'empty-policy-dir') } } } }
+        $r = Invoke-PolicyChecks -State $state -ProjectDir $TestDrive
+        $r.Pass | Should -BeFalse
+        $r.Status | Should -Be 'Failed'
+        $r.Reason | Should -Match 'rules|rego|policy'
+    }
+
+    It 'Invoke-BuiltinPolicy rejects unsupported rule actions as evaluation failure' {
+        $state = [PSCustomObject]@{ BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ policy = [PSCustomObject]@{ enabled = $true; rules = @([PSCustomObject]@{ rule = 'warn-debug'; path = 'build.defaultConfiguration'; value = 'Debug'; action = 'warn' }) } } } }
+        $policyInput = [PSCustomObject]@{ build = [PSCustomObject]@{ defaultConfiguration = 'Debug' }; project = [PSCustomObject]@{ name = 'demo' } }
+        $r = Invoke-BuiltinPolicy -State $state -InputObject $policyInput
+        $r.Status | Should -Be 'Failed'
+        $r.Backend | Should -Be 'builtin'
+        @($r.Violations).Count | Should -Be 0
+    }
+}

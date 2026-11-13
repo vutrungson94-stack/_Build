@@ -631,3 +631,156 @@ Describe 'SharedUtils targeted coverage helpers' {
         }
     }
 }
+
+Describe 'SharedUtils - secret redaction and containment helpers' {
+    BeforeAll {
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildConstants.psm1') -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'PathUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+    }
+
+    It 'Get-BuildSecretRedactPatterns returns the canonical union and honours explicit overrides safely' {
+        $patterns = @(Get-BuildSecretRedactPatterns)
+        $patterns.Count | Should -BeGreaterThan 5
+        ($patterns | Where-Object { $_.Name -eq 'Generic API Key' }).Count | Should -BeGreaterThan 0
+        ($patterns | Where-Object { $_.Name -eq 'Connection String' }).Count | Should -BeGreaterThan 0
+        # Explicit patterns override the union but must not disable redaction when empty.
+        $fallback = @(Get-BuildSecretRedactPatterns -Patterns @())
+        $fallback.Count | Should -BeGreaterThan 0
+    }
+
+    It 'Protect-BuildSecretText redacts token families and sensitive assignments' {
+        $openai = 'token sk-abcdefghijklmnopqrstuvwxyz123456'
+        $gh = 'ghp_abcdefghijklmnopqrstuvwxyz1234'
+        $google = 'AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ12'
+        $aws = 'AKIA1234567890ABCDEF'
+        $conn = 'Server=db;Password=supersecret;User=app'
+        $jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.signaturepart'
+        foreach ($sample in @($openai,$gh,$google,$aws,$conn,$jwt)) {
+            $out = Protect-BuildSecretText -Text $sample
+            $out | Should -Not -Be $sample
+            $out | Should -Match 'REDACTED'
+        }
+        $assign = 'password=hunter2 token=abc12345678901234567890'
+        (Protect-BuildSecretText -Text $assign) | Should -Match 'password=.*REDACTED'
+    }
+
+    It 'Invoke-SafeRemove refuses paths outside allowed roots and removes allowed paths' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-saferemove-' + [guid]::NewGuid().ToString('N'))
+        $outside = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-saferemove-out-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $root,$outside -Force | Out-Null
+        $insideFile = Join-Path $root 'inside.txt'
+        $outsideFile = Join-Path $outside 'outside.txt'
+        Set-Content -LiteralPath $insideFile -Value 'x' -Encoding UTF8
+        Set-Content -LiteralPath $outsideFile -Value 'y' -Encoding UTF8
+        try {
+            Invoke-SafeRemove -Path $outsideFile -AllowedRoots @($root)
+            Test-Path -LiteralPath $outsideFile | Should -BeTrue
+            Invoke-SafeRemove -Path $insideFile -AllowedRoots @($root)
+            Test-Path -LiteralPath $insideFile | Should -BeFalse
+        } finally {
+            foreach ($p in @($root,$outside)) { if (Test-Path $p) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue } }
+        }
+    }
+
+    It 'Get-BoundedProjectFiles respects include filters and excluded dirs/files' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-bounded-' + [guid]::NewGuid().ToString('N'))
+        $keepDir = Join-Path $root 'src'
+        $skipDir = Join-Path $root (Join-Path 'node_modules' 'pkg')
+        New-Item -ItemType Directory -Path $keepDir,$skipDir -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $keepDir 'a.ps1') -Value '1' -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $keepDir 'b.txt') -Value '2' -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $keepDir 'skip.me.ps1') -Value '3' -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $skipDir 'c.ps1') -Value '4' -Encoding UTF8
+        try {
+            $files = @(Get-BoundedProjectFiles -Root $root -Filters @('*.ps1') -ExcludeDirs @('node_modules') -ExcludeFiles @('skip.me.ps1'))
+            $names = @($files | ForEach-Object { $_.Name } | Sort-Object)
+            $names | Should -Contain 'a.ps1'
+            $names | Should -Not -Contain 'b.txt'
+            $names | Should -Not -Contain 'c.ps1'
+            $names | Should -Not -Contain 'skip.me.ps1'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Describe 'SharedUtils - JSON, file move, audit, and gitignore helpers' {
+    BeforeAll {
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'BuildConstants.psm1') -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'PathUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction SilentlyContinue
+        $null = Import-Module (Join-Path $global:GBuildModuleRoot 'SharedUtils.psm1') -Force -Global -DisableNameChecking -ErrorAction Stop
+    }
+
+    It 'Write-BuildJsonFile and Read-BuildJsonFile round-trip atomically and reject corrupt files' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-json-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        $path = Join-Path $root (Join-Path 'nested' 'data.json')
+        try {
+            $ok = Write-BuildJsonFile -Path $path -Data ([ordered]@{ a = 1; b = @{ c = 'x' } }) -Atomic
+            $ok | Should -BeTrue
+            $read = Read-BuildJsonFile -FilePath $path
+            $read.a | Should -Be 1
+            $read.b.c | Should -Be 'x'
+            @(Get-ChildItem -LiteralPath (Split-Path $path -Parent) -Filter '*.tmp' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+            Set-Content -LiteralPath $path -Value '{not-json' -Encoding UTF8
+            Read-BuildJsonFile -FilePath $path | Should -BeNullOrEmpty
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'Move-BuildFileAtomic replaces an existing destination without leaving temp files' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-move-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        $src = Join-Path $root 'staged.txt'
+        $dst = Join-Path $root (Join-Path 'out' 'final.txt')
+        New-Item -ItemType Directory -Path (Split-Path $dst -Parent) -Force | Out-Null
+        Set-Content -LiteralPath $dst -Value 'old' -Encoding UTF8
+        Set-Content -LiteralPath $src -Value 'new' -Encoding UTF8
+        try {
+            Move-BuildFileAtomic -Source $src -Destination $dst | Should -BeTrue
+            (Get-Content -LiteralPath $dst -Raw).Trim() | Should -Be 'new'
+            Test-Path -LiteralPath $src | Should -BeFalse
+            @(Get-ChildItem -LiteralPath (Split-Path $dst -Parent) -Filter '*.bak' -Force -ErrorAction SilentlyContinue).Count | Should -Be 0
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'Write-BuildAuditLog appends JSON lines and Get-AuditLogPath resolves under project root' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-audit-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        $state = [PSCustomObject]@{ ProjectRoot = $root }
+        try {
+            $logPath = Get-AuditLogPath -State $state -DefaultFileName 'audit.log'
+            $logPath.StartsWith([System.IO.Path]::GetFullPath($root), [System.StringComparison]::OrdinalIgnoreCase) | Should -BeTrue
+            $ok = Write-BuildAuditLog -LogPath $logPath -Entry @{ Action = 'test'; Detail = 'x' }
+            $ok | Should -BeTrue
+            Test-Path -LiteralPath $logPath | Should -BeTrue
+            $lines = @(Get-Content -LiteralPath $logPath -ErrorAction Stop)
+            $lines.Count | Should -BeGreaterThan 0
+            ($lines[-1] | ConvertFrom-Json).Action | Should -Be 'test'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'Update-ProjectGitignore adds missing patterns once in a normal project directory' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-gi-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $root -Force | Out-Null
+        $gi = Join-Path $root '.gitignore'
+        Set-Content -LiteralPath $gi -Value "bin/`n" -Encoding UTF8
+        $state = [PSCustomObject]@{ ProjectRoot = $root }
+        try {
+            Update-ProjectGitignore -State $state -ProjectDir $root
+            $text = Get-Content -LiteralPath $gi -Raw
+            $text | Should -Match 'Auto-added by gbuild'
+            $text | Should -Match '\.gbuildcache/'
+            Update-ProjectGitignore -State $state -ProjectDir $root
+            ([regex]::Matches((Get-Content -LiteralPath $gi -Raw), 'Auto-added by gbuild')).Count | Should -Be 1
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

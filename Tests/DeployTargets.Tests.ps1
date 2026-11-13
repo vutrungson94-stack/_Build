@@ -146,3 +146,91 @@ Describe 'Resolve-K8sDeploymentName reads the manifest Deployment' {
         Resolve-K8sDeploymentName -ManifestPath $ambiguous | Should -Be ''
     }
 }
+
+Describe 'DeployTargets - deterministic env/token/containment helpers' {
+    BeforeAll {
+        $global:dtState2 = [PSCustomObject]@{
+            ScriptRoot = $PSScriptRoot
+            ProjectRoot = $PSScriptRoot
+            BuildConfig = [PSCustomObject]@{
+                deploy = [PSCustomObject]@{
+                    environments = [PSCustomObject]@{
+                        dev = [PSCustomObject]@{ branch = 'develop'; requiresApproval = $false; targets = @('azure'); autoDeploy = $true }
+                        prod = [PSCustomObject]@{ branch = 'main'; requiresApproval = $true; targets = @('azure','aws'); autoDeploy = $false }
+                    }
+                }
+            }
+        }
+    }
+
+    It 'Test-DeployToken accepts normal tokens and rejects dangerous ones' {
+        $mod = Get-Module DeployTargets
+        $mod.Invoke({ Test-DeployToken -Value 'abc123' }) | Should -BeTrue
+        $mod.Invoke({ Test-DeployToken -Value ' ' }) | Should -BeFalse
+        $mod.Invoke({ Test-DeployToken -Value ('a' * 200) }) | Should -BeFalse
+        $mod.Invoke({ Test-DeployToken -Value 'has;semicolon' }) | Should -BeFalse
+        $mod.Invoke({ Test-DeployToken -Value "has`nnewline" }) | Should -BeFalse
+    }
+
+    It 'Get-DeployEnvironments parses config and Resolve-EnvironmentForBranch matches patterns' {
+        $envs = @(Get-DeployEnvironments -State $global:dtState2)
+        $envs.Count | Should -Be 2
+        ($envs | Where-Object { $_.Name -eq 'prod' }).RequiresApproval | Should -BeTrue
+        ($envs | Where-Object { $_.Name -eq 'prod' }).Targets | Should -Contain 'aws'
+        Resolve-EnvironmentForBranch -State $global:dtState2 -Branch 'main' | Select-Object -ExpandProperty Name | Should -Be 'prod'
+        Resolve-EnvironmentForBranch -State $global:dtState2 -Branch 'feature-x' | Should -BeNullOrEmpty
+    }
+
+    It 'Add-DeployEnvironment registers a new environment and Test-ApprovalRequired respects it' {
+        $state = [PSCustomObject]@{ BuildConfig = [PSCustomObject]@{ deploy = [PSCustomObject]@{} } }
+        $new = Add-DeployEnvironment -State $state -Name 'qa' -Branch 'release/*' -RequiresApproval -Targets @('azure') -AutoDeploy
+        $new | Should -Not -BeNullOrEmpty
+        $envs = @(Get-DeployEnvironments -State $state)
+        $envs.Count | Should -Be 1
+        Test-ApprovalRequired -State $state -EnvironmentName 'qa' | Should -BeTrue
+        Test-ApprovalRequired -State $state -EnvironmentName 'missing' | Should -BeFalse
+        Test-ApprovalRequired -State $state -EnvironmentName '' | Should -BeFalse
+    }
+
+    It 'Resolve-DeployContainedPath rejects traversal and non-directory paths' {
+        $tmpRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-deploy-' + [guid]::NewGuid().ToString('N'))
+        $inside = Join-Path $tmpRoot 'inside'
+        $null = New-Item -ItemType Directory -Path $inside -Force
+        try {
+            $state = [PSCustomObject]@{ ProjectRoot = $tmpRoot; ScriptRoot = $tmpRoot }
+            $mod = Get-Module DeployTargets
+            $ok = $mod.Invoke({ param($s,$p) Resolve-DeployContainedPath -State $s -Path $p -RequireDirectory }, @($state,$inside))
+            $ok | Should -Be $inside
+            $mod.Invoke({ param($s,$p) Resolve-DeployContainedPath -State $s -Path $p -RequireDirectory }, @($state,(Join-Path $tmpRoot (Join-Path '..' '..' 'escape')))) | Should -Be ''
+            $mod.Invoke({ param($s,$p) Resolve-DeployContainedPath -State $s -Path $p -RequireDirectory }, @($state,(Join-Path $tmpRoot 'missing-dir'))) | Should -Be ''
+        } finally {
+            if (Test-Path $tmpRoot) { Remove-Item -LiteralPath $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+    }
+
+    It 'Get-DeployPublishOutputDir resolves inside project root' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild-deploy-out-' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $root -Force
+        try {
+            $state = [PSCustomObject]@{ ProjectRoot = $root; ScriptRoot = $root; BuildConfig = [PSCustomObject]@{ paths = [PSCustomObject]@{ publishOutput = 'publish-output' } } }
+            $mod = Get-Module DeployTargets
+            $dir = $mod.Invoke({ param($s) Get-DeployPublishOutputDir -State $s }, @($state))
+            $dir | Should -Not -BeNullOrEmpty
+            $dir.StartsWith([System.IO.Path]::GetFullPath($root), [System.StringComparison]::OrdinalIgnoreCase) | Should -BeTrue
+        } finally {
+            if (Test-Path $root) { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+    }
+
+    It 'Resolve-K8sDeploymentName extracts a single Deployment name and rejects ambiguous manifests' {
+        $single = Join-Path $TestDrive 'single.yaml'
+        Set-Content -LiteralPath $single -Encoding UTF8 -Value "apiVersion: apps/v1`nkind: Deployment`nmetadata:`n  name: web-api`n"
+        Resolve-K8sDeploymentName -ManifestPath $single | Should -Be 'web-api'
+        $ambiguous = Join-Path $TestDrive 'ambiguous.yaml'
+        Set-Content -LiteralPath $ambiguous -Encoding UTF8 -Value "kind: Deployment`nmetadata:`n  name: one`n---`nkind: Deployment`nmetadata:`n  name: two`n"
+        Resolve-K8sDeploymentName -ManifestPath $ambiguous | Should -Be ''
+        $missing = Join-Path $TestDrive 'missing.yaml'
+        if (Test-Path -LiteralPath $missing) { Remove-Item -LiteralPath $missing -Force -ErrorAction SilentlyContinue }
+        { Resolve-K8sDeploymentName -ManifestPath $missing } | Should -Throw
+    }
+}

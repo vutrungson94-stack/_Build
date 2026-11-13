@@ -1,5 +1,10 @@
 name: _Build CI
 
+# AI and human contributors: this workflow verifies the contract in AGENTS.md.
+# Before changing shipped code, follow AGENTS.md §1.1: reuse the existing
+# owner, keep the diff as small as the fix allows, and preserve observable
+# behaviour (existing tests must stay green).
+
 on:
   push:
     branches: [ main, master ]
@@ -661,7 +666,7 @@ jobs:
           # see what was measured and never mistake it for the merged result.
           foreach ($f in @(Get-ChildItem -LiteralPath $dir -Filter 'coverage-shard-*.json' -File -ErrorAction SilentlyContinue)) {
             $b = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-            Write-Host ("shard coverage (PARTIAL, not gated here): {0}% of {1} lines across {2} file(s)" -f $b.coveragePercent, $b.linesTotal, @($b.perFile).Count)
+            Write-Host ("shard coverage (PARTIAL measurement, not gated here): {0}% of {1} lines across {2} file(s)" -f $b.coveragePercent, $b.linesTotal, @($b.perFile).Count)
           }
           exit 0
       - name: Upload coverage shard
@@ -693,6 +698,12 @@ jobs:
     # what was actually measured.
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'push')
     timeout-minutes: 10
+    env:
+      # Must match the coverage matrix size above. A shard that dies before
+      # writing its summary leaves NO artifact to count, so the expected count
+      # cannot be inferred from the summaries that did arrive - it is declared
+      # here and checked.
+      COVERAGE_SHARD_COUNT: '12'
     steps:
       - uses: actions/checkout@v7
         with:
@@ -713,6 +724,47 @@ jobs:
           if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
               New-Item -ItemType Directory -Path $dir -Force | Out-Null
           }
+          # COMPLETENESS GATE: a merge over a partial artifact set is not a
+          # merged baseline. Every shard writes coverage-shard-<n>-of-<m>.json
+          # at the end of its run, so the set of those files proves which
+          # shards finished. The intended count is DECLARED above: a shard that
+          # dies before writing its summary leaves no artifact to count, and
+          # inferring the count from the survivors would silently accept 11/12.
+          # A missing shard used to be invisible here (the merge only required
+          # ONE XML), which could publish a baseline measured over half the suite.
+          $expected = 0
+          if ($env:COVERAGE_SHARD_COUNT) {
+              try { $expected = [int]$env:COVERAGE_SHARD_COUNT } catch { $expected = 0 }
+          }
+          if ($expected -lt 1) {
+              Write-Host 'COVERAGE_SHARD_COUNT is missing or invalid - cannot prove the artifact set is complete'
+              exit 1
+          }
+          $shardReports = @(Get-ChildItem -LiteralPath (Join-Path $root 'shards') -Filter 'coverage-shard-*-of-*.json' -Recurse -File -ErrorAction SilentlyContinue)
+          if ($shardReports.Count -eq 0) {
+              Write-Host 'no shard coverage summaries found - a shard likely failed before producing one'
+              exit 1
+          }
+          $seen = @{}
+          $declared = @{}
+          foreach ($r in $shardReports) {
+              if ($r.Name -match '^coverage-shard-(\d+)-of-(\d+)\.json$') {
+                  $index = [int]$Matches[1]
+                  $of = [int]$Matches[2]
+                  $seen[$index] = $true
+                  $declared[$of] = $true
+              }
+          }
+          if ($declared.Count -ne 1 -or -not $declared.ContainsKey($expected)) {
+              Write-Host ("shard summaries declare {0}, expected {1}" -f (($declared.Keys | Sort-Object) -join ', '), $expected)
+              exit 1
+          }
+          $missing = @(1..$expected | Where-Object { -not $seen.ContainsKey($_) })
+          if ($missing.Count -gt 0) {
+              Write-Host ("incomplete coverage artifact set: missing shard(s) {0} of {1}" -f ($missing -join ', '), $expected)
+              exit 1
+          }
+          Write-Host ("all {0} coverage shard summaries are present" -f $expected)
           $xmls = @(Get-ChildItem -LiteralPath (Join-Path $root 'shards') -Filter 'coverage-*.xml' -Recurse -File -ErrorAction SilentlyContinue)
           if ($xmls.Count -eq 0) {
               Write-Host 'no coverage XMLs found - a shard likely failed before producing any'

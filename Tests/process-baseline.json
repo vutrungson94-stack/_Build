@@ -1,16 +1,36 @@
 {
   "$schema": "./process-baseline.schema.json",
   "description": "Quantitative baseline of the gbuild verification process itself. This file is the L4 artefact: the numbers below are MEASURED, not aspirational. The per-run adoption curve is appended to Tests/TestResults/process-trend.jsonl (gitignored); the Hygiene gate reads the committed floor in this file, so it works on a fresh checkout with no history. Nothing regenerates a per-run process-baseline.json - that claim was removed when the trend file became the per-run artefact. Update this file only when the process itself changes (new scope, new gate, accepted skip) - never to make a red run green.",
-  "generatedAtUtc": "2026-11-12T09:12:53Z",
-  "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All -StrictSkips (parallel/LPT) + coverage merge (Tests/Run-CoreTests.ps1 -MergeOnly -Coverage)",
+  "generatedAtUtc": "2026-11-13T03:04:00Z",
+  "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All -StrictSkips (parallel/LPT, 2026-11-13) for the core counts; the coverage figures are the last recorded merge from Tests/Run-CoreTests.ps1 -MergeOnly -Coverage (2026-11-12)",
   "host": "windows-2025 / pwsh 7.6",
   "core": {
-    "scopes": 121,
-    "testsTotal": 1684,
-    "passed": 1676,
+    "scopes": 124,
+    "testsTotal": 1701,
+    "passed": 1693,
     "failedAllowed": 0,
     "skipped": 8,
     "skippedMaxAllowed": 8,
+    "skipAllowlist": {
+      "ConfigContamination": [
+        "project-local gbuild.config.json (if present) carries the allowList overlay"
+      ],
+      "HotReload": [
+        "Get-PsBinary resolves ps command on Unix",
+        "Get-UnixProcessTreeMap returns empty dict when ps unavailable"
+      ],
+      "PathUtils": [
+        "Test-NoReparsePointInPath stops at the OS aliases (/var, /tmp), not above them"
+      ],
+      "Platform": [
+        "Test-SafePath contains a Unix-style nested path under a Unix base",
+        "Test-SafePath rejects a Unix-style traversal outside the base"
+      ],
+      "Security": [
+        "Test-NpmVulnerabilities returns empty when npm is absent or no vulns",
+        "reports Signed when gpg signing is enabled with a key and gpg is present"
+      ]
+    },
     "killedByInfraAllowed": 0,
     "skipEnforcement": "Tests/Run-CoreTests.ps1 -StrictSkips (which every CI job passes) is enforced against THIS budget, not against zero. It previously failed on any skip at all, which cannot hold alongside a baseline that records 8: every run failed for a reason unrelated to the code under test. skippedMaxAllowed is the deliberate, reviewed allowance, so lowering it is the ratchet - never edit it upward to make a red run green."
   },
@@ -33,6 +53,7 @@
     "measuredMergedInstructionCoverage": 49.14,
     "measuredInstructionsCovered": 22681,
     "measuredInstructionsTotal": 46155,
+    "regressionDeltaPct": 0.25,
     "reconciliation": "ONE gate, ONE artefact set. The floor is applied to the merged LINE view, because that view is the only one that can be recomputed from the merged JaCoCo reports alone (the merge job installs no Pester, by design). The bytecode view comes from the SAME reports and the SAME union rule and is published next to it for trend only. Pester's own command-coverage percentage (the -MinCoveragePct target) is a THIRD number: it is Pester's in-process statement analysis of a single process, it is NOT reproducible from the merged reports, and it is therefore NOT a repository gate - it is only the per-process target Pester enforces when -MinCoveragePct is given. The three percentages must never be compared with each other; each is published under its own name and denominator.",
     "note": "Full-suite figure is published by the coverage CI job as Tests/TestResults/coverage-baseline.json. Floor ratcheted from 15 to 55 after merged measurements 56.08% then 56.27% (2026-11-12, union of baseline XMLs plus targeted helper scopes: SDK discovery waterfall, Build/SharedUtils/Orchestrator/HotReload helpers, deploy/AAB/SDK event-service paths) with LPT scheduling and parallel scope isolation; raise only, never lower. The measured line and bytecode figures above come from the SAME merge (the union of the baseline reports plus the targeted helper-scope reports), so they are comparable with each other. A SHARD publishes its own partial figure as coverage-shard-<n>-of-<m>.json and is never gated: a shard measures a slice, and the floor belongs to the merge job that holds every shard's reports. Measured 2026-11-12 on a FULL coverage run (121 scopes, degree 16, the report folder holding only that run's reports so the merge is not mixed with earlier ones): 15,618 s of scope work. The measurement engine alone was 566 s and became the long pole, so it was split into four scopes (ProcessMetricsEngine / Trend / Ratchet / Control) and the coverage matrix now runs 12 shards instead of 4. The coverage shards are balanced on Tests/coverage-costs.json - the MEASURED cost under instrumentation, because the plain timing table is the wrong input for an instrumented run and balanced the shards by the wrong weights."
   },

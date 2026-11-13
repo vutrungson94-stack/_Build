@@ -138,3 +138,49 @@ Describe 'RBAC - P0 namespace and escalation regressions' {
         $decision.Reason | Should -Match 'enforcement skipped'
     }
 }
+
+Describe 'RBAC - authorization decisions and assertions' {
+    BeforeAll {
+        $cfg = Get-Content (Join-Path $PSScriptRoot '../gbuild.config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+        $script:RbacState2 = [PSCustomObject]@{ BuildConfig = $cfg; TenantId = 'default'; CorrelationId = 'rbac-test-2' }
+        Initialize-RBAC -State $script:RbacState2
+    }
+
+    It 'Test-RBACAuthorization returns structured allow/deny decisions' {
+        $allow = Test-RBACAuthorization -State $script:RbacState2 -Permission 'build' -Action 'execute' -UserName 'developer-user'
+        $allow.Allowed | Should -BeOfType [bool]
+        $deny = Test-RBACAuthorization -State $script:RbacState2 -Permission 'deploy' -Action 'execute' -UserName 'nobody-xyz'
+        $deny.Allowed | Should -BeFalse
+        $deny.Reason | Should -Not -BeNullOrEmpty
+    }
+
+    It 'Assert-RBACAuthorization blocks denied actions and allows permitted ones' {
+        $viewerState = [PSCustomObject]@{ TenantId = 'default'; BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ rbac = [PSCustomObject]@{ enabled = $true; userRoles = [PSCustomObject]@{ dev = 'Developer' }; defaultRole = 'Viewer' } } } }
+        { Assert-RBACAuthorization -State $viewerState -Permission 'build' -Action 'execute' -UserName 'dev' } | Should -Not -Throw
+        $denied = $false
+        try {
+            Assert-RBACAuthorization -State $viewerState -Permission 'deploy' -Action 'execute' -UserName 'dev'
+        } catch {
+            $denied = $true
+        }
+        $denied | Should -BeTrue -Because 'deploy execute must be denied for Developer role'
+    }
+
+    It 'maps build action codes and exposes privileged action list consistently' {
+        Get-BuildActionPermission -Action '1' | Should -Be 'build'
+        Get-BuildActionPermission -Action 'A' | Should -Be 'deploy'
+        # Some actions may be classified as deploy/privileged by config/precedence;
+        # assert mappings are non-empty valid permission namespaces.
+        foreach ($a in @('S','C','R','L')) {
+            $p = Get-BuildActionPermission -Action $a
+            $p | Should -Not -BeNullOrEmpty
+            $p | Should -BeIn @('build','deploy','security','cache','report','artifact')
+        }
+        $priv = @(Get-RbacPrivilegedActions)
+        $priv.Count | Should -BeGreaterThan 0
+        $priv | Should -Contain 'A'
+        # Viewer/default should not be allowed deploy execute by permission checks
+        $state = [PSCustomObject]@{ TenantId = 'default'; BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ rbac = [PSCustomObject]@{ enabled = $true; userRoles = [PSCustomObject]@{}; defaultRole = 'Viewer' } } } }
+        (Test-RBACAuthorization -State $state -Permission 'deploy' -Action 'execute' -UserName 'nobody-xyz').Allowed | Should -BeFalse
+    }
+}

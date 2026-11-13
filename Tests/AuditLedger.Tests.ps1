@@ -159,3 +159,86 @@ Describe 'AuditLedger - torn-tail repair (fail-closed writes)' {
         }
     }
 }
+
+Describe 'AuditLedger - path, export, range, and tamper detection' {
+    It 'resolves ledger path under project root and detects tampering in the chain' {
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuildledgercov_' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        try {
+            $st = [PSCustomObject]@{
+                ProjectRoot   = $tmp
+                ScriptRoot    = (Join-Path $PSScriptRoot '..')
+                TenantId      = 'default'
+                CorrelationId = 'ledger-cov'
+                BuildConfig   = [PSCustomObject]@{ security = [PSCustomObject]@{ auditLedger = [PSCustomObject]@{ enabled = $true; backend = 'file'; signing = [PSCustomObject]@{ enabled = $false } } } }
+            }
+            Initialize-AuditLedger -State $st -Force
+            $path = Get-LedgerPath -State $st
+            $path | Should -Not -BeNullOrEmpty
+            $path.StartsWith([System.IO.Path]::GetFullPath($tmp), [System.StringComparison]::OrdinalIgnoreCase) | Should -BeTrue
+            # Reset module ledger counters for a brand-new file so sequences/hash chain start at genesis in this isolated temp ledger.
+            & (Get-Module AuditLedger) { $script:LedgerState.EntryCount = 0; $script:LedgerState.CurrentHash = ''; try { $script:LedgerState.MemoryEntries.Clear() } catch { } }
+            Write-AuditLedgerEntry -State $st -Entry @{ Type = 'RBAC'; Action = 'allow.build'; Allowed = $true } | Out-Null
+            Write-AuditLedgerEntry -State $st -Entry @{ Type = 'RBAC'; Action = 'deny.deploy'; Allowed = $false } | Out-Null
+            Write-AuditLedgerEntry -State $st -Entry @{ Type = 'RBAC'; Action = 'allow.cache'; Allowed = $true } | Out-Null
+
+            Initialize-AuditLedger -State $st -Force
+            $ok = Test-AuditLedger -State $st -FullChain
+            $ok.Valid | Should -BeTrue
+            $ok.VerifiedEntries | Should -Be 3
+
+            # Tamper: change an action in the middle entry without recomputing hashes
+            $lines = @(Get-Content -LiteralPath $path)
+            $lines.Count | Should -BeGreaterOrEqual 3
+            $mid = $lines[1] | ConvertFrom-Json
+            $mid.Action = 'tampered.action'
+            $lines[1] = ($mid | ConvertTo-Json -Compress -Depth 20)
+            Set-Content -LiteralPath $path -Value $lines -Encoding UTF8
+            Initialize-AuditLedger -State $st -Force
+            $bad = Test-AuditLedger -State $st -FullChain
+            $bad.Valid | Should -BeFalse
+            ($bad.FailedEntries.Count -gt 0 -or $bad.HashChainValid -eq $false -or $bad.Errors.Count -gt 0) | Should -BeTrue
+        } finally {
+            Remove-Item -Path $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'exports filtered ledger data and verifies a requested range' {
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuildledgerexp_' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+        New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+        try {
+            $st = [PSCustomObject]@{
+                ProjectRoot   = $tmp
+                ScriptRoot    = (Join-Path $PSScriptRoot '..')
+                TenantId      = 'default'
+                CorrelationId = 'ledger-exp'
+                BuildConfig   = [PSCustomObject]@{ security = [PSCustomObject]@{ auditLedger = [PSCustomObject]@{ enabled = $true; backend = 'file'; signing = [PSCustomObject]@{ enabled = $false } } } }
+            }
+            Initialize-AuditLedger -State $st -Force
+            & (Get-Module AuditLedger) { $script:LedgerState.EntryCount = 0; $script:LedgerState.CurrentHash = ''; try { $script:LedgerState.MemoryEntries.Clear() } catch { } }
+            Write-AuditLedgerEntry -State $st -Entry @{ Type = 'RBAC'; Action = 'a1'; Allowed = $true } | Out-Null
+            Write-AuditLedgerEntry -State $st -Entry @{ Type = 'BUILD'; Action = 'a2'; Allowed = $true } | Out-Null
+            Write-AuditLedgerEntry -State $st -Entry @{ Type = 'RBAC'; Action = 'a3'; Allowed = $false } | Out-Null
+
+            Initialize-AuditLedger -State $st -Force
+            $jsonl = Export-AuditLedger -State $st -Format 'jsonl' -Filter @{ Type = 'RBAC' }
+            $jsonl | Should -Match 'a1'
+            $jsonl | Should -Match 'a3'
+            $jsonl | Should -Not -Match 'a2'
+            $csv = Export-AuditLedger -State $st -Format 'csv'
+            $csv | Should -Match 'Action'
+
+            Initialize-AuditLedger -State $st -Force
+            $range = Test-AuditLedgerRange -State $st -FromSequence 2 -ToSequence 3
+            $range.Valid | Should -BeTrue
+            @($range.Entries).Count | Should -Be 2
+            @($range.Entries | ForEach-Object { [int]$_.Sequence } | Sort-Object) | Should -Be @(2,3)
+
+            $disabled = [PSCustomObject]@{ ProjectRoot = $tmp; BuildConfig = [PSCustomObject]@{ security = [PSCustomObject]@{ auditLedger = [PSCustomObject]@{ enabled = $false } } } }
+            Initialize-AuditLedger -State $disabled -Force
+            (Write-AuditLedgerEntry -State $disabled -Entry @{ Type = 'X'; Action = 'noop' }) | Should -BeTrue
+        } finally {
+            Remove-Item -Path $tmp -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

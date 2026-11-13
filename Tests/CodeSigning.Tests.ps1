@@ -339,3 +339,69 @@ Describe 'CodeSigning - pipeline entry point' {
         $r.Message | Should -Match 'not available'
     }
 }
+
+Describe 'CodeSigning - config, artifact discovery, and tool resolution' {
+    BeforeAll {
+        Import-Module (Join-Path $global:GBuildModuleRoot 'CodeSigning.psm1') -Force -DisableNameChecking -ErrorAction Stop
+    }
+
+    It 'Get-CodeSigningConfig returns safe defaults when config is absent' {
+        $cfg = Get-CodeSigningConfig -State ([PSCustomObject]@{ BuildConfig = @{} })
+        $cfg.Enabled | Should -BeFalse
+        $cfg.Tool | Should -Not -BeNullOrEmpty
+        @($cfg.Artifacts).Count | Should -BeGreaterThan 0
+        $cfg.Verify | Should -Not -BeNullOrEmpty
+    }
+
+    It 'Get-CodeSigningConfig reads peSign values from state config' {
+        $state = [PSCustomObject]@{
+            BuildConfig = @{
+                security = @{
+                    peSign = @{
+                        enabled = $true
+                        tool = 'external'
+                        recursive = $false
+                        verify = 'none'
+                        failOnError = $false
+                        externalCommand = 'my-signer'
+                        artifacts = @('*.exe', '*.msi')
+                    }
+                }
+            }
+        }
+        $cfg = Get-CodeSigningConfig -State $state
+        $cfg.Enabled | Should -BeTrue
+        $cfg.Tool | Should -Be 'external'
+        $cfg.Recursive | Should -BeFalse
+        $cfg.Verify | Should -Be 'none'
+        $cfg.FailOnError | Should -BeFalse
+        $cfg.ExternalCommand | Should -Be 'my-signer'
+        (@($cfg.Artifacts) -contains '*.exe') | Should -BeTrue
+        (@($cfg.Artifacts) -contains '*.msi') | Should -BeTrue
+    }
+
+    It 'Get-CodeSigningArtifact finds matching files, respects recursion, and returns unique paths' {
+        $root = Join-Path $TestDrive 'artifacts'
+        $sub = Join-Path $root 'sub'
+        New-Item -ItemType Directory -Path $sub -Force | Out-Null
+        $a = Join-Path $root 'a.exe'; $b = Join-Path $root 'b.dll'; $c = Join-Path $sub 'c.exe'
+        Set-Content -LiteralPath $a -Value 'x'; Set-Content -LiteralPath $b -Value 'x'; Set-Content -LiteralPath $c -Value 'x'
+        $rec = @(Get-CodeSigningArtifact -Path $root -Pattern @('*.exe','*.dll') -Recursive $true)
+        $flat = @(Get-CodeSigningArtifact -Path $root -Pattern @('*.exe') -Recursive $false)
+        $rec.Count | Should -Be 3
+        ($rec -contains $a) | Should -BeTrue
+        ($rec -contains $b) | Should -BeTrue
+        ($rec -contains $c) | Should -BeTrue
+        $flat.Count | Should -Be 1
+        $flat[0] | Should -Be $a
+        @(Get-CodeSigningArtifact -Path (Join-Path $root 'missing-dir') -Pattern @('*.exe')) | Should -BeNullOrEmpty
+    }
+
+    It 'Test-CodeSigningToolAvailable handles auto and external command resolution deterministically' {
+        Test-CodeSigningToolAvailable -Tool 'external' -ExternalCommand '' | Should -BeFalse
+        Test-CodeSigningToolAvailable -Tool 'external' -ExternalCommand 'definitely-not-a-real-signer-xyz' | Should -BeFalse
+        # auto is available when either powershell authenticode or signtool exists on this machine
+        $autoExpected = ((Test-CodeSigningToolAvailable -Tool 'powershell') -or (Test-CodeSigningToolAvailable -Tool 'signtool'))
+        Test-CodeSigningToolAvailable -Tool 'auto' | Should -Be $autoExpected
+    }
+}

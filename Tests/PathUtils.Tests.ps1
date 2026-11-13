@@ -221,3 +221,103 @@ Describe 'PathUtils - TrimEnd coercion guard (regression)' {
         $bad | Should -BeNullOrEmpty -Because ("multi-char backslash TrimEnd args throw at runtime: " + ($bad -join '; '))
     }
 }
+
+Describe 'PathUtils - canonical OS and path comparison' {
+    It 'Get-CanonicalOSName normalises provider spellings' {
+        Get-CanonicalOSName -OS 'win32nt' | Should -Be 'Windows'
+        Get-CanonicalOSName -OS 'Windows_NT' | Should -Be 'Windows'
+        Get-CanonicalOSName -OS 'linux' | Should -Be 'Linux'
+        Get-CanonicalOSName -OS 'unix' | Should -Be 'Linux'
+        Get-CanonicalOSName -OS 'darwin' | Should -Be 'MacOS'
+        Get-CanonicalOSName -OS 'osx' | Should -Be 'MacOS'
+        Get-CanonicalOSName -OS 'macos' | Should -Be 'MacOS'
+        Get-CanonicalOSName -OS 'mystery' | Should -Be 'Unknown'
+    }
+
+    It 'Get-PathComparison returns the correct case-sensitivity for the host' {
+        $cmp = Get-PathComparison
+        if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+            $cmp | Should -Be ([System.StringComparison]::OrdinalIgnoreCase)
+        } else {
+            $cmp | Should -Be ([System.StringComparison]::Ordinal)
+        }
+    }
+
+    It 'Test-IsWindowsHost matches the actual platform' {
+        $expected = ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT)
+        Test-IsWindowsHost | Should -Be $expected
+    }
+}
+
+Describe 'PathUtils - containment and rooted resolution' {
+    BeforeAll {
+        $script:ptContainRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_contain_' + [guid]::NewGuid().ToString('N'))
+        $script:ptContainChild = Join-Path $script:ptContainRoot 'child'
+        New-Item -ItemType Directory -Path $script:ptContainChild -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $script:ptContainChild 'a.txt') -Value 'x' -Encoding UTF8
+        $script:ptOutside = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_outside_' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:ptOutside -Force | Out-Null
+    }
+    AfterAll {
+        foreach ($p in @($script:ptContainRoot, $script:ptOutside)) {
+            if ($p -and (Test-Path $p)) { Remove-Item $p -Recurse -Force -ErrorAction SilentlyContinue }
+        }
+    }
+
+    It 'Test-PathUnderRoots accepts the root itself and nested paths and rejects escapes' {
+        Test-PathUnderRoots -Path $script:ptContainRoot -AllowedRoots @($script:ptContainRoot) | Should -BeTrue
+        Test-PathUnderRoots -Path (Join-Path $script:ptContainChild 'a.txt') -AllowedRoots @($script:ptContainRoot) | Should -BeTrue
+        Test-PathUnderRoots -Path $script:ptOutside -AllowedRoots @($script:ptContainRoot) | Should -BeFalse
+        Test-PathUnderRoots -Path (Join-Path $script:ptContainRoot '..' ([System.IO.Path]::GetFileName($script:ptOutside))) -AllowedRoots @($script:ptContainRoot) | Should -BeFalse
+        Test-PathUnderRoots -Path '' -AllowedRoots @($script:ptContainRoot) | Should -BeFalse
+        Test-PathUnderRoots -Path $script:ptContainChild -AllowedRoots @() | Should -BeFalse
+    }
+
+    It 'Resolve-BuildContainedPath resolves safe children and refuses escapes and control chars' {
+        $safe = Resolve-BuildContainedPath -Path (Join-Path 'child' 'a.txt') -Base $script:ptContainRoot -MustExist
+        $safe | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $script:ptContainChild 'a.txt')))
+        Resolve-BuildContainedPath -Path (Join-Path '..' ([System.IO.Path]::GetFileName($script:ptOutside))) -Base $script:ptContainRoot | Should -Be ''
+        Resolve-BuildContainedPath -Path ("child`0a.txt") -Base $script:ptContainRoot | Should -Be ''
+        Resolve-BuildContainedPath -Path (Join-Path 'child' 'missing.txt') -Base $script:ptContainRoot -MustExist | Should -Be ''
+        Resolve-BuildContainedPath -Path 'child' -Base $script:ptContainRoot -RequireDirectory | Should -Be $script:ptContainChild
+    }
+
+    It 'Get-SafeJoinPath requires a rooted base and folds parent traversal' {
+        { Get-SafeJoinPath -Base (Join-Path 'relative' 'base') -Child 'x' } | Should -Throw
+        $base = $script:ptContainRoot
+        $joined = Get-SafeJoinPath -Base $base -Child (Join-Path 'child' '..' 'child' 'a.txt')
+        $joined | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $script:ptContainChild 'a.txt')))
+    }
+
+    It 'Get-BuildRootDirectory and Resolve-BuildRootedPath prefer state roots' {
+        $root = $script:ptContainRoot
+        Get-BuildRootDirectory -State ([PSCustomObject]@{ ProjectRoot = $root; ScriptRoot = (Join-Path ([System.IO.Path]::GetTempPath()) 'other') }) | Should -Be $root
+        Get-BuildRootDirectory -State ([PSCustomObject]@{ ScriptRoot = $root }) | Should -Be $root
+        $abs = Resolve-BuildRootedPath -RelativePath (Join-Path 'child' 'a.txt') -State ([PSCustomObject]@{ ProjectRoot = $root })
+        $abs | Should -Be ([System.IO.Path]::GetFullPath((Join-Path $script:ptContainChild 'a.txt')))
+        $kept = Join-Path $root 'already-rooted.txt'
+        Resolve-BuildRootedPath -RelativePath $kept -State ([PSCustomObject]@{ ProjectRoot = $root }) | Should -Be $kept
+    }
+}
+
+Describe 'PathUtils - project candidate discovery' {
+    It 'Get-BuildProjectCandidateDirectories finds child projects and skips common output dirs' {
+        $root = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_cand_' + [guid]::NewGuid().ToString('N'))
+        $projA = Join-Path $root 'ProjA'
+        $projB = Join-Path $root (Join-Path 'bin' 'HiddenProj')
+        $nested = Join-Path $root (Join-Path 'Sub' 'ProjC')
+        New-Item -ItemType Directory -Path $projA,$projB,$nested -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $projA 'package.json') -Value '{}' -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $projB 'package.json') -Value '{}' -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $nested 'package.json') -Value '{}' -Encoding UTF8
+        try {
+            $candidates = @(Get-BuildProjectCandidateDirectories -Path $root -MaxDepth 3)
+            $names = @($candidates | ForEach-Object { Split-Path $_ -Leaf })
+            $names | Should -Contain 'ProjA'
+            $names | Should -Contain 'ProjC'
+            $names | Should -Not -Contain 'HiddenProj'
+        } finally {
+            Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}

@@ -38,8 +38,12 @@ skipped silently: an unrun gate is a failed gate.
    the current shape; read them before changing anything.
 2. **Baseline** - run the gates on the *untouched* tree and record which
    checks fail **before** the change.
-3. **Design** - the smallest safe change. Identify the single owner of the
-   concept being changed and change that owner, not a copy.
+3. **Design** - the smallest safe change. Reuse the existing owner (helper,
+   constant, config key, path utility, locale key) instead of writing a second
+   implementation, and write the shortest code that preserves the observable
+   behaviour. "Shortest" means the smallest clear diff, not compressed or
+   cryptic code. Identify the single owner of the concept being changed and
+   change that owner, not a copy.
 4. **Implement and fix until green** - a failing test after the change is not
    "accepted for now"; fix the code or back the change out.
 5. **Verify** - run the scopes that cover the change, then the full suite.
@@ -177,6 +181,7 @@ is worse than no reference, because it is trusted.
 | Floor lowering | "Let me lower the coverage floor to make CI green" | Floors move only from measurement |
 | Metric drift | A number in the baseline that no engine produces | The gate reads the engine, not the file |
 | Partial vs global | A shard's percentage compared with the global floor | Partial measurements are diagnostics |
+| Reimplementation | A second copy of logic that already has an owner | Reuse-first, smallest-diff (`AGENTS.md` §1.1) |
 | Unclosed loop | A red gate and no analysis record | A failed gate opens a corrective-action record |
 | Silent scope | A test file that is never executed | Every test file belongs to a scope |
 | Unreconciled metrics | Two published percentages, no rule between them | One gate, one artefact set, a written reconciliation |

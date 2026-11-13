@@ -255,3 +255,73 @@ historic 12-test failure there.
 engine dropped the UTF-8 BOM from a shipped script that contains non-ASCII
 bytes; the `PS51Compat` gate failed it in the very run that measured the
 coverage. The BOM is restored, and the gate did its job.
+
+## 2026-11-13 update (fifth pass - contributor rule, and a wording regression caught by CI)
+
+Re-measured on the working tree (the table above is the 2026-11-09 snapshot;
+the later passes supersede it where they say so):
+
+| Check | Result | Evidence |
+|---|---|---|
+| Self-test | 11/11 | `pwsh ./gbuild.ps1 -SelfTest` |
+| Adoption | 7/7 classes at parity, mean 100 %, 0 site outstanding | process-metrics check |
+| Dependency graph | 77 modules, 0 missing, 0 cycles | dependencies check |
+| Locale parity | 7 locales x 1,263 keys | `Locales/*.json` |
+| Core baseline | 124 scopes, 1,701 tests (1,693 passed, 8 skipped), measured 2026-11-13 | `Tests/process-baseline.json` |
+| Merged line coverage | 55.96 % against a 55 % floor (last recorded merge) | `Tests/process-baseline.json` |
+| Decision records | 7 ADRs + index | `Docs/ADRs/README.md` |
+
+- **CI regression (fixed).** Commit `a67099a` generalised the shard diagnostic
+  from `PARTIAL measurement, not gated here` to `partial run, not gated here`
+  but did not update `Tests/Runner.Tests.ps1`; scope `Runner` failed on
+  `23f8a9d` while the rest of the suite passed. The runner and the workflow now
+  emit the canonical phrase, and the existing assertion is the regression
+  guard. This was test-contract/wording drift, not a coverage or infrastructure
+  defect.
+- **Reuse-first rule published.** `AGENTS.md` §1.1 and
+  `Docs/Process/verification-process.md` §3/§10 now require every change to
+  reuse the existing owner, keep the diff as small as the fix allows, and
+  preserve observable behaviour. The CI workflow points contributors at it.
+- **Coverage merge completeness (fixed).** The `coverage-merge` job previously
+  checked only that at least one XML arrived; a missing shard could still
+  produce a "merged" baseline. It now declares the expected shard count
+  (`COVERAGE_SHARD_COUNT: 12`), requires every
+  `coverage-shard-<n>-of-<m>.json` summary to be present, and requires the
+  summaries to declare that same count. The count is declared rather than
+  inferred from the survivors, because a shard that dies before writing its
+  summary leaves no artifact to count. Verified by simulation: 12/12 passes;
+  a missing shard 7, a missing shard 12 with no artifact at all, and a
+  declared count of 11 each fail.
+- **Baseline drift (fixed).** A full `-Scope All -StrictSkips` run on
+  2026-11-13 measured 124 scopes, 1,701 tests, 1,693 passed and 8 skipped
+  against a skip budget of 8. `Tests/process-baseline.json` now records those
+  values; `ModuleBodies`, `OrchestratorPipelineSteps` and `BuildCoverage` are
+  included. The coverage figures remain the last recorded merge (2026-11-12)
+  and the `generatedBy` field says so, rather than implying a new merge.
+- **Runner self-heal (fixed).** `Test-RunnerSelfHeal` in
+  `Tests/Run-CoreTests.ps1` returned true when the file EXISTED, so every
+  spawn rewrote the runner and logged a false "removed mid-suite" warning.
+  The check is now negated: only a missing driver is restored.
+- **Verdict: unchanged - L4 with several L5 mechanisms operating.** The
+  remaining distance is organisational (independent adoption and audit of the
+  published process). The three code-level findings from this pass are fixed;
+  the next candidates are:
+  1. **Scope-inventory gate.** The baseline is now correct, but nothing stops
+     it drifting again. A `Runner` test should parse `$scopeMap`, compare its
+     size with `core.scopes`, and require every top-level `*.Tests.ps1`
+     (except the E2E files owned by `Run-E2ETests.ps1`) to be mapped.
+  2. **Per-scope skip allowlist.** `-StrictSkips` budgets a single global
+     count (8), so an environment-dependent skip in one scope can hide a new
+     skip in another. Record the expected skip per scope with a reason and an
+     expiry, and fail on an unlisted skip.
+  3. **Coverage regression guard.** The floor is 55 % and the measured value
+     55.96 %; a 1-point regression still passes. Fail (or warn with an owned
+     CAR) when merged coverage drops by more than a stated delta from the
+     committed measurement, independently of the absolute floor.
+  4. **Targeted mutation score.** `ProcessMetricsMutation` exercises the
+     metrics engine itself. Extend mutation testing to the highest-risk owners
+     (`PathUtils` containment, `SharedUtils` redaction, `ConfigProvider`) with
+     a score floor, because line coverage does not prove the assertions bite.
+  5. **Flake ledger.** The runner records timings and failed-scope files but
+     not a pass-after-failure history. Record rerun outcomes and gate on the
+     flake rate, so intermittent tests are fixed instead of re-run.
