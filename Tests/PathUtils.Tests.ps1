@@ -163,16 +163,20 @@ Describe 'PathUtils - project root resolution' {
     }
 
     It 'Resolve-BuildProjectRoot reports HasMarker=$false and keeps the start dir when the walk is bounded out' {
-        $orphan = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_orphan_' + [guid]::NewGuid().ToString('N'))
+        # Keep the walk inside a controlled, marker-less tree so the bounded
+        # search (start dir + parent only) is deterministic regardless of what
+        # the host temp ancestors contain.
+        $base = Join-Path ([System.IO.Path]::GetTempPath()) ('gbutil_orphanbase_' + [guid]::NewGuid().ToString('N'))
+        $orphan = Join-Path $base 'child'
         New-Item -ItemType Directory -Path $orphan -Force | Out-Null
         try {
             # -MaxDepth 1 checks the directory itself and its parent only, so the
-            # walk cannot escape into a real project higher up the tree.
+            # walk cannot escape beyond the controlled base into the host tree.
             $r = Resolve-BuildProjectRoot -StartDir $orphan -MaxDepth 1
             $r.HasMarker | Should -BeFalse
             $r.Root | Should -Be ([System.IO.Path]::GetFullPath($orphan))
             $r.Explicit | Should -BeFalse
-        } finally { Remove-Item $orphan -Recurse -Force -ErrorAction SilentlyContinue }
+        } finally { Remove-Item $base -Recurse -Force -ErrorAction SilentlyContinue }
     }
 
     It 'Test-BuildVolumeRoot identifies a filesystem volume root' {
