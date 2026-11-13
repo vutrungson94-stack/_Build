@@ -22,7 +22,7 @@ What the three actually do is **borrow** each other:
 - `_Tests` borrows the project under test to run its suites - and, since
   2026-11-12, it delegates to a project that ships its own runner instead of
   flattening every `*.Tests.ps1` into one Pester session,
-- `_Build` borrows `_Tests/gtest.ps1` and `_Sync/gsync.ps1` as external gates,
+- `_Build` calls `_Tests/gtest.ps1 -SelfTest` and `_Sync/gsync.ps1 -Project . -Yes -NonInteractive` as external gates in its documented release loop (AGENTS.md §2); CI enforces its own gates and does not depend on them,
 - `_Sync` borrows the project it syncs.
 
 That is borrowing: a process invokes a tool across a file-system boundary and

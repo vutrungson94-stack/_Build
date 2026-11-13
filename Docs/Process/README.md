@@ -7,6 +7,7 @@ process transfers through these documents.
 | Document | What it is |
 |---|---|
 | [verification-process.md](verification-process.md) | The portable verification process: the loop, the gate inventory, the evidence, the ratchet doctrine, the coverage rules, and how another project inherits it |
+| [2026-11-13-independent-audit.md](2026-11-13-independent-audit.md) | An independent (fresh-context, read-only) audit of this process across both tools, the remediation mapping, and what a SCAMPI-class appraisal would still require |
 
 ## Why this exists
 

@@ -6,7 +6,8 @@ Date: 2026-11-12
 ## Context
 
 The platform measured itself, controlled its process with statistical limits
-and ran a working improvement loop - all the machinery of CMMI Level 5. What it
+and ran a working improvement loop - much of the machinery of a CMMI Level 5
+organization, per the self-assessment. What it
 did not have was a **process asset**: the discipline existed only as
 `AGENTS.md` inside this repository.
 

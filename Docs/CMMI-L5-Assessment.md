@@ -1,6 +1,6 @@
 # CMMI L5 / Enterprise Platform Maturity Assessment — `_Build`
 
-Assessment date: 2026-11-09 (re-measured 2026-11-12)
+Assessment date: 2026-11-09 (re-measured 2026-11-12; updated 2026-11-13, pass 7 is the authoritative current state)
 Scope: the `_Build` codebase itself (74,006 LOC measured across `Modules/`
 (91 files, 50,587 lines) + `Tests/` (130 files, 23,419 lines), 221 PowerShell
 files, 58 shipped modules, 7 locale catalogs). Evidence is taken from the code,
@@ -23,7 +23,7 @@ single-repo platform that is the expected ceiling.
 | Defect prevention | **L5** | `Tests/GateDetectors.ps1`, `Tests/GateSelfTest.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1`, pre-commit/pre-push hooks, `Tests/qpm-ledger.json` |
 | Causal analysis | **L4** | `Modules/RootCause.psm1` (CAR ledger, classifier table), `Modules/AnomalyDetector.psm1` |
 | Continuous improvement | **L5** | `Modules/AutoTuner.psm1` (proposal + pilot gate), `Find-RatchetCandidates`, `Tests/ProcessMetrics.Mutation.Tests.ps1` |
-| Verification & validation | **L4** | 125 scopes / 1,762 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 55 % (measured 55.96 %), `Tests/Run-CoreTests.ps1` scope isolation |
+| Verification & validation | **L4** | 125 scopes / 1,764 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 55 % (measured 55.96 %), `Tests/Run-CoreTests.ps1` scope isolation |
 | Configuration management | **L4** | `gbuild.config.json` + schema, config-key parity gate, `Modules/ConfigProvider.psm1` |
 | Portability / cross-platform | **L5** | `Modules/PathUtils.psm1`, POSIX launcher, Docker multi-arch, CI matrix (ubuntu/macos/windows/arm64) |
 | Code reuse / DRY | **L5** | 7/7 adoption classes at 100 %, governed duplication pinned by tests |
@@ -31,6 +31,21 @@ single-repo platform that is the expected ceiling.
 | Multilingual / i18n | **L5** | 7 locales × 1,263 keys at parity, `localeKeyWiring` 100 %, `i18nProseCoverage` 100 % |
 | Observability | **L4/L5** | `Modules/Logging.psm1`, `Modules/Metrics.psm1` (Prometheus/OTLP), `Modules/AuditLedger.psm1`, `Modules/SupplyChain.psm1` (SLSA), `Modules/Report.psm1` (SARIF) |
 | Governance / security | **L4** | `Modules/Security.psm1`, `Modules/RBAC.psm1`, `Modules/Policy.psm1`, `Modules/CredentialVault.psm1`, pre-push review gate |
+
+**Current truth (2026-11-13, seven passes)**:
+
+| Check | Result | Source |
+|---|---|---|
+| Scope inventory / tests | 125 scopes / 1,764 tests (1,756 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
+| Self-test | 11/11 checks | `gbuild.ps1 -SelfTest` |
+| Hygiene gates | 9 (gate recounts Describe blocks; the -19 and -8 stale counts are gone) | `Hygiene: the process baseline is versioned and structurally valid` |
+| Coverage | line floor 55 %, last merge 55.96 % (2026-11-12, unchanged on purpose) | `Tests/process-baseline.json` |
+| Targeted mutation score | 9/9 planted mutants detected (PathUtils, SharedUtils, ConfigProvider) | mutation tests in the three scopes |
+| Flake ledger | 1 entry (PathUtils bounded-walk, `fixed`, `d6defda`), gate live | `Tests/flake-ledger.json`, `FlakeLedger` scope |
+| CI on `main` | green at `ad71eaa` (independent audit remediation commit) | `gh run view 43410086942` (and previous-run confirmations) |
+| Rating | **unchanged - L4 with L5 mechanisms; NOT CMMI L5, self-assessed, single-repo + partial `_Sync` adoption.** Any external claim otherwise is a finding against this repository | pass 7 |
+
+Any claim this table contradicts is stale and should be reported as a finding.
 
 ## What is genuinely L5 here
 
