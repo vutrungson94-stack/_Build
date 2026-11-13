@@ -1450,7 +1450,7 @@ $isPartialShard = ($ShardCount -gt 1 -and $Shard -ge 1 -and -not $MergeOnly)
 # the tree and would have failed against the 55% floor for the same reason a
 # shard did - the floor belongs to the measurement of the WHOLE suite, which
 # is what the merge job performs.
-$isPartialRun = ($isPartialShard -or (-not $MergeOnly) -and ($Scope -ne 'All' -or $env:GBUILD_SS_LIST))
+$isPartialRun = ($isPartialShard -or ((-not $MergeOnly) -and ($Scope -ne 'All' -or $env:GBUILD_SS_LIST)))
 if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -LiteralPath $CoverageDir -PathType Container)) {
     try {
         # The "ignore what was already there" filter protects a normal run
@@ -1596,7 +1596,11 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
             if ($null -ne $measuredMergedPct -and $null -ne $coverageDeltaPct) {
                 $coverageRegressionFloor = [math]::Round($measuredMergedPct - $coverageDeltaPct, 2)
             }
-            if ($isPartialRun) {
+            # A shard is always partial and must never be gated on the global
+            # floor/delta. Keep the check explicit (not only via $isPartialRun)
+            # so a sharded run can never fail for measuring a slice.
+            $skipCoverageGate = ($isPartialRun -or $isPartialShard)
+            if ($skipCoverageGate) {
                 # A shard measures a SLICE, and so does a scope list. Their
                 # percentage is not comparable with the global floor, so it is
                 # published and NOT gated. The floor is enforced by the merge
@@ -1606,13 +1610,13 @@ if ((($Coverage -and -not $script:NoCoverage) -or $MergeOnly) -and (Test-Path -L
             } elseif ($null -ne $lineFloorPct) {
                 Write-ProgressLine ("COVERAGE GATE: line floor {0}% (Tests/process-baseline.json coverage.floorPercent); measured {1}%" -f $lineFloorPct, $pct)
             }
-            if ((-not $isPartialRun) -and ($null -ne $coverageRegressionFloor)) {
+            if ((-not $skipCoverageGate) -and ($null -ne $coverageRegressionFloor)) {
                 Write-ProgressLine ("COVERAGE DELTA: regression guard >= {0}% (measured {1}% - delta {2}%); measured {3}%" -f $coverageRegressionFloor, $measuredMergedPct, $coverageDeltaPct, $pct)
             }
             $coverageGateMsg = $null
-            if ((-not $isPartialRun) -and ($null -ne $lineFloorPct) -and ($pct -lt $lineFloorPct)) {
+            if ((-not $skipCoverageGate) -and ($null -ne $lineFloorPct) -and ($pct -lt $lineFloorPct)) {
                 $coverageGateMsg = ("COVERAGE GATE FAILED: line coverage {0}% < baseline floor {1}% ({2} lines measured)" -f $pct, $lineFloorPct, $totalCmds)
-            } elseif ((-not $isPartialRun) -and ($null -ne $coverageRegressionFloor) -and ($pct -lt $coverageRegressionFloor)) {
+            } elseif ((-not $skipCoverageGate) -and ($null -ne $coverageRegressionFloor) -and ($pct -lt $coverageRegressionFloor)) {
                 $coverageGateMsg = ("COVERAGE REGRESSION FAILED: line coverage {0}% < regression guard {1}% (measured {2}% - delta {3}%)" -f $pct, $coverageRegressionFloor, $measuredMergedPct, $coverageDeltaPct)
             }
             if ($coverageGateMsg) {
