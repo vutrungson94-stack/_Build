@@ -338,7 +338,7 @@ Describe 'SAST - zero findings must stay zero (no phantom finding)' {
 }
 
 Describe 'SAST - fixture files must not declare project languages' {
-    # A lone Go-default.go template under _Tests is not a Go project, but the
+    # A lone Go-default.go template under a tool fixture is not a Go project, but the
     # extension walk counted it as one - so a pure C#/Blazor repo demanded
     # bandit, gosec, cargo-audit, maven and bundler, and the fail-closed tool
     # policy blocked the build for scanners the project never needed.
@@ -346,7 +346,7 @@ Describe 'SAST - fixture files must not declare project languages' {
         $global:sastFixture = Join-Path ([System.IO.Path]::GetTempPath()) ('gbuild_sast_fixture_' + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $global:sastFixture -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $global:sastFixture 'package.json') -Value '{"name":"app"}'
-        $fx = Join-Path $global:sastFixture '_Tests/Tools/.mktest/templates'
+        $fx = Join-Path $global:sastFixture 'FixtureTool/Tools/.mktest/templates'
         New-Item -ItemType Directory -Path $fx -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $fx 'Go-default.go') -Value 'package main'
         Set-Content -LiteralPath (Join-Path $fx 'Java-default.java') -Value 'class A {}'
@@ -368,14 +368,14 @@ Describe 'SAST - fixture files must not declare project languages' {
     }
 
     It 'still counts manifest evidence anywhere (a test csproj is still C#)' {
-        $dir = Join-Path $global:sastFixture '_Tests/Helpers/Analyzer.CSharp'
+        $dir = Join-Path $global:sastFixture 'FixtureTool/Helpers/Analyzer.CSharp'
         New-Item -ItemType Directory -Path $dir -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $dir 'Analyzer.CSharp.csproj') -Value '<Project></Project>'
         try {
             $langs = @(Get-SastProjectLanguages -ProjectDir $global:sastFixture -State ([PSCustomObject]@{ BuildConfig = $null }))
             $langs | Should -Contain 'C#'
         } finally {
-            Remove-Item (Join-Path $global:sastFixture '_Tests') -Recurse -Force -ErrorAction SilentlyContinue
+            Remove-Item (Join-Path $global:sastFixture 'FixtureTool') -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 }

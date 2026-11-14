@@ -82,8 +82,8 @@ Describe "Security - Secret Scan Exclusions" {
         $dropDir = Join-Path $temp 'drop'
         $null = New-Item -ItemType Directory -Path $dropDir -Force
         Set-Content -Path (Join-Path $dropDir 'app.json') -Value '{"key":"sk-or-v1-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"}' -Encoding UTF8
-        # A _Sync/Tests directory with a .Tests.ps1 file (auto-detected as test dir)
-        $syncTestDir = Join-Path (Join-Path $temp '_Sync') 'Tests'
+        # A tool-like Tests directory with a .Tests.ps1 file (auto-detected as test dir)
+        $syncTestDir = Join-Path (Join-Path $temp 'OtherTool') 'Tests'
         $null = New-Item -ItemType Directory -Path $syncTestDir -Force
         Set-Content -Path (Join-Path $syncTestDir 'sample.ps1') -Value '$_api = "sk-or-v1-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"' -Encoding UTF8
         Set-Content -Path (Join-Path $syncTestDir 'Dummy.Tests.ps1') -Value 'Describe "x" { It "y" { $k = "sk-or-v1-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" } }' -Encoding UTF8
@@ -102,14 +102,14 @@ Describe "Security - Secret Scan Exclusions" {
     }
 
     It "Excludes the drop directory when passed via ExcludeDirs" {
-        $res = Invoke-SecretScan -SearchRoot $temp -ExcludeDirs @('drop', '_Sync/Tests', '_Tests', 'UnitTests')
+        $res = Invoke-SecretScan -SearchRoot $temp -ExcludeDirs @('drop', 'OtherTool/Tests', 'OtherTests', 'UnitTests')
         $res.Findings.Count | Should -Be 1
         ($res.Findings.File -replace '\\', '/' -join ',') | Should -Not -BeLike "*drop*"
     }
 
-    It "Auto-detects _Sync/Tests as a test directory via *.Tests.ps1" {
+    It "Auto-detects OtherTool/Tests as a test directory via *.Tests.ps1" {
         $res = Invoke-SecretScan -SearchRoot $temp
-        ($res.Findings.File -replace '\\', '/' -join ',') | Should -Not -BeLike "*_Sync/Tests*"
+        ($res.Findings.File -replace '\\', '/' -join ',') | Should -Not -BeLike "*OtherTool/Tests*"
     }
 
     It "Auto-detects a brand-new test directory (UnitTests) without hardcoding" {
