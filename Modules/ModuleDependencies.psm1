@@ -30,7 +30,7 @@ Set-StrictMode -Version 1.0
     $map = @{}
     $files = @()
     # Scan the module root recursively so nested providers/plugins/helpers are
-    # included, then pick up tool-root-level Core/Plugins layouts (_Sync).
+    # included, then pick up tool-root-level Core/Plugins layouts generically.
     $files += @(Get-ChildItem -Path $ModulesRoot -Filter '*.psm1' -File -Recurse -ErrorAction SilentlyContinue)
     $toolRoot = Split-Path -Parent $ModulesRoot
     foreach ($sub in @('Core', 'Plugins')) {

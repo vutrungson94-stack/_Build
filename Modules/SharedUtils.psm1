@@ -2442,22 +2442,20 @@ function Update-ProjectGitignore {
     }
     if ($patterns.Count -eq 0) { return }
 
-    # A tool's own .gitignore must never name a platform tool folder. The
-    # default pattern set contains '_Build/' and '_Sync/', so writing it
-    # into _Build/.gitignore made the tool ignore its own source - and the
-    # repository then tracked NONE of the code. The tool-folder patterns
-    # are dropped whenever the target is inside a tool folder or holds one.
-    $toolFolderNames = @('_Build', '_Sync', '_Tests')
-    $resolvedProjectDir = $null
-    try { $resolvedProjectDir = (Resolve-Path -LiteralPath $ProjectDir -ErrorAction Stop).Path } catch { }
-    $projectSegments = @()
-    if ($resolvedProjectDir) { $projectSegments = @(($resolvedProjectDir -replace '\\', '/') -split '/') }
-    $insideToolFolder = @($projectSegments | Where-Object { $_ -in $toolFolderNames }).Count -gt 0
-    if ($insideToolFolder) { return }
-    $holdsToolFolders = @($toolFolderNames | Where-Object { Test-Path -LiteralPath (Join-Path $ProjectDir $_) -PathType Container }).Count -gt 0
-    if ($holdsToolFolders) {
-        $patterns = @($patterns | Where-Object { ([string]$_).Trim().TrimEnd('/') -notin $toolFolderNames })
-    }
+    # Never write the pattern block into this tool's own repository, and never
+    # into a folder that merely contains several nested repositories. The check
+    # is generic: no sibling tool's folder name is hardcoded here, because the
+    # tools are independent and a name is exactly what breaks when one moves.
+    $toolRoot = Split-Path -Parent $PSScriptRoot
+    try {
+        $resolvedProjectDir = (Resolve-Path -LiteralPath $ProjectDir -ErrorAction Stop).Path
+        $resolvedToolRoot = (Resolve-Path -LiteralPath $toolRoot -ErrorAction Stop).Path
+        if ($resolvedProjectDir.TrimEnd('/', '\') -eq $resolvedToolRoot.TrimEnd('/', '\')) { return }
+        if (-not (Test-Path -LiteralPath (Join-Path $resolvedProjectDir '.git'))) {
+            $nested = @(Get-ChildItem -LiteralPath $resolvedProjectDir -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '.git') }).Count
+            if ($nested -ge 2) { return }
+        }
+    } catch { }
     if ($patterns.Count -eq 0) { return }
 
     $giPath = Join-Path $ProjectDir '.gitignore'

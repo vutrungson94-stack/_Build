@@ -227,7 +227,7 @@ function Get-LocaleMessage {
     [OutputType([string])]
       param(
           [Parameter(Mandatory)][string]$Key,
-          # -Args is kept as an alias: _Build and _Sync ship the same command
+          # -Args is kept as an alias: sibling tools ship the same command
           # name, so whichever module is imported last decides which one the
           # session sees. The two tools must expose the SAME contract for the
           # same command, otherwise a call site in one tool breaks as soon as

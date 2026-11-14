@@ -209,7 +209,7 @@ $script:BuildDefaults = @{
     ProjectMarkers          = @('*.csproj','*.fsproj','*.vbproj','*.sln','package.json','Cargo.toml','go.mod','pyproject.toml','setup.py','setup.cfg','pom.xml','build.gradle','build.gradle.kts','build.sbt','CMakeLists.txt','Makefile','Gemfile','composer.json','mix.exs','Package.swift','Dockerfile')
     # Patterns a project should ignore when using gbuild. Single source (not scattered).
     # Overridable via config 'project.gitignorePatterns'.
-    ProjectGitignorePatterns = @('_Build/','_Sync/','.gbuild/','.gbuildcache/','.gbuild-state.gbuildstate','*.gbuildstate','.gbuild-circuitbreaker.gbuildstate','*.lock','build-reports/','distributed-report/','reports/','logs/','publish-output/','TestResults/','Tests/TestResults/','test-results*.xml','testResults.xml','suite-progress-*.log','Tests/suite-progress-*.log','vault.key','*.vault.key','*.vault.salt','*.salt','gbuild-standalone-*/','nul*')
+    ProjectGitignorePatterns = @('_Build/','.gbuild/','.gbuildcache/','.gbuild-state.gbuildstate','*.gbuildstate','.gbuild-circuitbreaker.gbuildstate','*.lock','build-reports/','distributed-report/','reports/','logs/','publish-output/','TestResults/','Tests/TestResults/','test-results*.xml','testResults.xml','suite-progress-*.log','Tests/suite-progress-*.log','vault.key','*.vault.key','*.vault.salt','*.salt','gbuild-standalone-*/','nul*')
     # Generic filesystem walk bound ("effectively unbounded" sentinel) + depth error sentinel
     CompatibleChildItemMaxDepth = 2
     RelativeDepthErrorSentinel = 999999
@@ -289,10 +289,10 @@ $script:BuildDefaults = @{
     VaultAesPurposeUtf8     = 'gbuild-vault-aead'
     VaultKeyLengthBytes     = 32
     # NOTE: only tool-owned dirs are excluded by default ('_Build' + build
-    # artifacts). Generic host-owned names ('_Sync', '_Tests', '_Launch', ...)
-    # are deliberately NOT listed: this tool is portable/embedded, and claiming
-    # generic names would silently skip the host project's real source from
-    # secret scanning. Hosts declare their own extras via security.excludeDirs.
+    # artifacts). Generic host-owned tool folders are deliberately NOT listed:
+    # this tool is portable/embedded, and claiming generic names would silently
+    # skip the host project's real source from secret scanning. Hosts declare
+    # their own extras via security.excludeDirs.
     SecurityExcludeDirs     = @('bin', 'obj', 'node_modules', '.git', 'publish-output', '.gbuildcache', 'build-reports', 'wwwroot/lib', 'packages', 'TestResults', '_Build')
     # L5 CI posture: non-interactive runs deny privileged actions unless an
     # explicit allow-list (security.allowedActions / tenants) or full RBAC is

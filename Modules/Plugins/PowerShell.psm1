@@ -16,9 +16,9 @@ $null = Import-Module (Join-Path (Split-Path -Parent $PSScriptRoot) 'PathUtils.p
 # .gbuildcache and .tools) and left '.' unescaped, so it matched ANY character
 # instead of a literal dot. BuildConstants.SyntaxCheckExcludeDirs is the owner.
 $script:ExcludeDirPattern = if (Get-Command Get-ExcludeDirPattern -ErrorAction SilentlyContinue) {
-    Get-ExcludeDirPattern -FromConstant 'SyntaxCheckExcludeDirs' -Extra @('_Sync', '_Tests', '_Launch')
+    Get-ExcludeDirPattern -FromConstant 'SyntaxCheckExcludeDirs' -Extra @()
 } else {
-    $__ex = @('obj', 'bin', '.git', 'node_modules', 'TestResults', 'publish-output', '.gbuildcache', 'build-reports', 'logs', '_Build', '.tools', '_Sync', '_Tests', '_Launch')
+    $__ex = @('obj', 'bin', '.git', 'node_modules', 'TestResults', 'publish-output', '.gbuildcache', 'build-reports', 'logs', '_Build', '.tools')
     '[\\/](' + (($__ex | ForEach-Object { [regex]::Escape([string]$_) }) -join '|') + ')[\\/]'
 }
 

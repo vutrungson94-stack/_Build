@@ -1027,7 +1027,7 @@
   "log.standalone.noEmbeddableFiles": "Keine einbettbaren Dateien gefunden",
   "log.standalone.bundleVersionEmpty": "Standalone-Bundleversion ist leer",
   "log.launcher.noProjectMarker": "Kein Projekt gefunden unterhalb oder oberhalb von: {0}",
-  "log.launcher.workspaceRoot": "Dieser Ordner enthält nur die Plattformwerkzeuge (_Build, _Sync, _Tests). Richten Sie gbuild auf ein Projektverzeichnis.",
+  "log.launcher.workspaceRoot": "Dieser Ordner enthält mehrere Repository-Wurzeln und keine Projektmarkierung. Richten Sie gbuild auf ein Projektverzeichnis.",
   "log.launcher.noProjectMarkerFix": "Lösung: -Project <pfad> angeben oder gbuild aus dem Projektverzeichnis heraus starten.",
   "log.launcher.noProjectMarkerFound": "Darunter gefundene Projekte - eines davon bauen mit:",
   "log.launcher.noProjectMarkerHint": "Dieses Verzeichnis enthält kein Projekt-Manifest (*.sln, *.csproj, package.json, go.mod, Cargo.toml, pyproject.toml, pom.xml, CMakeLists.txt, ...).",

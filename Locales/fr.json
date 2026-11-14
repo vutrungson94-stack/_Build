@@ -1027,7 +1027,7 @@
   "log.standalone.noEmbeddableFiles": "Aucun fichier embarquable trouvé",
   "log.standalone.bundleVersionEmpty": "Version du bundle standalone vide",
   "log.launcher.noProjectMarker": "Aucun projet trouvé à cet emplacement ou au-dessus : {0}",
-  "log.launcher.workspaceRoot": "Ce dossier ne contient que les outils de la plateforme (_Build, _Sync, _Tests). Pointez gbuild vers un répertoire de projet.",
+  "log.launcher.workspaceRoot": "Ce dossier contient plusieurs racines de dépôts et aucun marqueur de projet. Pointez gbuild vers un répertoire de projet.",
   "log.launcher.noProjectMarkerFix": "Solution : passez -Project <chemin>, ou lancez gbuild depuis le répertoire du projet.",
   "log.launcher.noProjectMarkerFound": "Projets trouvés ci-dessous - compilez-en un avec :",
   "log.launcher.noProjectMarkerHint": "Ce répertoire ne contient aucun manifeste de projet (*.sln, *.csproj, package.json, go.mod, Cargo.toml, pyproject.toml, pom.xml, CMakeLists.txt, ...).",

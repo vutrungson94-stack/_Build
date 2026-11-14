@@ -1027,7 +1027,7 @@
   "log.standalone.noEmbeddableFiles": "埋め込み可能なファイルが見つかりません",
   "log.standalone.bundleVersionEmpty": "Standalone バンドルバージョンは空です",
   "log.launcher.noProjectMarker": "以下の場所、または上位にプロジェクトが見つかりません: {0}",
-  "log.launcher.workspaceRoot": "このフォルダにはプラットフォームツール（_Build、_Sync、_Tests）のみが含まれます。gbuild をプロジェクトディレクトリに向けてください。",
+  "log.launcher.workspaceRoot": "このフォルダーには複数のリポジトリルートがあり、プロジェクトの目印がありません。gbuild をプロジェクトディレクトリに向けてください。",
   "log.launcher.noProjectMarkerFix": "対処: -Project <パス> を指定するか、プロジェクトの内側から gbuild を実行してください。",
   "log.launcher.noProjectMarkerFound": "配下で見つかったプロジェクト - 次のようにビルドします:",
   "log.launcher.noProjectMarkerHint": "そのディレクトリにプロジェクトマニフェストがありません (*.sln, *.csproj, package.json, go.mod, Cargo.toml, pyproject.toml, pom.xml, CMakeLists.txt, ...)。",

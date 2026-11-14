@@ -104,15 +104,25 @@ if ($__targetGuide) {
 }
 Remove-Variable -Name __targetGuide -ErrorAction SilentlyContinue
 
-# Refuse to run against a folder that merely holds the platform tools: that is
-# not a project, and running here is what created stray logs/build-reports
-# (and worse, git state) outside any project.
+# Refuse to run against a folder that merely holds several repository roots and
+# has no project marker of its own. This is a generic workspace-root check: the
+# previous version hardcoded the names of sibling tools, which coupled three
+# independent systems and broke as soon as a tool folder was renamed or moved.
+function Test-GBuildWorkspaceRoot {
+    param([string]$Path)
+    foreach ($m in @('package.json','pyproject.toml','Cargo.toml','go.mod','pom.xml','build.gradle','composer.json','Gemfile')) {
+        if (Test-Path -LiteralPath (Join-Path $Path $m) -PathType Leaf) { return $false }
+    }
+    foreach ($m in @('*.sln','*.csproj','*.fsproj','*.vbproj','*.code-workspace')) {
+        if (@(Get-ChildItem -LiteralPath $Path -Filter $m -File -ErrorAction SilentlyContinue).Count -gt 0) { return $false }
+    }
+    if (Test-Path -LiteralPath (Join-Path $Path '.git')) { return $false }
+    $nested = @(Get-ChildItem -LiteralPath $Path -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName '.git') }).Count
+    return ($nested -ge 2)
+}
 $targetDir = if ($Project) { $Project } else { (Get-Location).Path }
-$toolFolderNames = @('_Build', '_Sync', '_Tests')
-$holdsPlatformFolders = @($toolFolderNames | Where-Object { Test-Path -LiteralPath (Join-Path $targetDir $_) -PathType Container }).Count -gt 0
-$isPlatformFolder = @((($targetDir -replace '\\', '/') -split '/') | Where-Object { $_ -in $toolFolderNames }).Count -gt 0
-if (-not ($Help -or $SelfTest -or $SyntaxCheck) -and $holdsPlatformFolders -and -not $isPlatformFolder) {
-    $msg = if (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue) { Get-LocaleMessage -Key 'log.launcher.workspaceRoot' } else { "This folder only holds the platform tools (_Build, _Sync, _Tests). Point gbuild at a project directory instead." }
+if (-not ($Help -or $SelfTest -or $SyntaxCheck) -and (Test-GBuildWorkspaceRoot -Path $targetDir)) {
+    $msg = if (Get-Command Get-LocaleMessage -ErrorAction SilentlyContinue) { Get-LocaleMessage -Key 'log.launcher.workspaceRoot' } else { "This folder contains multiple repository roots and no project marker. Point gbuild at a project directory instead." }
     Write-Host $msg -ForegroundColor Red
     exit 1
 }
