@@ -1,4 +1,4 @@
-﻿# _Build local runtime artifacts - never commit these.
+# _Build local runtime artifacts - never commit these.
 #
 # Every pattern below is listed exactly ONCE. The file previously carried four
 # of them twice (logs/, build-reports/, .gbuildcache/, test-results*.xml), split
@@ -8,7 +8,7 @@
 # behind with nothing indicating it was ever there.
 
 # --- Tool state -----------------------------------------------------------------
-.tools/                 # vendored PSScriptAnalyzer etc.; not in a fresh checkout
+.tools/
 .gbuild/                # per-device locale cache (deviceId hash + UI language)
 .gbuildcache/           # incremental build cache
 .gbuildstate
