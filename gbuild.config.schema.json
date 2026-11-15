@@ -1729,6 +1729,11 @@
           "type": "string",
           "description": "Folder (relative to the _Build tree root) that holds the tooling this copy ships, e.g. the bundled PSScriptAnalyzer. Resolved by SharedUtils.Get-BuildVendoredToolsRoot and prepended to the session PSModulePath on demand, so a stale entry pointing at another copy cannot decide which analyzer a run gets.",
           "default": ".tools/Modules"
+        },
+        "stateDirectory": {
+          "type": "string",
+          "description": "Root for per-project build state (.gbuild-state.gbuildstate). Absolute path under the project root or the _Build tree, or the literal 'project' to restore the legacy project-local layout. Default: tool-tree-rooted '.gbuildstate/<projectKey>' so the project folder stays free of build state.",
+          "default": ".gbuildstate"
         }
       }
     },

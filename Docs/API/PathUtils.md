@@ -1,6 +1,6 @@
 # PathUtils
 
-22 function(s). Source: `Modules/PathUtils.psm1`
+24 function(s). Source: `Modules/PathUtils.psm1`
 
 ### ConvertTo-ForwardSlash
 
@@ -85,5 +85,13 @@ Parameters: Path :String, Base :String, State :PSObject, RequireDirectory :Switc
 ### Find-ProjectManifest
 
 Parameters: Root :String, Filters :String[], Recurse :SwitchParameter, MaxDepth :Int32, State :Object
+
+### Get-BuildProjectKey
+
+Parameters: ProjectRoot :String
+
+### Resolve-PerProjectRuntimeRoot
+
+Parameters: Configured :String, ProjectRoot :String, DefaultLeaf :String
 
 

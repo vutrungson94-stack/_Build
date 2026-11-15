@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 <#
@@ -95,7 +95,7 @@ Describe "Remote Cache E2E (mock backend)" {
     It "restores only the current tenant and ignores traversal names" {
         InModuleScope CacheProvider {
             $root = $TestDrive
-            $state = [PSCustomObject]@{ TenantId = 'tenant-a'; ProjectRoot = $root; ScriptRoot = $root; BuildConfig = [PSCustomObject]@{ tenancy = [PSCustomObject]@{ isolation = 'directory' }; build = [PSCustomObject]@{ cacheDirectory = '.gbuildcache'; cacheRemote = [PSCustomObject]@{ Enabled = $true; Type = 'azureBlob'; Endpoint = 'https://example.blob.core.windows.net'; Container = 'gbuild-cache' } } } }
+            $state = [PSCustomObject]@{ TenantId = 'tenant-a'; ProjectRoot = $root; ScriptRoot = $root; BuildConfig = [PSCustomObject]@{ tenancy = [PSCustomObject]@{ isolation = 'directory' }; build = [PSCustomObject]@{ cacheDirectory = (Join-Path $root '.gbuildcache'); cacheRemote = [PSCustomObject]@{ Enabled = $true; Type = 'azureBlob'; Endpoint = 'https://example.blob.core.windows.net'; Container = 'gbuild-cache' } } } }
             Mock Invoke-RestMethod -MockWith { [xml]'<EnumerationResults><Blobs><Blob><Name>tenant-a/owned.bin</Name></Blob><Blob><Name>tenant-b/foreign.bin</Name></Blob><Blob><Name>../escape</Name></Blob></Blobs></EnumerationResults>' }
             $script:received = @()
             Mock Receive-CacheEntry -MockWith { $script:received += [PSCustomObject]@{ Key = $Key; Destination = $DestinationPath }; [System.IO.File]::WriteAllText($DestinationPath, 'owned'); return $true }

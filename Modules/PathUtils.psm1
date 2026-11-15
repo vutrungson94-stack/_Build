@@ -1072,4 +1072,88 @@ function Find-ProjectManifest {
     return $results | Select-Object -Unique
 }
 
-Export-ModuleMember -Function @('ConvertTo-ForwardSlash', 'Format-Path', 'Get-SafeJoinPath', 'Test-SafePath', 'Get-BuildRootDirectory', 'Resolve-BuildRootedPath', 'Test-PathUnderRoots', 'Test-ReparsePointItem', 'Test-NoReparsePointInPath', 'Get-ExcludeDirPattern', 'Invoke-EnsureDirectory', 'Resolve-NativePath', 'Find-ProjectManifest', 'Test-BuildProjectMarker', 'Resolve-BuildProjectRoot', 'Test-BuildVolumeRoot', 'Test-BuildPathEqual', 'Get-BuildProjectCandidateDirectories', 'Get-PathComparison', 'Test-IsWindowsHost', 'Get-CanonicalOSName', 'Resolve-BuildContainedPath')
+<#
+.SYNOPSIS
+    Stable per-project key for per-project runtime data (state & cache).
+.DESCRIPTION
+    Derived from the project root path: readable leaf + deterministic SHA-256
+    suffix. Same project path -> same key, across processes and machines.
+    This module has a strict zero-dependency contract (it is imported
+    standalone), so the hash is computed inline with SHA256; the key is a
+    folder suffix for runtime artifacts, not a cache or security artifact.
+#>
+function Get-BuildProjectKey {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$ProjectRoot
+    )
+    if ([string]::IsNullOrWhiteSpace($ProjectRoot)) { return '' }
+    try {
+        $normalized = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\', '/')
+    } catch {
+        return ''
+    }
+    $leaf = Split-Path -Path $normalized -Leaf
+    if ([string]::IsNullOrWhiteSpace($leaf)) { $leaf = 'project' }
+    $leafSafe = ($leaf -replace '[^A-Za-z0-9_.-]', '_')
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($normalized.ToUpperInvariant())
+        $hashHex = [System.Convert]::ToHexString($sha.ComputeHash($bytes))
+        $suffix = $hashHex.Substring(0, 12).ToLowerInvariant()
+    } catch {
+        $suffix = 'project'
+    } finally {
+        $sha.Dispose()
+    }
+    return ('{0}_{1}' -f $leafSafe, $suffix)
+}
+
+<#
+.SYNOPSIS
+    Directory for per-project runtime data (build state & cache).
+.DESCRIPTION
+    Per-project runtime artifacts (build state, incremental cache, lock files)
+    must not appear inside the project tree. Resolution, in order:
+      1. absolute path (rooted config/constant) -> used as-is, but only under
+         the project root or the _Build tree (enforced via Test-PathUnderRoots);
+      2. the literal 'project' -> <ProjectRoot> (legacy layout, opt-out escape);
+      3. anything else (or nothing) -> <_Build tree>/<value>/<projectKey>/
+    No literal path is embedded: the tool tree is derived from this module's
+    location and the key is derived from the project path.
+#>
+function Resolve-PerProjectRuntimeRoot {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+        [AllowEmptyString()][string]$Configured = '',
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$ProjectRoot,
+        [Parameter(Mandatory = $true)][string]$DefaultLeaf
+    )
+    $value = if ([string]::IsNullOrWhiteSpace($Configured)) { $DefaultLeaf } else { $Configured.Trim() }
+    $normalizedProject = $null
+    if (-not [string]::IsNullOrWhiteSpace($ProjectRoot)) {
+        try { $normalizedProject = [System.IO.Path]::GetFullPath($ProjectRoot).TrimEnd('\', '/') } catch { $normalizedProject = $null }
+    }
+    if ($value -ieq 'project') {
+        if (-not $normalizedProject) { return $null }
+        return $normalizedProject
+    }
+    $toolTree = Split-Path -Parent $PSScriptRoot
+    if ([System.IO.Path]::IsPathRooted($value)) {
+        try { $candidate = [System.IO.Path]::GetFullPath($value).TrimEnd('\', '/') } catch { return $null }
+        $allowed = [System.Collections.Generic.List[string]]::new()
+        if ($normalizedProject) { $allowed.Add($normalizedProject) }
+        if ($toolTree) { $allowed.Add($toolTree) }
+        if ($allowed.Count -eq 0) { return $null }
+        if (-not (Test-PathUnderRoots -Path $candidate -AllowedRoots $allowed)) { return $null }
+        return $candidate
+    }
+    if (-not $normalizedProject) { return $null }
+    $key = Get-BuildProjectKey -ProjectRoot $normalizedProject
+    if (-not $key) { return $null }
+    if (-not $toolTree) { return $null }
+    return (Join-Path (Join-Path $toolTree $value) $key)
+}
+Export-ModuleMember -Function @('ConvertTo-ForwardSlash', 'Format-Path', 'Get-SafeJoinPath', 'Test-SafePath', 'Get-BuildRootDirectory', 'Resolve-BuildRootedPath', 'Test-PathUnderRoots', 'Test-ReparsePointItem', 'Test-NoReparsePointInPath', 'Get-ExcludeDirPattern', 'Invoke-EnsureDirectory', 'Resolve-NativePath', 'Find-ProjectManifest', 'Test-BuildProjectMarker', 'Resolve-BuildProjectRoot', 'Test-BuildVolumeRoot', 'Test-BuildPathEqual', 'Get-BuildProjectCandidateDirectories', 'Get-PathComparison', 'Test-IsWindowsHost', 'Get-CanonicalOSName', 'Resolve-BuildContainedPath', 'Get-BuildProjectKey', 'Resolve-PerProjectRuntimeRoot')

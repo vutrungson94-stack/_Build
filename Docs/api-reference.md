@@ -2681,6 +2681,14 @@ Parameters: Path :String, Base :String, State :PSObject, RequireDirectory :Switc
 
 Parameters: Root :String, Filters :String[], Recurse :SwitchParameter, MaxDepth :Int32, State :Object
 
+### Get-BuildProjectKey
+
+Parameters: ProjectRoot :String
+
+### Resolve-PerProjectRuntimeRoot
+
+Parameters: Configured :String, ProjectRoot :String, DefaultLeaf :String
+
 
 ## Avalonia
 
@@ -4459,7 +4467,7 @@ Parameters: Document :Object, State :PSObject
 | [ModuleDependencies](API/ModuleDependencies.md) | 3 |
 | [Orchestrator](API/Orchestrator.md) | 5 |
 | [Parallel](API/Parallel.md) | 4 |
-| [PathUtils](API/PathUtils.md) | 22 |
+| [PathUtils](API/PathUtils.md) | 24 |
 | [Avalonia](API/Avalonia.md) | 1 |
 | [Cpp](API/Cpp.md) | 4 |
 | [Docker](API/Docker.md) | 4 |
@@ -4495,5 +4503,5 @@ Parameters: Document :Object, State :PSObject
 | [Versioning](API/Versioning.md) | 7 |
 | [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 74 module(s), 1108 function(s).
+Total: 74 module(s), 1110 function(s).
 

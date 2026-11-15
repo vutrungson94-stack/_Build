@@ -212,25 +212,39 @@ class BuildCache {
         }
         $this.TenantId = $effectiveTenant
         $requestedCacheDir = $CacheDir
-        if ($effectiveTenant -ne 'default') { $requestedCacheDir = Join-Path $requestedCacheDir $effectiveTenant }
 
-        # Validate/normalize before touching the filesystem so an unsupported
-        # path format degrades to a safe fallback instead of fataling the build.
-        $cacheDirPath = $this.ResolveCachePath($root, $requestedCacheDir)
-        if (-not $cacheDirPath) {
-            # Guaranteed-valid fallback: a temp-scoped cache dir. The build
-            # continues; cache is simply less effective across sessions.
-            # Dir name single-sourced from BuildConstants.CacheDir.
-            $cacheDirPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [string](Get-BuildConstant -Key 'CacheDir' -Fallback '.gbuildcache'))
-            if ($effectiveTenant -ne 'default') { $cacheDirPath = Join-Path $cacheDirPath $effectiveTenant }
-            if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
-                Write-Log (Resolve-LogMessage -Key 'log.cache.invalidPath' -MessageArgs @([string]("$root\$CacheDir"), $cacheDirPath) -Fallback '[CACHE] Invalid project cache path ''{0}''; using fallback: {1}') 'Warn' $State
+        # Anchor per-project runtime data OUTSIDE the project tree: the tool
+        # tree holds a deterministic project-keyed folder by default. Literal
+        # 'project' restores the legacy project-local layout; an absolute
+        # config value under the project root or the tool tree is honoured.
+        $runtimeRoot = $null
+        try {
+            if (Get-Command Resolve-PerProjectRuntimeRoot -ErrorAction SilentlyContinue) {
+                $runtimeRoot = Resolve-PerProjectRuntimeRoot -Configured $requestedCacheDir -ProjectRoot $root -DefaultLeaf '.gbuildcache'
             }
-            $this.ConfiguredDirName = if ($effectiveTenant -ne 'default') { $effectiveTenant } else { Split-Path -Path $cacheDirPath.TrimEnd('\', '/') -Leaf }
+        } catch { $runtimeRoot = $null }
+
+        if ($runtimeRoot) {
+            $cacheDirPath = $runtimeRoot
+            if ($effectiveTenant -ne 'default') { $cacheDirPath = Join-Path $cacheDirPath $effectiveTenant }
+            $this.ConfiguredDirName = Split-Path -Path $cacheDirPath.TrimEnd('\', '/') -Leaf
         } else {
-            $reqLeaf = ''
-            try { $reqLeaf = Split-Path -Path ("$requestedCacheDir").TrimEnd('\', '/') -Leaf } catch { $reqLeaf = '' }
-            if ($reqLeaf) { $this.ConfiguredDirName = $reqLeaf }
+            # Validate/normalize before touching the filesystem so an unsupported
+            # path format degrades to a safe fallback instead of fataling the build.
+            $fallbackReq = $requestedCacheDir
+            if ($effectiveTenant -ne 'default') { $fallbackReq = Join-Path $fallbackReq $effectiveTenant }
+            $cacheDirPath = $this.ResolveCachePath($root, $fallbackReq)
+            if (-not $cacheDirPath) {
+                # Guaranteed-valid fallback: a temp-scoped cache dir. The build
+                # continues; cache is simply less effective across sessions.
+                # Dir name single-sourced from BuildConstants.CacheDir.
+                $cacheDirPath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [string](Get-BuildConstant -Key 'CacheDir' -Fallback '.gbuildcache'))
+                if ($effectiveTenant -ne 'default') { $cacheDirPath = Join-Path $cacheDirPath $effectiveTenant }
+                if (Get-Command Write-Log -ErrorAction SilentlyContinue) {
+                    Write-Log (Resolve-LogMessage -Key 'log.cache.invalidPath' -MessageArgs @([string]("$root\$CacheDir"), $cacheDirPath) -Fallback '[CACHE] Invalid project cache path ''{0}''; using fallback: {1}') 'Warn' $State
+                }
+            }
+            $this.ConfiguredDirName = Split-Path -Path $cacheDirPath.TrimEnd('\', '/') -Leaf
         }
 
         try {

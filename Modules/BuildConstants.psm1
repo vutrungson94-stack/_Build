@@ -355,6 +355,10 @@ $script:BuildDefaults = @{
     # Directory names — single source for paths used across multiple modules
     PublishOutputDir        = 'publish-output'
     CacheDir                = '.gbuildcache'
+    # Per-project runtime state anchor. Resolved through PathUtils.Resolve-PerProjectRuntimeRoot:
+    # absolute path wins (contained), 'project' restores the legacy project-local layout,
+    # otherwise the artifacts land in <_Build tree>/<StateDirectory>/<projectKey>/.
+    StateDirectory          = '.gbuildstate'
     ReportOutputDir         = 'build-reports'
 
     # SDK — DefaultTfm is a fallback only; the build system detects the real TFM
@@ -1002,6 +1006,7 @@ $script:ConfigKeyMap = @{
     'WebhookTokenByteLength'  = 'alerting.tokenByteLength'
     'PublishOutputDir'          = 'paths.publishOutput'
     'CacheDir'                  = 'build.cacheDirectory'
+    'StateDirectory'            = 'paths.stateDirectory'
     'ReportOutputDir'           = 'report.outputDir'
     'SdkMajorMin'               = 'health.minDotnetMajor'
     'DefaultTfm'                = 'dotnet.defaultTfm'

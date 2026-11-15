@@ -718,7 +718,21 @@ function Get-StateFilePath {
     elseif ($State -and $State.ScriptRoot) { $root = [string]$State.ScriptRoot }
     else { return $null }
     if ([string]::IsNullOrWhiteSpace($root) -or -not [System.IO.Path]::IsPathRooted($root)) { return $null }
-    return Join-Path $root '.gbuild-state.gbuildstate'
+    # Per-project runtime data is anchored OUTSIDE the project tree (tool tree
+    # under a deterministic per-project key). Pass the literal 'project' in
+    # paths.stateDirectory (BuildConstants key StateDirectory) or an absolute
+    # path under the project/tool tree to restore the legacy project-local
+    # layout.
+    $configured = ''
+    try { $configured = [string](Get-BuildConstant -Key 'StateDirectory' -State $State -Fallback '') } catch { $configured = '' }
+    $runtimeRoot = $null
+    try {
+        if (Get-Command Resolve-PerProjectRuntimeRoot -ErrorAction SilentlyContinue) {
+            $runtimeRoot = Resolve-PerProjectRuntimeRoot -Configured $configured -ProjectRoot $root -DefaultLeaf '.gbuildstate'
+        }
+    } catch { $runtimeRoot = $null }
+    if ([string]::IsNullOrWhiteSpace($runtimeRoot)) { return $null }
+    return Join-Path $runtimeRoot '.gbuild-state.gbuildstate'
 }
 
 function Save-BuildState {

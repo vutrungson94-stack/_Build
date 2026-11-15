@@ -216,7 +216,7 @@ Describe "ErrorHandling" {
 
     It "Save-BuildState creates a state file on disk" {
         $td = New-IntegrationTempDir
-        $st = [PSCustomObject]@{ ScriptRoot = $td; CorrelationId = 'save-test'; BuildConfig = [PSCustomObject]@{} }
+        $st = [PSCustomObject]@{ ScriptRoot = $td; CorrelationId = 'save-test'; BuildConfig = [PSCustomObject]@{ paths = [PSCustomObject]@{ stateDirectory = 'project' } } }
         $ok = Save-BuildState -State $st
         $ok | Should -BeTrue
         $path = Get-StateFilePath -State $st
@@ -226,7 +226,7 @@ Describe "ErrorHandling" {
 
     It "Restore-BuildState recovers State from disk and reports the previous run's error count without replaying it" {
         $td = New-IntegrationTempDir
-        $st = [PSCustomObject]@{ ScriptRoot = $td; CorrelationId = 'restore-test'; BuildConfig = [PSCustomObject]@{} }
+        $st = [PSCustomObject]@{ ScriptRoot = $td; CorrelationId = 'restore-test'; BuildConfig = [PSCustomObject]@{ paths = [PSCustomObject]@{ stateDirectory = 'project' } } }
         New-BuildError -Message 'persist-me' -Category 'Transient' -State $st
         Save-BuildState -State $st | Out-Null
         Reset-ErrorLog
@@ -263,7 +263,7 @@ Describe "ErrorHandling" {
     It "Save-BuildState anchors relative paths on the state file directory, not the CWD" {
         $proj = New-IntegrationTempDir
         $sub  = New-Item -ItemType Directory -Path (Join-Path $proj 'Modules') -Force
-        $st = [PSCustomObject]@{ ScriptRoot = $proj; ProjectRoot = $proj; WorkingDir = $proj; CorrelationId = 'anchor-test' }
+        $st = [PSCustomObject]@{ ScriptRoot = $proj; ProjectRoot = $proj; WorkingDir = $proj; CorrelationId = 'anchor-test'; BuildConfig = [PSCustomObject]@{ paths = [PSCustomObject]@{ stateDirectory = 'project' } } }
 
         $origLoc = $PWD.Path
         try {
@@ -288,7 +288,7 @@ Describe "ErrorHandling" {
         $proj   = New-IntegrationTempDir
         $sub    = New-Item -ItemType Directory -Path (Join-Path $proj 'Modules') -Force
         $launch = New-IntegrationTempDir
-        $st = [PSCustomObject]@{ ScriptRoot = $proj; ProjectRoot = $proj; WorkingDir = $proj; CorrelationId = 'roundtrip-test' }
+        $st = [PSCustomObject]@{ ScriptRoot = $proj; ProjectRoot = $proj; WorkingDir = $proj; CorrelationId = 'roundtrip-test'; BuildConfig = [PSCustomObject]@{ paths = [PSCustomObject]@{ stateDirectory = 'project' } } }
 
         $origLoc = $PWD.Path
         try {

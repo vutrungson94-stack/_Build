@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 <#
@@ -238,10 +238,22 @@ Describe 'L5 Extended: toolchain hermeticity' {
     }
 
     It 'reports the vendored analyzer drift instead of hiding it' {
-        $h = Test-ToolchainHermetic -ToolRoot $global:toolRoot
-        $h.VendoredToolsOk | Should -BeFalse
-        $h.Hermetic | Should -BeFalse
-        ($h.Reasons -join ' ') | Should -Match 'PSScriptAnalyzer'
+        # Hermetic fixture: digest-pinned Dockerfile but NO vendored analyzer.
+        # Machine state must not decide this test (the toolchain vendors the
+        # pinned analyzer by design, so the real tool root is expected to be
+        # hermetic). Prove the checker REPORTS drift, from a known-drifted root.
+        $d = New-IntegrationTempDir
+        try {
+            $sha = [string]::new('0', 64)
+            [System.IO.File]::WriteAllText((Join-Path $d 'Dockerfile'), "FROM alpine@sha256:$sha`n", (New-Object System.Text.UTF8Encoding($false)))
+            $h = Test-ToolchainHermetic -ToolRoot $d
+            $h.DockerfilePinned | Should -BeTrue
+            $h.VendoredToolsOk | Should -BeFalse
+            $h.Hermetic | Should -BeFalse
+            ($h.Reasons -join ' ') | Should -Match 'PSScriptAnalyzer'
+        } finally {
+            Remove-Item $d -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It 'fails closed on a tool root without a Dockerfile' {

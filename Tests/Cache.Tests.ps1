@@ -1,4 +1,4 @@
-﻿#Requires -Version 5.1
+#Requires -Version 5.1
 #Requires -Module Pester
 
 Set-StrictMode -Version 1.0
@@ -18,13 +18,13 @@ Describe "Cache Integration" {
     }
 
     It "Initialize-BuildCache creates the cache root on disk" {
-        $root = Initialize-BuildCache -State $global:cacheState -CacheDir 'cache'
+        $root = Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache')
         $root | Should -Not -BeNullOrEmpty
         Test-Path $root | Should -BeTrue
     }
 
     It "Save-CacheEntry then Get-CacheEntry round-trips the stored hash" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         $saved = Save-CacheEntry -Key 'projA' -ProjectHash 'ABC123'
         $saved.Hash | Should -Be 'ABC123'
         $got = Get-CacheEntry -Key 'projA'
@@ -33,7 +33,7 @@ Describe "Cache Integration" {
     }
 
     It "Test-CacheValid returns true for a matching hash and false for a mismatch" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         $output = Join-Path $global:cacheTemp 'projB.out'
         Set-Content -LiteralPath $output -Value 'artifact' -Force
         Save-CacheEntry -Key 'projB' -ProjectHash 'HASH1' -OutputPath $output | Out-Null
@@ -42,7 +42,7 @@ Describe "Cache Integration" {
     }
 
     It "Get-CacheEntry returns null for an unknown key" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         Get-CacheEntry -Key 'never-saved' | Should -BeNullOrEmpty
     }
 
@@ -60,15 +60,15 @@ Describe "Cache Integration" {
         $stateB = [PSCustomObject]@{ ScriptRoot = $global:cacheTemp; ProjectRoot = $global:cacheTemp; TenantId = 'tenant-b' }
         $output = Join-Path $global:cacheTemp 'tenant-output.out'
         Set-Content -LiteralPath $output -Value 'artifact' -Force
-        Initialize-BuildCache -State $stateA -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $stateA -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         Save-CacheEntry -Key 'shared' -ProjectHash 'HASH-T' -OutputPath $output | Out-Null
         Test-CacheValid -Key 'shared' -ProjectHash 'HASH-T' | Should -BeTrue
-        Initialize-BuildCache -State $stateB -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $stateB -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         Test-CacheValid -Key 'shared' -ProjectHash 'HASH-T' | Should -BeFalse
     }
 
     It "does not hit when the saved output disappears" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         $output = Join-Path $global:cacheTemp 'disappearing.out'
         Set-Content -LiteralPath $output -Value 'artifact' -Force
         Save-CacheEntry -Key 'disappearing' -ProjectHash 'HASH1' -OutputPath $output | Out-Null
@@ -77,7 +77,7 @@ Describe "Cache Integration" {
     }
 
     It "keeps the index parseable after writes" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         Save-CacheEntry -Key 'atomic-a' -ProjectHash 'HASH-A' | Out-Null
         Save-CacheEntry -Key 'atomic-b' -ProjectHash 'HASH-B' | Out-Null
         $index = Get-Content -LiteralPath (Join-Path $global:cacheTemp 'cache\index.json') -Raw | ConvertFrom-Json
@@ -88,7 +88,7 @@ Describe "Cache Integration" {
 Describe "Cache Hashing" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Cache.psm1') -Force -DisableNameChecking -ErrorAction Stop
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
     }
 
     It "Get-FileHashFast returns a stable 64-char hex hash" {
@@ -112,11 +112,11 @@ Describe "Cache Hashing" {
 Describe "Cache Statistics and Maintenance" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Cache.psm1') -Force -DisableNameChecking -ErrorAction Stop
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
     }
 
     It "Get-CacheStatistics returns an object with statistic properties" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         Save-CacheEntry -Key 'statProbe' -ProjectHash 'STAT1' | Out-Null
         $stats = Get-CacheStatistics
         $stats | Should -Not -BeNullOrEmpty
@@ -136,7 +136,7 @@ Describe "Cache Statistics and Maintenance" {
     }
 
     It "Optimize-Cache does not throw (even after clear)" {
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
         { Optimize-Cache -State $global:cacheState } | Should -Not -Throw
     }
 }
@@ -144,7 +144,7 @@ Describe "Cache Statistics and Maintenance" {
 Describe "Cache Build Wrapper" {
     BeforeAll {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'Cache.psm1') -Force -DisableNameChecking -ErrorAction Stop
-        Initialize-BuildCache -State $global:cacheState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:cacheState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
     }
 
     It "Invoke-BuildWithCache caches results on the second call" {
@@ -175,7 +175,7 @@ Describe "Cache Remote Sync Wiring" {
         $null = Import-Module (Join-Path $global:GBuildModuleRoot 'CacheProvider.psm1') -Force -DisableNameChecking -ErrorAction Stop
         $global:syncTemp = New-IntegrationTempDir
         $global:syncState = [PSCustomObject]@{ ScriptRoot = $global:syncTemp; ProjectRoot = $global:syncTemp; CorrelationId = 'cache-sync' }
-        Initialize-BuildCache -State $global:syncState -CacheDir 'cache' | Out-Null
+        Initialize-BuildCache -State $global:syncState -CacheDir (Join-Path $global:cacheTemp 'cache') | Out-Null
     }
     AfterAll {
         if ($global:syncTemp -and (Test-Path $global:syncTemp)) { Remove-Item $global:syncTemp -Recurse -Force -ErrorAction SilentlyContinue }

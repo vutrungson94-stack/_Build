@@ -1272,6 +1272,7 @@
     },
     "paths": {
         "publishOutput": "publish-output",
+        "stateDirectory": ".gbuildstate",
         "localeDir": "../Locales",
         "vendoredTools": ".tools/Modules"
     },
