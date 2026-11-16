@@ -23,7 +23,7 @@ single-repo platform that is the expected ceiling.
 | Defect prevention | **L5** | `Tests/GateDetectors.ps1`, `Tests/GateSelfTest.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1`, pre-commit/pre-push hooks, `Tests/qpm-ledger.json` |
 | Causal analysis | **L4** | `Modules/RootCause.psm1` (CAR ledger, classifier table), `Modules/AnomalyDetector.psm1` |
 | Continuous improvement | **L5** | `Modules/AutoTuner.psm1` (proposal + pilot gate), `Find-RatchetCandidates`, `Tests/ProcessMetrics.Mutation.Tests.ps1` |
-| Verification & validation | **L4** | 125 scopes / 1,764 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 57 % (measured 57.81 %), `Tests/Run-CoreTests.ps1` scope isolation |
+| Verification & validation | **L4** | 126 scopes / 1,768 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 57 % (measured 57.81 %), `Tests/Run-CoreTests.ps1` scope isolation |
 | Configuration management | **L4** | `gbuild.config.json` + schema, config-key parity gate, `Modules/ConfigProvider.psm1` |
 | Portability / cross-platform | **L5** | `Modules/PathUtils.psm1`, POSIX launcher, Docker multi-arch, CI matrix (ubuntu/macos/windows/arm64) |
 | Code reuse / DRY | **L5** | 7/7 adoption classes at 100 %, governed duplication pinned by tests |
@@ -36,10 +36,10 @@ single-repo platform that is the expected ceiling.
 
 | Check | Result | Source |
 |---|---|---|
-| Scope inventory / tests | 125 scopes / 1,764 tests (1,756 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
+| Scope inventory / tests | 126 scopes / 1,768 tests (1,760 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
 | Self-test | 11/11 checks | `gbuild.ps1 -SelfTest` |
 | Hygiene gates | 9 (gate recounts Describe blocks; the -19 and -8 stale counts are gone) | `Hygiene: the process baseline is versioned and structurally valid` |
-| Coverage | line floor 55 %, last merge 55.96 % (2026-11-12, unchanged on purpose) | `Tests/process-baseline.json` |
+| Coverage | line floor 57 %, measured 57.81 % (2026-11-12 baseline measured by CI merge; floor raised from 55 only after measure) | `Tests/process-baseline.json` |
 | Targeted mutation score | 9/9 planted mutants detected (PathUtils, SharedUtils, ConfigProvider) | mutation tests in the three scopes |
 | Flake ledger | 1 entry (PathUtils bounded-walk, `fixed`, `d6defda`), gate live | `Tests/flake-ledger.json`, `FlakeLedger` scope |
 | CI on `main` | green at `ad71eaa` (independent audit remediation commit) | `gh run view 43410086942` (and previous-run confirmations) |
@@ -100,7 +100,7 @@ Any claim this table contradicts is stale and should be reported as a finding.
    the same run (ledger window, QPM MTTR, measured adoption mean), so the
    process now has ceilings AND goals.
 4. **Coverage is measured on two different metrics that are not reconciled.**
-   `Tests/process-baseline.json` records a 55 % line-coverage floor and a 55 %
+   `Tests/process-baseline.json` records a 57 % line-coverage floor (ratcheted 2026-11-12 after two full merges) and a 57 % command-coverage gate
    command-coverage gate; the file itself warns they must never be compared.
    That is honest, but it is also a sign that the coverage process is not yet
    unified. **Closed 2026-11-12** - one gate over one artefact set: the merge
@@ -410,7 +410,7 @@ escape visible only under coverage instrumentation in run `43388525320`.
 
 | Metric | Value | Source |
 |---|---|---|
-| Core suite | 125 scopes, 1,762 tests (1,754 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
+| Core suite | 126 scopes, 1,768 tests (1,760 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
 | Skip budget | 8 (`core.skippedMaxAllowed`), per-scope allowlist in place | `Tests/process-baseline.json` |
 | Merged line coverage | 55.96% against a 55% floor (last recorded merge, 2026-11-12) | `Tests/process-baseline.json` |
 | Mutation score (targeted) | 9/9 planted mutants detected | `Tests/PathUtils.Tests.ps1`, `Tests/SharedUtils.Tests.ps1`, `Tests/ConfigProvider.Tests.ps1` |

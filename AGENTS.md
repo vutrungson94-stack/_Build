@@ -301,7 +301,7 @@ aspiration - raise it as coverage grows, never lower it to go green.
 `-Coverage` implies the **full parallel** path: every scope is scheduled as its own
 isolated child through a bounded pool (`-ParallelScopes N`, default
 `min(ProcessorCount, 16)`, override with `GBUILD_SCOPE_PARALLELISM`). Pester
-coverage is breakpoint-based and ~10x slower, so the sequential 125-scope run
+coverage is breakpoint-based and ~10x slower, so the sequential 126-scope run
 took ~2 h and could never fit a CI budget. Each child is still a separate
 process, so the state-isolation guarantee above is unchanged - do not
 "optimise" this back into one session.

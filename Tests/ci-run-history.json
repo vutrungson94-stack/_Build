@@ -1,0 +1,747 @@
+{
+  "schema": "gsync.ci-run-history.v1",
+  "repo": "_Build",
+  "workflow": "_Build CI",
+  "windowDays": 90,
+  "generatedAtUtc": "2026-11-16T09:14:40.9132841Z",
+  "source": "gh run list --repo vutrungson94-stack/<repo> --limit 200 --json number,conclusion,workflowName,createdAt,headBranch (public repository data)",
+  "runsInWindow": 121,
+  "totals": {
+    "success": 18,
+    "failure": 79,
+    "cancelled": 24,
+    "other": 0
+  },
+  "changeFailureRatePct": 81.44,
+  "nNonCancelled": 97,
+  "note": "Change-failure rate of PRIMARY workflow runs on MAIN (the CI signal). This is NOT a production escape rate: it is the fraction of pushes that failed the CI gate. An escape is a defect that reaches production; there is no production deployment feed in this repository, so escapeRate cannot be honestly computed here and is NOT claimed. MTTR and SLO targets are not set from this data. The 81.44% figure measures code pushed that failed the CI gate, split by push; many runs were red during active remediation windows and cancelled-in-progress runs are counted separately.",
+  "disclaimer": "This file is an INPUT to review, not an SLO. It makes no claim about escape-rate, MTTR, availability, or any production concern.",
+  "runs": [
+    {
+      "n": 8,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T06:50:29Z",
+      "branch": "main"
+    },
+    {
+      "n": 9,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T06:50:43Z",
+      "branch": "main"
+    },
+    {
+      "n": 10,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T07:24:10Z",
+      "branch": "main"
+    },
+    {
+      "n": 11,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T08:19:51Z",
+      "branch": "main"
+    },
+    {
+      "n": 12,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T09:09:27Z",
+      "branch": "main"
+    },
+    {
+      "n": 13,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T09:22:53Z",
+      "branch": "main"
+    },
+    {
+      "n": 14,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T10:58:24Z",
+      "branch": "main"
+    },
+    {
+      "n": 15,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T11:39:21Z",
+      "branch": "main"
+    },
+    {
+      "n": 16,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T12:19:45Z",
+      "branch": "main"
+    },
+    {
+      "n": 17,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T13:59:44Z",
+      "branch": "main"
+    },
+    {
+      "n": 18,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T14:03:01Z",
+      "branch": "main"
+    },
+    {
+      "n": 19,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T14:29:56Z",
+      "branch": "main"
+    },
+    {
+      "n": 20,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T14:53:00Z",
+      "branch": "main"
+    },
+    {
+      "n": 21,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T15:51:03Z",
+      "branch": "main"
+    },
+    {
+      "n": 22,
+      "conclusion": "failure",
+      "createdAt": "2026-10-26T16:18:11Z",
+      "branch": "main"
+    },
+    {
+      "n": 23,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T01:29:08Z",
+      "branch": "main"
+    },
+    {
+      "n": 24,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T01:51:48Z",
+      "branch": "main"
+    },
+    {
+      "n": 25,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T02:20:54Z",
+      "branch": "main"
+    },
+    {
+      "n": 26,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T02:33:14Z",
+      "branch": "main"
+    },
+    {
+      "n": 27,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T03:11:02Z",
+      "branch": "main"
+    },
+    {
+      "n": 28,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T04:49:27Z",
+      "branch": "main"
+    },
+    {
+      "n": 29,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T05:45:49Z",
+      "branch": "main"
+    },
+    {
+      "n": 30,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T06:06:14Z",
+      "branch": "main"
+    },
+    {
+      "n": 31,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T06:29:26Z",
+      "branch": "main"
+    },
+    {
+      "n": 32,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T06:50:48Z",
+      "branch": "main"
+    },
+    {
+      "n": 33,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T07:57:55Z",
+      "branch": "main"
+    },
+    {
+      "n": 34,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T10:19:41Z",
+      "branch": "main"
+    },
+    {
+      "n": 35,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T10:40:09Z",
+      "branch": "main"
+    },
+    {
+      "n": 36,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T11:03:13Z",
+      "branch": "main"
+    },
+    {
+      "n": 37,
+      "conclusion": "failure",
+      "createdAt": "2026-10-27T12:17:55Z",
+      "branch": "main"
+    },
+    {
+      "n": 38,
+      "conclusion": "success",
+      "createdAt": "2026-10-28T02:55:49Z",
+      "branch": "main"
+    },
+    {
+      "n": 39,
+      "conclusion": "success",
+      "createdAt": "2026-10-28T03:15:20Z",
+      "branch": "main"
+    },
+    {
+      "n": 40,
+      "conclusion": "success",
+      "createdAt": "2026-10-28T03:34:38Z",
+      "branch": "main"
+    },
+    {
+      "n": 41,
+      "conclusion": "success",
+      "createdAt": "2026-11-02T05:30:28Z",
+      "branch": "main"
+    },
+    {
+      "n": 42,
+      "conclusion": "failure",
+      "createdAt": "2026-11-02T05:57:36Z",
+      "branch": "main"
+    },
+    {
+      "n": 43,
+      "conclusion": "failure",
+      "createdAt": "2026-11-02T05:57:54Z",
+      "branch": "main"
+    },
+    {
+      "n": 44,
+      "conclusion": "success",
+      "createdAt": "2026-11-02T06:48:52Z",
+      "branch": "main"
+    },
+    {
+      "n": 45,
+      "conclusion": "failure",
+      "createdAt": "2026-11-02T09:02:23Z",
+      "branch": "main"
+    },
+    {
+      "n": 46,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T06:18:48Z",
+      "branch": "main"
+    },
+    {
+      "n": 47,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T06:22:54Z",
+      "branch": "main"
+    },
+    {
+      "n": 48,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T06:40:05Z",
+      "branch": "main"
+    },
+    {
+      "n": 49,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T07:00:18Z",
+      "branch": "main"
+    },
+    {
+      "n": 50,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T07:21:45Z",
+      "branch": "main"
+    },
+    {
+      "n": 51,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T07:33:28Z",
+      "branch": "main"
+    },
+    {
+      "n": 52,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T07:37:04Z",
+      "branch": "main"
+    },
+    {
+      "n": 53,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T08:11:06Z",
+      "branch": "main"
+    },
+    {
+      "n": 54,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T08:36:58Z",
+      "branch": "main"
+    },
+    {
+      "n": 55,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T10:56:41Z",
+      "branch": "main"
+    },
+    {
+      "n": 56,
+      "conclusion": "failure",
+      "createdAt": "2026-11-03T12:12:18Z",
+      "branch": "main"
+    },
+    {
+      "n": 57,
+      "conclusion": "failure",
+      "createdAt": "2026-11-04T07:42:41Z",
+      "branch": "main"
+    },
+    {
+      "n": 58,
+      "conclusion": "failure",
+      "createdAt": "2026-11-04T08:41:50Z",
+      "branch": "main"
+    },
+    {
+      "n": 59,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-04T09:06:07Z",
+      "branch": "main"
+    },
+    {
+      "n": 60,
+      "conclusion": "failure",
+      "createdAt": "2026-11-04T09:16:45Z",
+      "branch": "main"
+    },
+    {
+      "n": 61,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-04T10:05:43Z",
+      "branch": "main"
+    },
+    {
+      "n": 62,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-04T10:50:55Z",
+      "branch": "main"
+    },
+    {
+      "n": 63,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-04T11:01:36Z",
+      "branch": "main"
+    },
+    {
+      "n": 64,
+      "conclusion": "failure",
+      "createdAt": "2026-11-04T11:49:21Z",
+      "branch": "main"
+    },
+    {
+      "n": 65,
+      "conclusion": "failure",
+      "createdAt": "2026-11-04T12:06:55Z",
+      "branch": "main"
+    },
+    {
+      "n": 66,
+      "conclusion": "failure",
+      "createdAt": "2026-11-04T12:30:55Z",
+      "branch": "main"
+    },
+    {
+      "n": 67,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-06T05:42:07Z",
+      "branch": "main"
+    },
+    {
+      "n": 68,
+      "conclusion": "failure",
+      "createdAt": "2026-11-06T05:54:33Z",
+      "branch": "main"
+    },
+    {
+      "n": 69,
+      "conclusion": "failure",
+      "createdAt": "2026-11-06T08:14:55Z",
+      "branch": "main"
+    },
+    {
+      "n": 70,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-06T08:34:56Z",
+      "branch": "main"
+    },
+    {
+      "n": 71,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-06T08:50:12Z",
+      "branch": "main"
+    },
+    {
+      "n": 72,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-06T09:06:54Z",
+      "branch": "main"
+    },
+    {
+      "n": 73,
+      "conclusion": "failure",
+      "createdAt": "2026-11-06T09:10:51Z",
+      "branch": "main"
+    },
+    {
+      "n": 74,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-09T11:48:44Z",
+      "branch": "main"
+    },
+    {
+      "n": 75,
+      "conclusion": "failure",
+      "createdAt": "2026-11-09T11:59:03Z",
+      "branch": "main"
+    },
+    {
+      "n": 76,
+      "conclusion": "failure",
+      "createdAt": "2026-11-09T12:46:10Z",
+      "branch": "main"
+    },
+    {
+      "n": 77,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-10T05:44:02Z",
+      "branch": "main"
+    },
+    {
+      "n": 78,
+      "conclusion": "failure",
+      "createdAt": "2026-11-10T05:51:40Z",
+      "branch": "main"
+    },
+    {
+      "n": 79,
+      "conclusion": "failure",
+      "createdAt": "2026-11-10T06:20:27Z",
+      "branch": "main"
+    },
+    {
+      "n": 80,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-10T06:43:38Z",
+      "branch": "main"
+    },
+    {
+      "n": 81,
+      "conclusion": "failure",
+      "createdAt": "2026-11-10T06:48:35Z",
+      "branch": "main"
+    },
+    {
+      "n": 82,
+      "conclusion": "failure",
+      "createdAt": "2026-11-10T07:11:57Z",
+      "branch": "main"
+    },
+    {
+      "n": 83,
+      "conclusion": "success",
+      "createdAt": "2026-11-10T07:45:39Z",
+      "branch": "main"
+    },
+    {
+      "n": 84,
+      "conclusion": "failure",
+      "createdAt": "2026-11-10T08:51:04Z",
+      "branch": "main"
+    },
+    {
+      "n": 85,
+      "conclusion": "failure",
+      "createdAt": "2026-11-11T07:13:29Z",
+      "branch": "main"
+    },
+    {
+      "n": 86,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-11T07:39:22Z",
+      "branch": "main"
+    },
+    {
+      "n": 87,
+      "conclusion": "failure",
+      "createdAt": "2026-11-11T07:46:47Z",
+      "branch": "main"
+    },
+    {
+      "n": 88,
+      "conclusion": "failure",
+      "createdAt": "2026-11-11T09:27:52Z",
+      "branch": "main"
+    },
+    {
+      "n": 89,
+      "conclusion": "failure",
+      "createdAt": "2026-11-11T10:21:47Z",
+      "branch": "main"
+    },
+    {
+      "n": 90,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-11T11:12:10Z",
+      "branch": "main"
+    },
+    {
+      "n": 91,
+      "conclusion": "success",
+      "createdAt": "2026-11-11T11:31:19Z",
+      "branch": "main"
+    },
+    {
+      "n": 92,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T04:02:45Z",
+      "branch": "main"
+    },
+    {
+      "n": 93,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T04:31:38Z",
+      "branch": "main"
+    },
+    {
+      "n": 94,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T05:04:30Z",
+      "branch": "main"
+    },
+    {
+      "n": 95,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T05:19:48Z",
+      "branch": "main"
+    },
+    {
+      "n": 96,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T05:34:32Z",
+      "branch": "main"
+    },
+    {
+      "n": 97,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T06:10:20Z",
+      "branch": "main"
+    },
+    {
+      "n": 98,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T06:15:03Z",
+      "branch": "main"
+    },
+    {
+      "n": 99,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T06:35:29Z",
+      "branch": "main"
+    },
+    {
+      "n": 100,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T06:51:54Z",
+      "branch": "main"
+    },
+    {
+      "n": 101,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T06:59:03Z",
+      "branch": "main"
+    },
+    {
+      "n": 102,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T07:53:23Z",
+      "branch": "main"
+    },
+    {
+      "n": 103,
+      "conclusion": "success",
+      "createdAt": "2026-11-12T08:06:28Z",
+      "branch": "main"
+    },
+    {
+      "n": 104,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T09:23:28Z",
+      "branch": "main"
+    },
+    {
+      "n": 105,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T09:52:14Z",
+      "branch": "main"
+    },
+    {
+      "n": 106,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T10:03:13Z",
+      "branch": "main"
+    },
+    {
+      "n": 107,
+      "conclusion": "success",
+      "createdAt": "2026-11-12T10:33:10Z",
+      "branch": "main"
+    },
+    {
+      "n": 108,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T11:16:48Z",
+      "branch": "main"
+    },
+    {
+      "n": 109,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T11:39:06Z",
+      "branch": "main"
+    },
+    {
+      "n": 110,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T12:26:43Z",
+      "branch": "main"
+    },
+    {
+      "n": 111,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-12T12:36:26Z",
+      "branch": "main"
+    },
+    {
+      "n": 112,
+      "conclusion": "failure",
+      "createdAt": "2026-11-12T12:42:46Z",
+      "branch": "main"
+    },
+    {
+      "n": 113,
+      "conclusion": "failure",
+      "createdAt": "2026-11-13T06:32:13Z",
+      "branch": "main"
+    },
+    {
+      "n": 114,
+      "conclusion": "failure",
+      "createdAt": "2026-11-13T06:48:51Z",
+      "branch": "main"
+    },
+    {
+      "n": 115,
+      "conclusion": "failure",
+      "createdAt": "2026-11-13T07:22:26Z",
+      "branch": "main"
+    },
+    {
+      "n": 116,
+      "conclusion": "failure",
+      "createdAt": "2026-11-13T07:49:36Z",
+      "branch": "main"
+    },
+    {
+      "n": 117,
+      "conclusion": "success",
+      "createdAt": "2026-11-13T08:19:11Z",
+      "branch": "main"
+    },
+    {
+      "n": 118,
+      "conclusion": "success",
+      "createdAt": "2026-11-13T09:00:08Z",
+      "branch": "main"
+    },
+    {
+      "n": 119,
+      "conclusion": "success",
+      "createdAt": "2026-11-13T09:51:14Z",
+      "branch": "main"
+    },
+    {
+      "n": 120,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-13T10:34:22Z",
+      "branch": "main"
+    },
+    {
+      "n": 121,
+      "conclusion": "failure",
+      "createdAt": "2026-11-13T10:50:42Z",
+      "branch": "main"
+    },
+    {
+      "n": 122,
+      "conclusion": "success",
+      "createdAt": "2026-11-13T11:02:33Z",
+      "branch": "main"
+    },
+    {
+      "n": 123,
+      "conclusion": "success",
+      "createdAt": "2026-11-13T11:27:33Z",
+      "branch": "main"
+    },
+    {
+      "n": 124,
+      "conclusion": "success",
+      "createdAt": "2026-11-14T09:20:33Z",
+      "branch": "main"
+    },
+    {
+      "n": 125,
+      "conclusion": "cancelled",
+      "createdAt": "2026-11-15T12:33:34Z",
+      "branch": "main"
+    },
+    {
+      "n": 126,
+      "conclusion": "success",
+      "createdAt": "2026-11-15T12:34:58Z",
+      "branch": "main"
+    },
+    {
+      "n": 127,
+      "conclusion": "success",
+      "createdAt": "2026-11-15T12:59:46Z",
+      "branch": "main"
+    },
+    {
+      "n": 128,
+      "conclusion": "success",
+      "createdAt": "2026-11-16T08:12:42Z",
+      "branch": "main"
+    }
+  ]
+}

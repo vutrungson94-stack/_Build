@@ -254,6 +254,7 @@ $scopeMap = @{
     'CircuitBreaker'          = 'CircuitBreaker.Tests.ps1'
     'CircuitBreakerPersistence' = 'CircuitBreaker.Persistence.Tests.ps1'
     'Chaos'                   = 'Chaos.Tests.ps1'
+    'CiRunHistory'            = 'CiRunHistory.Tests.ps1'
     'Clean'                   = 'Clean.Tests.ps1'
     'ClusterOrchestrator'     = 'ClusterOrchestrator.Tests.ps1'
     'Config'                  = 'Config.Tests.ps1'
