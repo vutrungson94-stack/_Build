@@ -168,9 +168,13 @@ Describe 'Documentation - the process asset is published and in sync' {
 
         # Falsifiability: the exact stale contract the 2026-11-13 audit found
         # (floor 55 for a baseline that records 57) must be reported, not pass.
+        # The scope fingerprint is derived from the baseline (not hardcoded)
+        # so the fixture cannot go vacuous on the next ratchet: the stale
+        # contract replaces whatever the baseline records with the audit's
+        # historical 112-scope.
         $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("gbuild-fingerprint-" + [guid]::NewGuid().ToString('N') + '.txt')
         try {
-            $stale = ($agents -replace '57%', '55%') -replace [regex]::Escape('125-scope'), '112-scope'
+            $stale = ($agents -replace '57%', '55%') -replace [regex]::Escape(([string]$b.core.scopes + '-scope')), '112-scope'
             Set-Content -LiteralPath $tmp -Value $stale -Encoding UTF8
             $r = @(& $checker (Get-Content -LiteralPath $tmp -Raw) $b)
             $r.Count | Should -BeGreaterThan 0
