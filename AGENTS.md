@@ -289,12 +289,13 @@ The CI `coverage` job runs on BOTH push and pull_request and uses the
 scope-isolated runner with the ratchet:
 
 ```powershell
-pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips -Coverage -MinCoveragePct 55
+# -MinCoveragePct is NOT used in CI; the floor lives in Tests/process-baseline.json (57%)
+pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File 'Tests/Run-CoreTests.ps1' -Scope All -StrictSkips -Coverage
 ```
 
 Do NOT replace that with a raw `Invoke-Pester` over `Tests/`: a single-session
 run leaks module-global state between state-sensitive scopes and produces ~16
-false failures (see section 6). The ratchet (55%) is a measured floor, not an
+false failures (see section 6). The ratchet (57%) is a measured floor, not an
 aspiration - raise it as coverage grows, never lower it to go green.
 
 `-Coverage` implies the **full parallel** path: every scope is scheduled as its own

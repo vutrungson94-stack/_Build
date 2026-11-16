@@ -149,6 +149,34 @@ Describe 'Documentation - the process asset is published and in sync' {
         foreach ($cmd in $commands) {
             $agents | Should -Match ([regex]::Escape($cmd)) -Because "the repository contract must declare the same gate as the published process: $cmd"
         }
+        # NUMBERS, not just commands. The published contract dropped the local
+        # numbers ahead of the evidence more than once ("55%" where the merge
+        # measured 57.81% and the committed baseline records floor 57), so
+        # this gate pins the baseline-derived fingerprints: any drift fails
+        # here instead of shipping silently.
+        $b = Get-Content -LiteralPath (Join-Path $script:DocToolRoot 'Tests/process-baseline.json') -Raw -Encoding UTF8 | ConvertFrom-Json -ErrorAction Stop
+        $checker = {
+            param([string]$AgentsText, [object]$BaselineDoc)
+            $missing = @()
+            foreach ($f in @('-Scope All -StrictSkips', [string]$BaselineDoc.core.scopes + '-scope', [string]$BaselineDoc.coverage.floorPercent + '%')) {
+                if ($AgentsText -notmatch [regex]::Escape($f)) { $missing += $f }
+            }
+            return @($missing)
+        }
+        $missing = @(& $checker $agents $b)
+        $missing.Count | Should -Be 0 -Because ("AGENTS.md drifted from the committed baseline: missing " + ($missing -join '; '))
+
+        # Falsifiability: the exact stale contract the 2026-11-13 audit found
+        # (floor 55 for a baseline that records 57) must be reported, not pass.
+        $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("gbuild-fingerprint-" + [guid]::NewGuid().ToString('N') + '.txt')
+        try {
+            $stale = ($agents -replace '57%', '55%') -replace [regex]::Escape('125-scope'), '112-scope'
+            Set-Content -LiteralPath $tmp -Value $stale -Encoding UTF8
+            $r = @(& $checker (Get-Content -LiteralPath $tmp -Raw) $b)
+            $r.Count | Should -BeGreaterThan 0
+        } finally {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
     }
 
     It 'lists every decision record in the ADR index' {
