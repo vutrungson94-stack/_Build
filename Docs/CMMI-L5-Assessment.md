@@ -467,6 +467,8 @@ Its verdict is not complimentary and is binding on this document:
 - `Tests/Run-CoreTests.ps1`: a fresh full `-Scope All -StrictSkips` run
   re-measured the suite green (1,762 total).
 
+**Current state of these items, honestly described:** Docs/Appraisal-Dossier.md maps each MG v2.0 practice to committed evidence and names the gaps; Docs/Escape-Rate-SLO.md records what this repository measures itself against today (the enforced internal SLO in Tests/process-baseline.json .slo - escape rate / MTTR / adoption - and the 90-day CI change-failure rate in Tests/ci-run-history.json) and states plainly that no consumer-facing escape rate, MTTR or production SLO exists and is claimed.
+
 **What a SCAMPI-class appraisal still requires (from the same report, §5 -
 none of this producible by us):**
 
