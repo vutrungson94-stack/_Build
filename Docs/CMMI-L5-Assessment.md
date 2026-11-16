@@ -23,7 +23,7 @@ single-repo platform that is the expected ceiling.
 | Defect prevention | **L5** | `Tests/GateDetectors.ps1`, `Tests/GateSelfTest.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1`, pre-commit/pre-push hooks, `Tests/qpm-ledger.json` |
 | Causal analysis | **L4** | `Modules/RootCause.psm1` (CAR ledger, classifier table), `Modules/AnomalyDetector.psm1` |
 | Continuous improvement | **L5** | `Modules/AutoTuner.psm1` (proposal + pilot gate), `Find-RatchetCandidates`, `Tests/ProcessMetrics.Mutation.Tests.ps1` |
-| Verification & validation | **L4** | 126 scopes / 1,768 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 57 % (measured 57.81 %), `Tests/Run-CoreTests.ps1` scope isolation |
+| Verification & validation | **L4** | 127 scopes / 1,774 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 57 % (measured 57.81 %), `Tests/Run-CoreTests.ps1` scope isolation |
 | Configuration management | **L4** | `gbuild.config.json` + schema, config-key parity gate, `Modules/ConfigProvider.psm1` |
 | Portability / cross-platform | **L5** | `Modules/PathUtils.psm1`, POSIX launcher, Docker multi-arch, CI matrix (ubuntu/macos/windows/arm64) |
 | Code reuse / DRY | **L5** | 7/7 adoption classes at 100 %, governed duplication pinned by tests |
@@ -36,12 +36,12 @@ single-repo platform that is the expected ceiling.
 
 | Check | Result | Source |
 |---|---|---|
-| Scope inventory / tests | 126 scopes / 1,768 tests (1,760 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
+| Scope inventory / tests | 127 scopes / 1,774 tests (1,766 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
 | Self-test | 11/11 checks | `gbuild.ps1 -SelfTest` |
 | Hygiene gates | 9 (gate recounts Describe blocks; the -19 and -8 stale counts are gone) | `Hygiene: the process baseline is versioned and structurally valid` |
 | Coverage | line floor 57 %, measured 57.81 % (2026-11-12 baseline measured by CI merge; floor raised from 55 only after measure) | `Tests/process-baseline.json` |
 | Targeted mutation score | 9/9 planted mutants detected (PathUtils, SharedUtils, ConfigProvider) | mutation tests in the three scopes |
-| Flake ledger | 1 entry (PathUtils bounded-walk, `fixed`, `d6defda`), gate live | `Tests/flake-ledger.json`, `FlakeLedger` scope |
+| Flake ledger | 2 entries (auditledger hashchain-substring + PathUtils bounded-walk, both `fixed`), gate live | `Tests/flake-ledger.json`, `FlakeLedger` scope |
 | CI on `main` | green at `ad71eaa` (independent audit remediation commit) | `gh run view 43410086942` (and previous-run confirmations) |
 | Rating | **unchanged - L4 with L5 mechanisms; NOT CMMI L5, self-assessed, single-repo + partial `_Sync` adoption.** Any external claim otherwise is a finding against this repository | pass 7 |
 
@@ -410,11 +410,11 @@ escape visible only under coverage instrumentation in run `43388525320`.
 
 | Metric | Value | Source |
 |---|---|---|
-| Core suite | 126 scopes, 1,768 tests (1,760 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
+| Core suite | 127 scopes, 1,774 tests (1,766 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
 | Skip budget | 8 (`core.skippedMaxAllowed`), per-scope allowlist in place | `Tests/process-baseline.json` |
 | Merged line coverage | 55.96% against a 55% floor (last recorded merge, 2026-11-12) | `Tests/process-baseline.json` |
 | Mutation score (targeted) | 9/9 planted mutants detected | `Tests/PathUtils.Tests.ps1`, `Tests/SharedUtils.Tests.ps1`, `Tests/ConfigProvider.Tests.ps1` |
-| Flake ledger | 1 entry (PathUtils, `fixed`); gate 0 findings | `Tests/flake-ledger.json`, `Tests/FlakeLedger.Tests.ps1` |
+| Flake ledger | 2 entries (both `fixed`); gate 0 findings | `Tests/flake-ledger.json`, `Tests/FlakeLedger.Tests.ps1` |
 | CI (43392287986, d6defda) | all jobs green, including merged coverage | `gh run view 43392287986` |
 
 **Verdict unchanged: still L4 with several L5 mechanisms operating - now with
@@ -467,6 +467,24 @@ Its verdict is not complimentary and is binding on this document:
 - `Tests/Run-CoreTests.ps1`: a fresh full `-Scope All -StrictSkips` run
   re-measured the suite green (1,762 total).
 
+## 2026-11-16 update (eighth pass - CAR closure-effectiveness mechanism)
+
+- `Tests/CarEffectiveness.Tests.ps1` (new scope `CarEffectiveness`) +
+  `Tests/car-ledger.json` - the verified-closure half of the CAR loop. The
+  gate validates that every Resolved record carries at least 2 verified
+  consecutive green executions after the fix sha, plus `mttrMinutes ==
+  closedAt - openedAt`; Open records answer to the same 14-day stale budget.
+  Falsifiability fixtures prove the gate fails when it should. The ledger is
+  EMPTY - no Resolved record with verified post-fix evidence has yet been
+  committed by this repository; population effectiveness is unmeasured, not
+  good and not bad.
+- Inventory bumped consistently in the same change: scopeMap `CarEffectiveness`,
+  baseline scopes 126 -> 127, testsTotal 1,768 -> 1,774 (1,760 -> 1,766 passed,
+  8 in-budget skips), `Tests/coverage-costs.json` extended with the entry
+  measured for this scope on the maintainer host (45.4s; base table unchanged).
+- Stale documentation rows repaired against the committed flake ledger
+  (2 committed entries, both `fixed`), not against prose.
+
 **Current state of these items, honestly described:** Docs/Appraisal-Dossier.md maps each MG v2.0 practice to committed evidence and names the gaps; Docs/Escape-Rate-SLO.md records what this repository measures itself against today (the enforced internal SLO in Tests/process-baseline.json .slo - escape rate / MTTR / adoption - and the 90-day CI change-failure rate in Tests/ci-run-history.json) and states plainly that no consumer-facing escape rate, MTTR or production SLO exists and is claimed.
 
 **What a SCAMPI-class appraisal still requires (from the same report, §5 -
@@ -491,4 +509,5 @@ verification loop. `_Sync` runs a partial, disclosed adoption of the same
 process. Ratings of this kind are organizational judgements delivered by an
 authorized appraiser, not a git push. Any document here claiming otherwise
 is a finding against this repository, not a feature.
+
 

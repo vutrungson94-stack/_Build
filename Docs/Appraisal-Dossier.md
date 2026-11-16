@@ -20,7 +20,7 @@ grade them, and no evidence below comes from them.
 
 | Capability | Measured |
 |---|---|
-| Pester suite | 1,760 passed, 0 failed, 8 skipped, 1,768 total; 126 scopes, all state-sensitive isolated |
+| Pester suite | 1,766 passed, 0 failed, 8 skipped, 1,774 total; 127 scopes, all state-sensitive isolated |
 | SelfTest | 11/11 gates, parse 103 files, dependencies 77 modules / no missing deps / no cycles |
 | Quality/coverage floor | floor 57 line coverage (measured 57.81%); 9 hygiene gates recounted by the gate itself |
 | Internal SLO (enforced) | `process-baseline.json .slo` enforced by `gbuild.ps1 -SelfTest`: escape rate ≤ 0 new escapes / 7 days (measured 0; both recorded escapes dated 2026-11-03), MTTR ≤ 900 s (measured 137 s over the 50-sample QPM window, 2026-11-12), adoption ≥ 0.99 (measured 1.0) |
@@ -39,7 +39,7 @@ grade them, and no evidence below comes from them.
 | QIA04 — Analyzing process performance | `Docs/CMMI-L5-Assessment.md`, `Docs/Process/2026-11-13-independent-audit.md` | done |
 | QIA05 — Establishing process control | `-SelfTest` gate suite (11 gates); `Runner.Tests.ps1` fails on process-baseline drift | done |
 | QIA06 — Monitoring the process in statistical control | The `.slo` gate in `gbuild.ps1 -SelfTest` (escape rate / MTTR / adoption, measured in-run) and the SPC gate (`ProcessControl` scope) are enforced; what is NOT yet proven is the statistical stability of the CI change-failure signal post-remediation | partial, honestly bounded |
-| CAR03 — Corrective action reports | Auto-CAR on failed gate (`RootCause.New-VerificationCAR`, opened on real CI failures); `Tests/CiRunHistory.Tests.ps1` pins the CI-history artefact; a verified-closure effectiveness ledger like `_Sync`'s does not exist yet | partial |
+| CAR03 — Corrective action reports | Auto-CAR on failed gate (`RootCause.New-VerificationCAR`, opened on real CI failures); verified-closure gate committed: `Tests/CarEffectiveness.Tests.ps1` validates `Tests/car-ledger.json` (>=2 consecutive verified green executions post-fix + mttrMinutes reconciliation). The ledger is EMPTY - zero records by design; mechanism committed, population not yet measured | done (mechanism), honestly bounded |
 | SPS — Establishing a supply chain baseline | `Modules/SupplyChain.psm1`, `sbom` CI job, provenance | done |
 | IMP — Assessing process improvement | `Docs/CMMI-L5-Assessment.md`, `Docs/Process/2026-11-13-independent-audit.md` | done |
 | IMP Level 5 — Cross-project evidence | None; consumers of this tool are outside the repo and adopt it on their own authority. No consumer project has agreed in this repository to have its release flow measured. | **missing — stated honestly** |
@@ -48,6 +48,7 @@ grade them, and no evidence below comes from them.
 
 1. Consumer-facing escape rate / MTTR: **none exists** — the internal SLO (`process-baseline.json .slo`) measures this repository's own verification process (defects that reached a green state, e.g. QPM-2026-001/002), not defects escaping into projects built by `_Build`. Cross-project incident data does not exist in this repository; no consumer-facing escape rate is claimed and none can be set from data that is not here.
 2. Cross-project adoption evidence: **none recorded** — a consumer project would need to agree to have its release pipeline measured under `_Build`'s process.
-3. CAR closure-effectiveness for `_Build`: a stale-CAR gate exists (CI self-test), but a verified-record ledger like `_Sync`'s does not exist yet; the gap is stated, not hidden.
+3. CAR closure-effectiveness for `_Build`: the verified-closure gate and ledger are now committed (empty: no Resolved-record-with-evidence exists yet); stale Open records are gated by the hygiene gate; the population audit does not exist yet.
 4. SCAMPI appraisal: **none performed** — no lead appraiser, no sponsor, no interviews.
 5. CI failure data exists (`Tests/ci-run-history.json`) but is **not an escape-rate SLO** and is not labeled as one.
+

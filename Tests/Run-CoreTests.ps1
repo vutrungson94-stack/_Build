@@ -251,6 +251,7 @@ $scopeMap = @{
     'CacheHA'                 = 'CacheHA.Tests.ps1'
     'CacheProvider'           = 'CacheProvider.Tests.ps1'
     'CacheProviderEviction'   = 'CacheProvider.Eviction.Tests.ps1'
+    'CarEffectiveness'        = 'CarEffectiveness.Tests.ps1'
     'CircuitBreaker'          = 'CircuitBreaker.Tests.ps1'
     'CircuitBreakerPersistence' = 'CircuitBreaker.Persistence.Tests.ps1'
     'Chaos'                   = 'Chaos.Tests.ps1'

@@ -5,9 +5,9 @@
   "generatedBy": "Tests/Run-CoreTests.ps1 -Scope All -StrictSkips (parallel/LPT, 2026-11-13, all passes 5-7: inventory, mutation tests, FlakeLedger scope, CAR-disposition gate) for the core counts; the coverage figures were re-measured by the CI merge of run 43413816387 (2026-11-13); the core counts are from the local -Scope All run of the same tree",
   "host": "windows-2025 / pwsh 7.6",
   "core": {
-    "scopes": 126,
-    "testsTotal": 1768,
-    "passed": 1760,
+    "scopes": 127,
+    "testsTotal": 1774,
+    "passed": 1766,
     "failedAllowed": 0,
     "skipped": 8,
     "skippedMaxAllowed": 8,
@@ -263,4 +263,5 @@
   ],
   "platformPathLiteralExemptionNote": "PATTERN-scoped, not file-scoped. A file-scoped list silently exempts every future backslash added to that file, which is a suppression wearing a name. Each entry names the exact offending fragment and states why the backslash is correct there. Read by BOTH Tests/Hygiene.Tests.ps1 and Modules/ProcessMetrics.psm1, so the metric and its gate can never disagree."
 }
+
 
