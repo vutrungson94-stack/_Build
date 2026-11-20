@@ -1041,7 +1041,16 @@ function Invoke-UniversalSyntaxCheck {
                 }
             } elseif ($ext -in $tomlExt) {
                 $content = Get-Content -Path $f.FullName -Raw -Encoding UTF8 -EA Stop
-                if ($content -notmatch '^\s*\[') { $errorLines += ("{0}: suspicious TOML (no section header)" -f $f.FullName); $errors++ }
+                # TOML allows top-level keys before the first [section]; Fly's
+                # fly.toml (`app = '...'` then `[build]`) and Rust/Python manifests
+                # legitimately use that form. Reuse the structural rule already
+                # enforced by Preflight.psm1: suspicious only if the file has
+                # neither a section header nor a key/value pair. [ \t]* (not \s*)
+                # keeps the match on a single line so a later section cannot
+                # accidentally validate earlier garbage.
+                if ($content -notmatch '(?m)^[ \t]*(?:\[[A-Za-z0-9_\-". ]+\]|[A-Za-z0-9_\-".]+[ \t]*=)') {
+                    $errorLines += ("{0}: suspicious TOML (no section header or key/value pair)" -f $f.FullName); $errors++
+                }
             } elseif ($ext -in $yamlExt) {
                 $null = Get-Content -Path $f.FullName -Raw -Encoding UTF8 -EA Stop
             } elseif ($name -in $dockerExt) {

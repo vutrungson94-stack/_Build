@@ -602,7 +602,12 @@ Describe 'SharedUtils targeted coverage helpers' {
                 Set-Content -LiteralPath (Join-Path $root 'ok.json') -Value '{"a":1}' -Encoding UTF8
                 Set-Content -LiteralPath (Join-Path $root 'bad.json') -Value '{"a":' -Encoding UTF8
                 Set-Content -LiteralPath (Join-Path $root 'ok.toml') -Value "[section]`nkey = 'v'" -Encoding UTF8
-                Set-Content -LiteralPath (Join-Path $root 'bad.toml') -Value "key = 'v'" -Encoding UTF8
+                # Top-level keys before the first [section] are valid TOML;
+                # fly.toml uses exactly this shape (comment, app = ..., [build]).
+                Set-Content -LiteralPath (Join-Path $root 'ok-top.toml') -Value "# Fly config`napp = 'demo'`nprimary_region = 'sin'`n`n[build]`n  dockerfile = 'Dockerfile'" -Encoding UTF8
+                # Suspicious TOML now means neither a section nor a key/value pair;
+                # `key = 'v'` used to live here but it is valid TOML and must pass.
+                Set-Content -LiteralPath (Join-Path $root 'bad.toml') -Value 'this is not toml' -Encoding UTF8
                 Set-Content -LiteralPath (Join-Path $root 'ok.yaml') -Value "a: 1" -Encoding UTF8
                 Set-Content -LiteralPath (Join-Path $root 'Dockerfile') -Value "FROM alpine:3.20" -Encoding UTF8
                 Set-Content -LiteralPath (Join-Path $root 'Dockerfile.bad') -Value "RUN echo hi" -Encoding UTF8
@@ -626,7 +631,11 @@ Describe 'SharedUtils targeted coverage helpers' {
                 $r.FilesChecked | Should -BeGreaterThan 5
                 $r.FilesWithErrors | Should -BeGreaterThan 0
                 @($r.Errors).Count | Should -BeGreaterThan 0
-                ($r.Errors -join "`n") | Should -Match 'bad\.ps1|bad\.json|bad\.toml|bad\.cs|Dockerfile|CMakeLists'
+                $errText = $r.Errors -join "`n"
+                $errText | Should -Match 'bad\.ps1|bad\.json|bad\.cs|Dockerfile|CMakeLists'
+                $errText | Should -Match 'bad\.toml'
+                $errText | Should -Not -Match 'ok-top\.toml'
+                $errText | Should -Not -Match 'ok\.toml'
             } finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
         }
     }
