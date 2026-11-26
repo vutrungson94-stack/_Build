@@ -979,6 +979,18 @@
                 "type": "string"
               },
               "description": "When non-empty, ONLY listed plugin names may load."
+            },
+            "requireSignature": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, a plugin must carry a valid RSA-SHA256 .sig sidecar; with no trusted key the gate fails closed."
+            },
+            "trustedPublicKeys": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "RSA public keys (XML) trusted to sign plugins. Private keys are never stored in the repository."
             }
           }
         },

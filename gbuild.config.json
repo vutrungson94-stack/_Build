@@ -416,7 +416,9 @@
             "allowPrerelease": false,
             "requireManifest": false,
             "disabled": [],
-            "allowList": []
+            "allowList": [],
+            "requireSignature": false,
+            "trustedPublicKeys": []
         },
         "cluster": {
             "enabled": false,

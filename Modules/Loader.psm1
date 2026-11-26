@@ -268,6 +268,22 @@ function Register-Plugins {
             $plugins += Get-ChildItem -Path $dir -Filter '*.psm1' -File -ErrorAction SilentlyContinue
         }
     }
+    # Provenance gate before any import. A signature policy with no trusted
+    # key is FAIL CLOSED: no plugin loads, rather than silently loading
+    # arbitrary code from an external root.
+    $requireSignature = $false
+    try {
+        $requireSignature = [bool](Get-ConfigValue -Path 'build.plugins.requireSignature' -State $State -Default $false)
+    } catch { }
+    if ($requireSignature -and (Get-Command Test-GBuildPluginSignatures -ErrorAction SilentlyContinue)) {
+        $sigGate = Test-GBuildPluginSignatures -Plugins $plugins -State $State -RequireSignature
+        if (-not $sigGate.Passed) {
+            foreach ($finding in @($sigGate.Findings)) {
+                Write-Log (Get-LocaleMessage -Key 'log.plugin.skippedContract' -MessageArgs ('signature: ' + $finding) -Fallback ('[PLUGIN] Skipped: ' + $finding)) 'Warn' $State
+            }
+            return
+        }
+    }
     # Formal SDK gate (PluginSDK.psm1): when available, pre-scan manifests so
     # version/compat/disabled policy applies BEFORE any module import, and so
     # dependency order is deterministic. Absent SDK (standalone) => legacy path.

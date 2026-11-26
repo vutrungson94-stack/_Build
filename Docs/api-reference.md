@@ -2991,6 +2991,22 @@ Parameters: Manifest :Object, State :PSObject, KnownManifests :Object[]
 
 Parameters: Manifests :Array
 
+### Get-GBuildPluginPublicKeys
+
+Parameters: State :Object
+
+### Get-GBuildPluginSignaturePath
+
+Parameters: ModulePath :String
+
+### Test-GBuildPluginSignature
+
+Parameters: ModulePath :String, PublicKeyXml :String
+
+### Test-GBuildPluginSignatures
+
+Parameters: Plugins :Object[], State :Object, RequireSignature :SwitchParameter
+
 
 ## Policy
 
@@ -4481,7 +4497,7 @@ Parameters: Document :Object, State :PSObject
 | [PowerShell](API/PowerShell.md) | 2 |
 | [Python](API/Python.md) | 2 |
 | [Ruby](API/Ruby.md) | 1 |
-| [PluginSDK](API/PluginSDK.md) | 13 |
+| [PluginSDK](API/PluginSDK.md) | 17 |
 | [Policy](API/Policy.md) | 15 |
 | [Preflight](API/Preflight.md) | 4 |
 | [ProcessMetrics](API/ProcessMetrics.md) | 19 |
@@ -4503,5 +4519,5 @@ Parameters: Document :Object, State :PSObject
 | [Versioning](API/Versioning.md) | 7 |
 | [YamlPipeline](API/YamlPipeline.md) | 16 |
 
-Total: 74 module(s), 1110 function(s).
+Total: 74 module(s), 1114 function(s).
 

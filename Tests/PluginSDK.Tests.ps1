@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 1.0
+Set-StrictMode -Version 1.0
 
 $modulePath = Join-Path $PSScriptRoot '../Modules/PluginSDK.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
@@ -151,5 +151,69 @@ Describe 'PluginSDK - P0 binding regressions' {
         $manifest = New-PluginManifestTemplate -Name 'NeedsGhost' -SupportedLanguages @('Test')
         $manifest.dependencies = @([PSCustomObject]@{ name = 'Ghost'; version = '1.0.0' })
         (Resolve-PluginDependencies -Manifests @($manifest)).Valid | Should -BeFalse
+    }
+}
+
+Describe 'PluginSDK provenance' {
+    BeforeAll {
+        $script:SigningKey = [System.Security.Cryptography.RSA]::Create(2048)
+        $script:PublicKeyXml = $script:SigningKey.ToXmlString($false)
+        $script:SignedDir = Join-Path $TestDrive 'signed-plugins'
+        New-Item -ItemType Directory -Path $script:SignedDir -Force | Out-Null
+        $script:PluginFile = Join-Path $script:SignedDir 'SignedDemo.psm1'
+        @'
+function Get-PluginInfo { [pscustomobject]@{ Name='SignedDemo'; Version='1.0.0'; apiVersion='1.0.0' } }
+function Invoke-PluginBuild { param($State,$ProjectDir) $true }
+function Invoke-PluginTest { param($State,$ProjectDir) $true }
+function Invoke-PluginLint { param($State,$ProjectDir) $true }
+Export-ModuleMember -Function @('Get-PluginInfo','Invoke-PluginBuild','Invoke-PluginTest','Invoke-PluginLint')
+'@ | Set-Content -LiteralPath $script:PluginFile -Encoding UTF8
+        $signature = $script:SigningKey.SignData(
+            [System.IO.File]::ReadAllBytes($script:PluginFile),
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        [System.IO.File]::WriteAllText(
+            (Get-GBuildPluginSignaturePath -ModulePath $script:PluginFile),
+            [Convert]::ToBase64String($signature),
+            (New-Object System.Text.UTF8Encoding($false)))
+        $script:ProvenanceState = [PSCustomObject]@{
+            BuildConfig = [PSCustomObject]@{
+                build = [PSCustomObject]@{
+                    plugins = [PSCustomObject]@{
+                        enabled = $true
+                        requireSignature = $true
+                        trustedPublicKeys = @($script:PublicKeyXml)
+                    }
+                }
+            }
+        }
+    }
+
+    AfterAll { $script:SigningKey.Dispose() }
+
+    It 'Verifies a signed plugin with the configured public key' {
+        $plugin = Get-Item -LiteralPath $script:PluginFile
+        $gate = Test-GBuildPluginSignatures -Plugins @($plugin) -State $script:ProvenanceState -RequireSignature
+        $gate.Passed | Should -BeTrue
+    }
+
+    It 'Rejects a tampered plugin (falsifiability)' {
+        $copy = Join-Path $TestDrive 'Tampered.psm1'
+        Copy-Item -LiteralPath $script:PluginFile -Destination $copy -Force
+        Copy-Item -LiteralPath (Get-GBuildPluginSignaturePath -ModulePath $script:PluginFile) -Destination (Get-GBuildPluginSignaturePath -ModulePath $copy) -Force
+        Add-Content -LiteralPath $copy -Value '# tampered'
+        Test-GBuildPluginSignature -ModulePath $copy -PublicKeyXml $script:PublicKeyXml | Should -BeFalse
+    }
+
+    It 'Fails closed when signatures are required but no key is configured' {
+        $state = [PSCustomObject]@{ BuildConfig = [PSCustomObject]@{ build = [PSCustomObject]@{ plugins = [PSCustomObject]@{ trustedPublicKeys = @() } } } }
+        $gate = Test-GBuildPluginSignatures -Plugins @() -State $state -RequireSignature
+        $gate.Passed | Should -BeFalse
+        $gate.Findings | Should -Match 'no trusted RSA public key'
+    }
+
+    It 'Is inert when the policy is off' {
+        $gate = Test-GBuildPluginSignatures -Plugins @() -State $script:ProvenanceState
+        $gate.Passed | Should -BeTrue
     }
 }

@@ -6,8 +6,8 @@
   "host": "windows-2025 / pwsh 7.6",
   "core": {
     "scopes": 127,
-    "testsTotal": 1774,
-    "passed": 1766,
+    "testsTotal": 1778,
+    "passed": 1770,
     "failedAllowed": 0,
     "skipped": 8,
     "skippedMaxAllowed": 8,

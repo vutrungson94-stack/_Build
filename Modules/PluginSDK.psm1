@@ -425,6 +425,82 @@ function Resolve-PluginDependencies {
     return @{ Ordered = @($ordered); Valid = $valid; Errors = @($errors); Missing = @($missing | Select-Object -Unique) }
 }
 
+# -- Plugin provenance (port of the _Sync signature gate) -------------------
+# A plugin is arbitrary PowerShell executed during a build. Contract checks
+# prove its SHAPE; an RSA signature proves its PROVENANCE. Keys are public and
+# come from config/env - no private key is ever shipped in this repository.
+
+function Get-GBuildPluginPublicKeys {
+    [CmdletBinding()]
+    param($State = $null)
+    $keys = @()
+    try {
+        $configured = Get-ConfigValue -Path 'build.plugins.trustedPublicKeys' -State $State -Default @()
+        if ($null -ne $configured) { $keys += @($configured | Where-Object { $_ }) }
+    } catch { }
+    $envKeys = [string][Environment]::GetEnvironmentVariable('GBUILD_PLUGIN_PUBLIC_KEYS')
+    if ($envKeys) { $keys += @($envKeys -split ';' | Where-Object { $_ }) }
+    return @($keys | Select-Object -Unique)
+}
+
+function Get-GBuildPluginSignaturePath {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$ModulePath)
+    return [System.IO.Path]::ChangeExtension($ModulePath, '.sig')
+}
+
+function Test-GBuildPluginSignature {
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory)][string]$ModulePath,
+        [Parameter(Mandatory)][string]$PublicKeyXml
+    )
+    if (-not (Test-Path -LiteralPath $ModulePath -PathType Leaf)) { return $false }
+    $sigPath = Get-GBuildPluginSignaturePath -ModulePath $ModulePath
+    if (-not (Test-Path -LiteralPath $sigPath -PathType Leaf)) { return $false }
+    try {
+        $signature = [Convert]::FromBase64String((Get-Content -LiteralPath $sigPath -Raw -Encoding UTF8).Trim())
+        $data = [System.IO.File]::ReadAllBytes($ModulePath)
+        $rsa = [System.Security.Cryptography.RSA]::Create()
+        try {
+            $rsa.FromXmlString($PublicKeyXml)
+            return [bool]$rsa.VerifyData($data, $signature,
+                [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+                [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+        } finally { $rsa.Dispose() }
+    } catch { return $false }
+}
+
+function Test-GBuildPluginSignatures {
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [object[]]$Plugins = @(),
+        $State = $null,
+        [switch]$RequireSignature
+    )
+    if (-not $RequireSignature) { return @{ Passed = $true; Findings = @() } }
+    $keys = @(Get-GBuildPluginPublicKeys -State $State)
+    if ($keys.Count -eq 0) {
+        return @{
+            Passed = $false
+            Findings = @('build.plugins.requireSignature=true but no trusted RSA public key is configured')
+        }
+    }
+    $findings = @()
+    foreach ($plugin in @($Plugins)) {
+        $path = if ($plugin -is [System.IO.FileInfo]) { [string]$plugin.FullName } else { [string]$plugin.Path }
+        $name = if ($plugin -is [System.IO.FileInfo]) { [string]$plugin.BaseName } else { [string]$plugin.Name }
+        $valid = $false
+        foreach ($key in $keys) {
+            if (Test-GBuildPluginSignature -ModulePath $path -PublicKeyXml ([string]$key)) { $valid = $true; break }
+        }
+        if (-not $valid) { $findings += "Plugin '$name' has a missing or invalid signature" }
+    }
+    return @{ Passed = ($findings.Count -eq 0); Findings = @($findings) }
+}
+
 Export-ModuleMember -Function @(
     'Get-PluginSdkApiVersion',
     'Get-GBuildToolVersion',
@@ -438,5 +514,9 @@ Export-ModuleMember -Function @(
     'New-PluginManifestTemplate',
     'Get-PluginSdkConfig',
     'Test-PluginCompatibility',
-    'Resolve-PluginDependencies'
+    'Resolve-PluginDependencies',
+    'Get-GBuildPluginPublicKeys',
+    'Get-GBuildPluginSignaturePath',
+    'Test-GBuildPluginSignature',
+    'Test-GBuildPluginSignatures'
 )

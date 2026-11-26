@@ -20,7 +20,7 @@ grade them, and no evidence below comes from them.
 
 | Capability | Measured |
 |---|---|
-| Pester suite | 1,766 passed, 0 failed, 8 skipped, 1,774 total; 127 scopes, all state-sensitive isolated |
+| Pester suite | 1,770 passed, 0 failed, 8 skipped, 1,778 total; 127 scopes, all state-sensitive isolated |
 | SelfTest | 11/11 gates, parse 103 files, dependencies 77 modules / no missing deps / no cycles |
 | Quality/coverage floor | floor 57 line coverage (measured 57.81%); 9 hygiene gates recounted by the gate itself |
 | Internal SLO (enforced) | `process-baseline.json .slo` enforced by `gbuild.ps1 -SelfTest`: escape rate ≤ 0 new escapes / 7 days (measured 0; both recorded escapes dated 2026-11-03), MTTR ≤ 900 s (measured 137 s over the 50-sample QPM window, 2026-11-12), adoption ≥ 0.99 (measured 1.0) |

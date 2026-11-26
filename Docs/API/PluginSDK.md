@@ -1,6 +1,6 @@
 # PluginSDK
 
-13 function(s). Source: `Modules/PluginSDK.psm1`
+17 function(s). Source: `Modules/PluginSDK.psm1`
 
 ### Get-PluginSdkApiVersion
 
@@ -49,5 +49,21 @@ Parameters: Manifest :Object, State :PSObject, KnownManifests :Object[]
 ### Resolve-PluginDependencies
 
 Parameters: Manifests :Array
+
+### Get-GBuildPluginPublicKeys
+
+Parameters: State :Object
+
+### Get-GBuildPluginSignaturePath
+
+Parameters: ModulePath :String
+
+### Test-GBuildPluginSignature
+
+Parameters: ModulePath :String, PublicKeyXml :String
+
+### Test-GBuildPluginSignatures
+
+Parameters: Plugins :Object[], State :Object, RequireSignature :SwitchParameter
 
 

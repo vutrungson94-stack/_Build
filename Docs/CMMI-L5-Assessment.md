@@ -23,7 +23,7 @@ single-repo platform that is the expected ceiling.
 | Defect prevention | **L5** | `Tests/GateDetectors.ps1`, `Tests/GateSelfTest.Tests.ps1`, `Tests/ModuleHygiene.Tests.ps1`, pre-commit/pre-push hooks, `Tests/qpm-ledger.json` |
 | Causal analysis | **L4** | `Modules/RootCause.psm1` (CAR ledger, classifier table), `Modules/AnomalyDetector.psm1` |
 | Continuous improvement | **L5** | `Modules/AutoTuner.psm1` (proposal + pilot gate), `Find-RatchetCandidates`, `Tests/ProcessMetrics.Mutation.Tests.ps1` |
-| Verification & validation | **L4** | 127 scopes / 1,774 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 57 % (measured 57.81 %), `Tests/Run-CoreTests.ps1` scope isolation |
+| Verification & validation | **L4** | 127 scopes / 1,778 tests, 9 hygiene gates (8 Hygiene + 1 ModuleHygiene, gate-recounted), coverage line floor 57 % (measured 57.81 %), `Tests/Run-CoreTests.ps1` scope isolation |
 | Configuration management | **L4** | `gbuild.config.json` + schema, config-key parity gate, `Modules/ConfigProvider.psm1` |
 | Portability / cross-platform | **L5** | `Modules/PathUtils.psm1`, POSIX launcher, Docker multi-arch, CI matrix (ubuntu/macos/windows/arm64) |
 | Code reuse / DRY | **L5** | 7/7 adoption classes at 100 %, governed duplication pinned by tests |
@@ -36,7 +36,7 @@ single-repo platform that is the expected ceiling.
 
 | Check | Result | Source |
 |---|---|---|
-| Scope inventory / tests | 127 scopes / 1,774 tests (1,766 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
+| Scope inventory / tests | 127 scopes / 1,778 tests (1,770 passed, 8 skipped, budget 8) | `Tests/process-baseline.json`; measured by full `-Scope All -StrictSkips` run |
 | Self-test | 11/11 checks | `gbuild.ps1 -SelfTest` |
 | Hygiene gates | 9 (gate recounts Describe blocks; the -19 and -8 stale counts are gone) | `Hygiene: the process baseline is versioned and structurally valid` |
 | Coverage | line floor 57 %, measured 57.81 % (2026-11-12 baseline measured by CI merge; floor raised from 55 only after measure) | `Tests/process-baseline.json` |
@@ -410,7 +410,7 @@ escape visible only under coverage instrumentation in run `43388525320`.
 
 | Metric | Value | Source |
 |---|---|---|
-| Core suite | 127 scopes, 1,774 tests (1,766 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
+| Core suite | 127 scopes, 1,778 tests (1,770 passed, 8 skipped) | `Tests/Run-CoreTests.ps1 -Scope All -StrictSkips` |
 | Skip budget | 8 (`core.skippedMaxAllowed`), per-scope allowlist in place | `Tests/process-baseline.json` |
 | Merged line coverage | 55.96% against a 55% floor (last recorded merge, 2026-11-12) | `Tests/process-baseline.json` |
 | Mutation score (targeted) | 9/9 planted mutants detected | `Tests/PathUtils.Tests.ps1`, `Tests/SharedUtils.Tests.ps1`, `Tests/ConfigProvider.Tests.ps1` |
@@ -479,7 +479,7 @@ Its verdict is not complimentary and is binding on this document:
   committed by this repository; population effectiveness is unmeasured, not
   good and not bad.
 - Inventory bumped consistently in the same change: scopeMap `CarEffectiveness`,
-  baseline scopes 126 -> 127, testsTotal 1,768 -> 1,774 (1,760 -> 1,766 passed,
+  baseline scopes 126 -> 127, testsTotal 1,768 -> 1,778 (1,760 -> 1,770 passed,
   8 in-budget skips), `Tests/coverage-costs.json` extended with the entry
   measured for this scope on the maintainer host (45.4s; base table unchanged).
 - Stale documentation rows repaired against the committed flake ledger
@@ -510,4 +510,6 @@ process. Ratings of this kind are organizational judgements delivered by an
 authorized appraiser, not a git push. Any document here claiming otherwise
 is a finding against this repository, not a feature.
 
+## 2026-11-26 addendum (cross-pollination from `_Sync`)
 
+Plugin provenance was the highest-value security gap in the assessment and is now closed in code: `PluginSDK.psm1` verifies RSA-SHA256 `.sig` sidecars against `build.plugins.trustedPublicKeys` (or `GBUILD_PLUGIN_PUBLIC_KEYS`), and `Loader.psm1` refuses to import any plugin when `requireSignature=true` with no trusted key - fail closed. Public keys only; no private key is committed. Verified in `Tests/PluginSDK.Tests.ps1` with a generated keypair and a tampered-plugin fixture. Measured suite numbers moved from 1,774 to 1,778 tests (1,770 passed, 8 skipped) and are recorded in `Tests/process-baseline.json`. Verdict unchanged: L4 with L5-local mechanisms.
