@@ -16,7 +16,7 @@ grade them, and no evidence below comes from them.
 ./gbuild.ps1 -SelfTest    # expect: PASSED (11/11 checks), exit 0
 ```
 
-## Actual numbers (measured 2026-11-16, not copied)
+## Actual numbers (re-measured 2026-11-26, not copied)
 
 | Capability | Measured |
 |---|---|
@@ -24,7 +24,8 @@ grade them, and no evidence below comes from them.
 | SelfTest | 11/11 gates, parse 103 files, dependencies 77 modules / no missing deps / no cycles |
 | Quality/coverage floor | floor 57 line coverage (measured 57.81%); 9 hygiene gates recounted by the gate itself |
 | Internal SLO (enforced) | `process-baseline.json .slo` enforced by `gbuild.ps1 -SelfTest`: escape rate ≤ 0 new escapes / 7 days (measured 0; both recorded escapes dated 2026-11-03), MTTR ≤ 900 s (measured 137 s over the 50-sample QPM window, 2026-11-12), adoption ≥ 0.99 (measured 1.0) |
-| CI main-workflow, 90d | 18 success / 79 failure / 24 cancelled; change-failure rate 81.44% |
+| CI main-workflow, 90d | 18 success / 79 failure / 24 cancelled; change-failure rate 81.44% (historical window measured 2026-11-16) |
+| CI current (2026-11-26) | run #134 success, 24/24 job instances from the 10-job workflow (matrix shards included); no job softened |
 
 ## Practice mapping (MG v2.0, illustrative)
 

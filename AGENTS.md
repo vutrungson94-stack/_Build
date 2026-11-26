@@ -1,7 +1,7 @@
 # AGENTS.md — instructions for humans and AI assistants
 
 Before you change **any** file in this repository, read this file. It is the
-contract that keeps a 75k-line, 7-locale, 3-OS build platform stable while it is
+contract that keeps an ~83k-line, 7-locale, 3-OS build platform stable while it is
 being changed. This repo is a **tool**, not an application: a defect here breaks
 every project built with it, so the rules below are stricter than they look.
 

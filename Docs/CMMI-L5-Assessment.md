@@ -1,10 +1,11 @@
 # CMMI L5 / Enterprise Platform Maturity Assessment — `_Build`
 
 Assessment date: 2026-11-09 (re-measured 2026-11-12; updated 2026-11-13, pass 7 is the authoritative current state)
-Scope: the `_Build` codebase itself (74,006 LOC measured across `Modules/`
-(91 files, 50,587 lines) + `Tests/` (130 files, 23,419 lines), 221 PowerShell
-files, 58 shipped modules, 7 locale catalogs). Evidence is taken from the code,
-not from README claims. Every score below names the file that proves it.
+Scope: the `_Build` codebase itself (82,871 LOC measured across `Modules/`
+(91 files, 53,992 lines) + `Tests/` (140 files, 28,879 lines), 244 PowerShell
+files, 58 shipped modules, 7 locale catalogs). Measured again 2026-11-26 after
+the plugin-provenance change. Evidence is taken from the code, not from README
+claims. Every score below names the file that proves it.
 
 ## Verdict
 
