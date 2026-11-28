@@ -25,7 +25,7 @@ grade them, and no evidence below comes from them.
 | Quality/coverage floor | floor 57 line coverage (measured 57.81%); 9 hygiene gates recounted by the gate itself |
 | Internal SLO (enforced) | `process-baseline.json .slo` enforced by `gbuild.ps1 -SelfTest`: escape rate ≤ 0 new escapes / 7 days (measured 0; both recorded escapes dated 2026-11-03), MTTR ≤ 900 s (measured 137 s over the 50-sample QPM window, 2026-11-12), adoption ≥ 0.99 (measured 1.0) |
 | CI main-workflow, 90d | 18 success / 79 failure / 24 cancelled; change-failure rate 81.44% (historical window measured 2026-11-16) |
-| CI current (2026-11-26) | run #134 success, 24/24 job instances from the 10-job workflow (matrix shards included); no job softened |
+| CI current (2026-11-26) | run #135 success, 24/24 job instances from the 10-job workflow (matrix shards included); no job softened |
 
 ## Practice mapping (MG v2.0, illustrative)
 
@@ -53,3 +53,6 @@ grade them, and no evidence below comes from them.
 4. SCAMPI appraisal: **none performed** — no lead appraiser, no sponsor, no interviews.
 5. CI failure data exists (`Tests/ci-run-history.json`) but is **not an escape-rate SLO** and is not labeled as one.
 
+## Evidence index
+
+Practice-to-evidence mapping: [`Appraisal-Traceability.md`](Appraisal-Traceability.md). Self-assembled, not a SCAMPI result.

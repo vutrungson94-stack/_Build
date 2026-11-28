@@ -514,3 +514,7 @@ is a finding against this repository, not a feature.
 ## 2026-11-26 addendum (cross-pollination from `_Sync`)
 
 Plugin provenance was the highest-value security gap in the assessment and is now closed in code: `PluginSDK.psm1` verifies RSA-SHA256 `.sig` sidecars against `build.plugins.trustedPublicKeys` (or `GBUILD_PLUGIN_PUBLIC_KEYS`), and `Loader.psm1` refuses to import any plugin when `requireSignature=true` with no trusted key - fail closed. Public keys only; no private key is committed. Verified in `Tests/PluginSDK.Tests.ps1` with a generated keypair and a tampered-plugin fixture. Measured suite numbers moved from 1,774 to 1,778 tests (1,770 passed, 8 skipped) and are recorded in `Tests/process-baseline.json`. Verdict unchanged: L4 with L5-local mechanisms.
+
+## Evidence index
+
+Practice-to-evidence mapping: [`Appraisal-Traceability.md`](Appraisal-Traceability.md). Self-assembled, not a SCAMPI result.
