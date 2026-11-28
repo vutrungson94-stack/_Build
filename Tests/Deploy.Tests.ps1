@@ -266,8 +266,18 @@ Describe "Deploy - readiness probe (Test-ProcessExited / Test-WebAppReady contra
     }
 
     It "Test-WebAppReady returns false for a closed port without throwing" {
-        # Pick a port very unlikely to be in use.
-        $probePort = 53123
+        # A FIXED port is a flake source: any unrelated listener on 53123 makes
+        # a "closed port" assertion fail. Use a just-released ephemeral port,
+        # the same pattern as Test-UrlServing below, and skip if it is somehow
+        # already listening instead of asserting a false negative.
+        $tmp = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, 0)
+        $tmp.Start()
+        $probePort = ([System.Net.IPEndPoint]$tmp.LocalEndpoint).Port
+        $tmp.Stop()
+        if (Test-PortListening -Port $probePort) {
+            Set-ItResult -Skipped -Because "port $probePort unexpectedly listening; avoiding flake"
+            return
+        }
         # NOTE: call DIRECTLY (not inside { } | Should -Not -Throw): Pester 5
         # runs that scriptblock in an isolated scope so outer assignments do
         # NOT propagate, which vacuous-passes/fails the value assert. A throw

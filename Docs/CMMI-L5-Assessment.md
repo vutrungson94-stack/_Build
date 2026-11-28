@@ -518,3 +518,25 @@ Plugin provenance was the highest-value security gap in the assessment and is no
 ## Evidence index
 
 Practice-to-evidence mapping: [`Appraisal-Traceability.md`](Appraisal-Traceability.md). Self-assembled, not a SCAMPI result.
+
+## 2026-11-28 addendum (flake disposition, not a gate change)
+
+The two intermittent full-suite failures were traced to local artifacts and a
+fixed-port test, not to production code:
+
+- Five auto-opened CARs from earlier instrumented coverage runs had never been
+  dispositioned; the Hygiene gate correctly flagged them as stale. All five
+  affected scopes were re-run green (ProcessMetricsTrend 5/5, PS51Compat 9/9,
+  Runner 5/5, Level5Parity 21/21, Hygiene 20/20) and the records were closed
+  with that evidence.
+- `Deploy` used a fixed probe port (`53123`); an unrelated listener flips the
+  "closed port" assertion. It now uses a just-released ephemeral port with a
+  listening guard, matching the sibling `Test-UrlServing` test. Deploy re-ran
+  34/34 green three consecutive times.
+
+After the fix the full suite was green twice in a row: 1,770 passed / 0 failed /
+8 skipped / 1,778 total. The 8 skips are OS/environment-dependent (Unix `ps`,
+path aliases, platform-specific path cases, project-local config overlay, npm/gpg
+availability) and are already covered on the matching CI matrix jobs, so the
+budget is intentionally kept at 8 - lowering it here would only turn a red gate
+into a false one. No floor, threshold, or test was weakened.
